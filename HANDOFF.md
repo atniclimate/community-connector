@@ -3,168 +3,88 @@
 > This file outranks session memory. Reading order for a new session: CLAUDE.md,
 > then this file, then current-phase ADRs.
 
-Last updated: 2026-07-06 ~05:00 Pacific, end of session 1 (a single overnight
-session spanning bootstrap through Phase 1 completion, including a usage-limit
-failover and resume - see DECISIONS D-007).
+Last updated: 2026-07-06 afternoon, session 2 (the DECISION SESSION:
+SESSION_2_LAUNCH interview Parts 1-5 answered, D-019..D-040 recorded,
+Execution Plan v2 adopted, graph-networks deep research commissioned).
 
 ## Phase status
 
 **Phase 0 - Bootstrap: COMPLETE.**
-**Phase 1 - Domain model and ADRs: COMPLETE.** All acceptance criteria met:
+**Phase 1 - Domain model and ADRs: COMPLETE** (ADR-001..003 accepted).
+**Phase 2 - Rust core: CLOSED** (six crates behind cn-api; permission
+property test green; measurement gates recorded; closing review D-016).
+**Phase 3 - Frontend: ~HALF.** Done: ADR-004 renderer (instanced layer),
+design brief final, I4 state machine + wasm worker, theming pipeline,
+base renderer landed + visual fixes DIRECTOR-ACCEPTED
+(docs/design/screenshots/viz-fixes-2026-07-06.png).
 
-| Criterion | Status |
-|---|---|
-| ADR-001 domain model | ACCEPTED (1 adversarial round, amended; D-010) |
-| ADR-002 event log / network readiness | ACCEPTED (2 rounds, amended; D-013) |
-| ADR-003 wasm boundary | ACCEPTED (2 rounds, amended; D-015) - cn-api facade crate added, cn-wasm is cdylib+rlib |
-| Written specs | ADR-001 (entity/attribute model), docs/specs/permission-model.md, schemas/group-template.schema.json, ADR-002 (op log/sync) |
-| Two contrasting synthetic templates | fixtures/templates/*.template.json, both PASS `npm run validate:templates` (app/) |
+## Session 2 outcomes (this session)
 
-Also complete: docs/design/DESIGN_BRIEF.md revised per adversarial critique
-(D-012, D-014); its critique round 2 is PARKED until the Phase 3 rendering
-spike exists. PolyForm Noncommercial 1.0.0 license added (D-011).
+1. Decision interview conducted through Part 5; the human ended it there;
+   Parts 6-8 defaults apply. Eighteen entries: **D-019..D-040**. The
+   spine: ATNI Climate convention pilot (D-022 arc), snapshot-first
+   (D-024), facilitator laptop (D-025), backup risk ACCEPTED (D-026),
+   identity deferred (D-027), facilitator role in cn-perm (D-028),
+   personal mode = v0.2 (D-029), form-respondents-only + QR joins
+   (D-030), TSDF codes primary (D-032), demo-wide T1 with ATNI Climate
+   as tier authority (D-034), accessibility deferred post-pilot (D-035),
+   facilitator wizard (D-036), in-app story authoring in v0.1 (D-037),
+   DESIGN sitting deferred (D-038).
+2. **Execution Plan v2** written into docs/PROJECT_PLAN.md section 3
+   (D-039): v0.1.0 = convention-pilot ready; 9-12 sessions; Phase 5 /
+   Session D / Session A / Session F remainder -> v0.2.
+3. Real-data gate process added to CLAUDE.md gates section (D-030/D-034).
+4. NEXT_SESSION.md refreshed (brief + remaining questions Q-A..Q-F).
+5. docs/SESSION_2_LAUNCH.md retired to docs/archive/.
+6. Graph-networks deep research commissioned (D-040); report lands at
+   **docs/research/graph-networks-report-2026-07-06.md**. Check it is
+   present and committed; if missing, the research did not complete -
+   re-run per D-040's scope.
 
-## Next phase: Phase 2 - Rust core
+## Exact next three actions
 
-Acceptance (CLAUDE.md / launch prompt section 5): cn-model, cn-schema,
-cn-perm, cn-graph, cn-store implemented behind the cn-api facade with the
-wasm boundary; cargo test green including the permission property test (no
-projection ever leaks above the viewer's access); clippy clean; wasm bundle
-builds and loads in a smoke page. Measurement gates from ADR rounds: wasm
-heap at 5k entities x 10 attrs + 10k edges under 64MB; projection payload
-budget measured.
-
-### Phase 2 chain state (updated mid-phase)
-
-DONE: wasm32 target installed; wasm-pack smoke build of cn-wasm PASSES
-(cdylib+rlib + target-gated wasm-bindgen committed). Director blueprints
-authored and committed for ALL five core crates:
-docs/blueprints/{cn-model,cn-schema,cn-store,cn-perm,cn-graph}.md.
-cn-model IMPLEMENTED and committed (15 tests; fmt/clippy/test/wasm green).
-
-IN FLIGHT: cn-schema implementation on codex (task .codex/task-cn-schema.md,
-result lands at .codex/cn-schema-result.md).
-
-MECHANICAL CHAIN for whoever continues (each step: wait for result file,
-re-run verification loop from core/ - fmt --check, clippy --workspace
---all-targets -D warnings, test --workspace, cargo build --target
-wasm32-unknown-unknown -p <crate>, pii-scan - then atomic commit, then
-`Start-Process pwsh -ArgumentList @('-NoProfile','-File','.codex\run-<next>.ps1') -WindowStyle Hidden`):
-
-1. cn-schema lands -> verify/commit -> launch run-cn-store.ps1
-2. cn-store lands -> verify/commit -> launch run-cn-perm.ps1 (high effort -
-   it owns the Phase 2 acceptance property test)
-3. cn-perm lands -> verify/commit -> launch run-cn-graph.ps1
-4. cn-graph lands -> verify/commit -> launch run-cn-api.ps1 (blueprint
-   docs/blueprints/cn-api.md is DONE and committed; the task implements
-   cn-api + cn-wasm bindings + smoke page + measurement gate in one go;
-   verification includes wasm-pack build and npm smoke:node from app/).
-5. DONE: cn-api landed, verified (incl. Node wasm smoke PASS), committed.
-   Measurement gate numbers (native, i5-1340P, 5,000 entities + 10,000
-   edges, member viewer, 2026-07-06): fold 255ms; projection compute 133ms;
-   projection JSON 2.88MB; ops JSONL 16.4MB; state JSON proxy 9.87MB.
-   Assessment: within gates for v0. Watch items for Phase 3: projection
-   JSON is 2.9MB per full recompute crossing the wasm boundary (D3 caching
-   mitigates; D2 typed-array escape hatch if browser profiling demands),
-   and wasm-side timings should be re-measured in the smoke page before
-   Phase 3 relies on them.
-6. DONE: closing review returned FIXES-REQUIRED (archived at
-   docs/analysis/core-review-phase2-2026-07-06.md); director rulings in
-   D-016; all accepted fixes applied, spot-checked, re-verified, committed.
-
-**PHASE 2 CORE: CLOSED** (2026-07-06). cn-sync is intentionally a
-placeholder - the SyncTransport trait + local adapter are Phase 5 scope per
-the phase plan (D-016); ADR-002 A-B8 defines the contract they must meet.
-
-## Next phase: Phase 3 - Frontend
-
-Driven by docs/design/DESIGN_BRIEF.md (revised; its critique round 2 is
-parked until spike evidence exists). Acceptance: CLAUDE.md phase plan
-(viz + view modes, template-driven color, stories, detail panels, wizard +
-profile editor, explicit state machine per I4, tsc + vite build clean, both
-fixture groups load and render, R9 accessibility criteria, snapshot under
-budget).
-
-### Exact next three actions
-
-1. DONE - RENDERING SPIKE run and decided (ADR-004): custom instanced layer
-   33.5 avg FPS / 5 draw calls on the real Iris Xe (headed Chrome 149) vs
-   stock 26.1 / three-forcegraph 22.0 at ~10k draw calls - only instanced
-   passes the 30 FPS bar. Measurement executed via playwright-cli headed
-   Chrome (claude-in-chrome extension was not connected). Spike harness
-   kept at app/spike as the regression benchmark.
-2. DONE - brief round 2 judged and applied (D-018; budget spent; brief is
-   now ADR-004-consistent and is Phase 3's working document).
-3. DONE - state machine + wasm worker landed, I4 spot-checked, committed
-   (7 vitest tests; stale-revision rejection; correlation-id protocol).
-4. DONE - theming pipeline landed (16 tests) AND fixture palettes improved
-   at source (rotated Okabe-Ito): both templates derive with ZERO
-   adjustments/warnings; the theme test pins that as the regression guard.
-5. DONE - base renderer landed (26 tests, snapshot 0.55MB, 120 entities
-   projected, I4 dispatch-only verified) AND director visual check
-   performed (screenshot: docs/design/screenshots/base-renderer-2026-07-06.png).
-   VISUAL FINDINGS for the next viz cycle (S3-A in PROJECT_PLAN):
-   - node instance colors are not reaching the material - node bodies
-     render near-black; only halos carry color (check instanceColor
-     wiring / material color multiplication / lighting-emissive share)
-   - edge/node visual hierarchy inverted: edges dominate, nodes vanish
-   - halo distance-culling appears too aggressive (2 visible of 120)
-   - background reads flat black; verify the gradient+vignette quad is
-     actually in the scene
-6. PLANNING DOCS added (this commit): docs/PROJECT_PLAN.md (full plan to
-   v0.1.0 with session shapes and Fable/Codex routing) and
-   docs/NEXT_SESSION.md (60-second resume brief + the human interview -
-   run it when the human is next present). CLAUDE.md reading order and
-   session-end protocol updated accordingly.
-
-7. DONE - S3-A visual fixes landed and DIRECTOR-ACCEPTED (screenshot:
-   docs/design/screenshots/viz-fixes-2026-07-06.png). Root cause of the
-   black nodes: instanceColor not reaching the stock material fragment
-   path; now an explicit self-lit shader. All four findings resolved.
-8. SESSION 2 LAUNCH PROMPT written: **docs/SESSION_2_LAUNCH.md** - paste
-   into a fresh session to run the decision interview (8 parts, options +
-   recommendations + defaults) and produce Execution Plan v2. It lands any
-   in-flight work first and retires itself to docs/archive/ when done.
-
-Next: EITHER the human pastes docs/SESSION_2_LAUNCH.md (decision session -
-preferred before more build work), OR autonomous continuation proceeds
-with S3-A's remaining scope per PROJECT_PLAN: labels (troika), motion/
-focus-mode polish, benchmark re-run against the p95 goal.
-
-Review debt to schedule (routing policy standing job): a codex review diff
-pass over the accumulated core implementation commits before Phase 2 close.
-Known I12 debt for that pass: cn-store `Snapshot::load` returns Ok(None) on
-discard without a report channel - cn-api's load path must surface the
-discard reason as a warning finding (cn-store result note, 2026-07-06).
+1. **Human sitting (preferred next):** read the research report alongside
+   Execution Plan v2; shape plan v3; answer NEXT_SESSION Q-A (convention
+   date) and Q-B (form platform); schedule the DESIGN sitting (D-038).
+2. **Autonomous build (if no human):** S3-A2 "Constellation legible" -
+   labels (troika, grind HIGH), motion/focus polish (grind medium),
+   benchmark re-run vs p95 goal. Then S3-B "Explore + Route".
+3. **FORM deliverable (docs, any time):** draft the intake form + ATNI
+   template + consent email per D-023 for HUMAN REVIEW - it gates the
+   consent email and needs no code. Do not send or publish anything.
 
 ## Open human gates
 
-1. License variant: PolyForm NONCOMMERCIAL 1.0.0 was selected from the
-   "polyform" answer - confirm, or name Internal Use / Small Business instead.
-2. (Standing) no remotes, no real data, no spend without explicit instruction.
+1. License variant: PolyForm Noncommercial 1.0.0 stands by default
+   (D-019/Q7.4); one line changes it to Internal Use / Small Business.
+2. (Standing) no remotes (risk explicitly accepted, D-026), no real data
+   (pilot gate process now defined in CLAUDE.md), no spend without
+   explicit instruction.
+3. Community-facing text (form, consent email) requires human review
+   before any use (D-023).
 
 ## Degraded modes / standing directives
 
-- Codex runs use `--sandbox danger-full-access` (D-008; human said "figure it
-  out" - D-011 keeps the bypass with mitigations).
-- Routing policy is MANDATORY (CLAUDE.md, docs/CODEX_GUIDE.md section 7):
-  Codex absorbs bulk work; effort-match grind tasks (D-014: multi-ruling doc
-  revisions need gpt-5.5/medium, not gpt-5.4-mini/low).
+- Codex runs use `--sandbox danger-full-access` (D-008 mitigations).
+- Routing policy MANDATORY (docs/CODEX_GUIDE.md section 7); effort-match
+  grind tasks (D-014).
 - Atomic commits without asking (CLAUDE.md cadence).
-- Re-arm a one-shot 8:00 AM local resume cron each session while the
-  usage-failover directive stands (this session's is armed: job fb983a1b;
-  session-only, dies with the terminal).
+- 8:00 AM safety cron re-armed this session (job 85cd754f, one-shot
+  2026-07-07 08:03; session-only, dies with the terminal).
 - Never point codex --output-last-message at a task's own artifact path.
 
 ## Warnings that must not be lost
 
-- The design brief's second critique round is intentionally parked until the
-  Phase 3 rendering spike produces evidence (D-012); do not treat the brief's
-  rendering numbers as validated - they are labeled allocations.
-- wasm32 target not installed yet (Phase 2 action 1).
-- .codex/ is gitignored scratch; the token analysis that matters is preserved
-  at docs/analysis/token-analysis-2026-07-06.md, and ADR critiques at
-  docs/adr/ADR-001-round1-critique.md (rounds 2/3 critiques for ADR-002/003
-  live only in .codex/ - archive them if ever needed before cleanup).
-- Predecessor PII exclusion list (CLAUDE.md) applies to every Codex prompt;
-  nothing is cleared.
+- Backup risk is ACCEPTED, not solved (D-026): single-machine total loss
+  remains risk #1; re-raise at every decision session.
+- D-032 (TSDF codes primary) and D-037 (in-app authoring in v0.1) are
+  deliberate human choices AGAINST recommendations - do not "fix" them.
+- Same-day QR joiners create the fast re-ingest requirement (D-030) -
+  it is S4-A acceptance, not a nice-to-have.
+- The design brief's rendering numbers are labeled allocations, not
+  validated measurements; DESIGN sitting (D-038) is where aesthetics get
+  human eyes.
+- Predecessor PII exclusion list (CLAUDE.md) applies to every Codex
+  prompt AND to research tasks; nothing is cleared.
+- .codex/ is gitignored scratch; session-2 interview notes live at
+  .codex/interview-notes-s2.md (DECISIONS entries are the durable record).
