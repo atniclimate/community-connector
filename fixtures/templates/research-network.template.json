@@ -1,0 +1,101 @@
+{
+  "schema_version": "0.1.0",
+  "template_id": "research-network",
+  "name": "Research Coordination Network",
+  "description": "Template for research coordination networks: researchers, institutions, publications, study areas, species, and the collaborations connecting them. Synthetic fixture - any example values use the @example.test namespace.",
+  "vocabulary": {
+    "entities": "network members and research objects",
+    "person": "researcher",
+    "gathering": "convening"
+  },
+  "kinds": [
+    {
+      "id": "person",
+      "label": "Researcher",
+      "shape": "sphere",
+      "color_role": "kind-1",
+      "attributes": [
+        { "id": "display_name", "type": "text", "required": true, "default_visibility": "group" },
+        { "id": "contact_email", "type": "link", "format": "email", "default_visibility": "trusted" },
+        { "id": "orcid", "type": "link", "default_visibility": "public" },
+        { "id": "expertise", "type": "tags", "default_visibility": "group" },
+        { "id": "career_stage", "type": "enum", "values": ["student", "early-career", "established", "emeritus"], "default_visibility": "group" },
+        { "id": "portrait", "type": "media", "default_visibility": "group" }
+      ]
+    },
+    {
+      "id": "organization",
+      "label": "Institution",
+      "shape": "cube",
+      "color_role": "kind-2",
+      "attributes": [
+        { "id": "display_name", "type": "text", "required": true, "default_visibility": "public" },
+        { "id": "org_type", "type": "enum", "values": ["university", "agency", "tribal-nation", "ngo", "industry"], "default_visibility": "public" },
+        { "id": "website", "type": "link", "default_visibility": "public" }
+      ]
+    },
+    {
+      "id": "publication",
+      "label": "Publication",
+      "shape": "octahedron",
+      "color_role": "kind-3",
+      "attributes": [
+        { "id": "title", "type": "text", "required": true, "default_visibility": "public" },
+        { "id": "year", "type": "number", "default_visibility": "public" },
+        { "id": "doi", "type": "link", "default_visibility": "public" },
+        { "id": "topics", "type": "tags", "default_visibility": "public" }
+      ]
+    },
+    {
+      "id": "study_area",
+      "label": "Study Area",
+      "shape": "cone",
+      "color_role": "kind-4",
+      "attributes": [
+        { "id": "display_name", "type": "text", "required": true, "default_visibility": "group" },
+        { "id": "location", "type": "geo", "default_visibility": "group" },
+        { "id": "ecosystem", "type": "tags", "default_visibility": "group" }
+      ]
+    },
+    {
+      "id": "species",
+      "label": "Species",
+      "shape": "tetrahedron",
+      "color_role": "kind-5",
+      "attributes": [
+        { "id": "scientific_name", "type": "text", "required": true, "default_visibility": "public" },
+        { "id": "common_name", "type": "text", "default_visibility": "public" },
+        { "id": "conservation_status", "type": "enum", "values": ["least-concern", "vulnerable", "endangered", "unknown"], "default_visibility": "public" }
+      ]
+    },
+    {
+      "id": "gathering",
+      "label": "Convening",
+      "shape": "torus",
+      "color_role": "kind-6",
+      "attributes": [
+        { "id": "display_name", "type": "text", "required": true, "default_visibility": "group" },
+        { "id": "date", "type": "date", "default_visibility": "group" },
+        { "id": "location", "type": "geo", "default_visibility": "group" }
+      ]
+    }
+  ],
+  "edge_kinds": [
+    { "id": "coauthored", "label": "co-authored with", "from": ["person"], "to": ["person"], "directed": false, "weighted": true },
+    { "id": "authored", "label": "authored", "from": ["person"], "to": ["publication"], "directed": true },
+    { "id": "affiliated_with", "label": "affiliated with", "from": ["person"], "to": ["organization"], "directed": true },
+    { "id": "studies", "label": "studies", "from": ["person", "publication"], "to": ["species", "study_area"], "directed": true },
+    { "id": "attended", "label": "attended", "from": ["person"], "to": ["gathering"], "directed": true }
+  ],
+  "theme": {
+    "mode": "default-dark",
+    "roles": {
+      "kind-1": "#e8a87c",
+      "kind-2": "#7ca6e8",
+      "kind-3": "#9c8ce8",
+      "kind-4": "#7ce8b2",
+      "kind-5": "#e8d47c",
+      "kind-6": "#e87ca6"
+    }
+  }
+}

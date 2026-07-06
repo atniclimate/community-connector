@@ -1,0 +1,103 @@
+{
+  "schema_version": "0.1.0",
+  "template_id": "fisheries-committee",
+  "name": "Winterberry River Fisheries Committee",
+  "description": "Template for a community fisheries committee (entirely fictional, non-research vocabulary): members, fishing sites, needs, skills and resources, seasonal work, and gatherings. Proves R2 range against the research-network template. Synthetic fixture - any example values use the @example.test namespace.",
+  "vocabulary": {
+    "entities": "committee members, places, and work",
+    "person": "member",
+    "gathering": "gathering"
+  },
+  "kinds": [
+    {
+      "id": "person",
+      "label": "Member",
+      "shape": "sphere",
+      "color_role": "kind-1",
+      "attributes": [
+        { "id": "display_name", "type": "text", "required": true, "default_visibility": "group" },
+        { "id": "contact_email", "type": "link", "format": "email", "default_visibility": "trusted" },
+        { "id": "roles", "type": "tags", "default_visibility": "group" },
+        { "id": "seasons_active", "type": "enum", "values": ["spring", "summer", "fall", "winter", "year-round"], "default_visibility": "group" },
+        { "id": "family_canoe_photo", "type": "media", "default_visibility": "private" }
+      ]
+    },
+    {
+      "id": "fishing_site",
+      "label": "Fishing Site",
+      "shape": "cone",
+      "color_role": "kind-2",
+      "attributes": [
+        { "id": "display_name", "type": "text", "required": true, "default_visibility": "group" },
+        { "id": "location", "type": "geo", "default_visibility": "trusted" },
+        { "id": "site_knowledge", "type": "text", "default_visibility": "trusted" },
+        { "id": "access_season", "type": "enum", "values": ["spring", "summer", "fall", "winter"], "default_visibility": "group" }
+      ]
+    },
+    {
+      "id": "need",
+      "label": "Need",
+      "shape": "octahedron",
+      "color_role": "kind-3",
+      "attributes": [
+        { "id": "display_name", "type": "text", "required": true, "default_visibility": "group" },
+        { "id": "urgency", "type": "enum", "values": ["someday", "this-season", "now"], "default_visibility": "group" },
+        { "id": "details", "type": "text", "default_visibility": "group" },
+        { "id": "date_raised", "type": "date", "default_visibility": "group" }
+      ]
+    },
+    {
+      "id": "skill_resource",
+      "label": "Skill or Resource",
+      "shape": "tetrahedron",
+      "color_role": "kind-4",
+      "attributes": [
+        { "id": "display_name", "type": "text", "required": true, "default_visibility": "group" },
+        { "id": "category", "type": "enum", "values": ["equipment", "craft", "knowledge", "logistics", "funding"], "default_visibility": "group" },
+        { "id": "notes", "type": "text", "default_visibility": "group" }
+      ]
+    },
+    {
+      "id": "project",
+      "label": "Seasonal Work",
+      "shape": "cube",
+      "color_role": "kind-5",
+      "attributes": [
+        { "id": "display_name", "type": "text", "required": true, "default_visibility": "group" },
+        { "id": "season", "type": "enum", "values": ["spring", "summer", "fall", "winter"], "default_visibility": "group" },
+        { "id": "headcount_needed", "type": "number", "default_visibility": "group" }
+      ]
+    },
+    {
+      "id": "gathering",
+      "label": "Gathering",
+      "shape": "torus",
+      "color_role": "kind-6",
+      "attributes": [
+        { "id": "display_name", "type": "text", "required": true, "default_visibility": "group" },
+        { "id": "date", "type": "date", "default_visibility": "group" },
+        { "id": "location", "type": "geo", "default_visibility": "group" },
+        { "id": "flyer", "type": "media", "default_visibility": "group" }
+      ]
+    }
+  ],
+  "edge_kinds": [
+    { "id": "has_skill", "label": "brings", "from": ["person"], "to": ["skill_resource"], "directed": true },
+    { "id": "raised_need", "label": "raised", "from": ["person"], "to": ["need"], "directed": true },
+    { "id": "need_met_by", "label": "could be met by", "from": ["need"], "to": ["skill_resource", "person", "project"], "directed": true, "weighted": true },
+    { "id": "stewards", "label": "stewards", "from": ["person"], "to": ["fishing_site"], "directed": true },
+    { "id": "works_on", "label": "works on", "from": ["person"], "to": ["project"], "directed": true },
+    { "id": "attends", "label": "attends", "from": ["person"], "to": ["gathering"], "directed": true }
+  ],
+  "theme": {
+    "mode": "default-dark",
+    "roles": {
+      "kind-1": "#7cc8e8",
+      "kind-2": "#7ce8b2",
+      "kind-3": "#e8a87c",
+      "kind-4": "#e8d47c",
+      "kind-5": "#9c8ce8",
+      "kind-6": "#e87ca6"
+    }
+  }
+}
