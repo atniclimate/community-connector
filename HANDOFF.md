@@ -100,16 +100,25 @@ budget).
 4. DONE - theming pipeline landed (16 tests) AND fixture palettes improved
    at source (rotated Okabe-Ito): both templates derive with ZERO
    adjustments/warnings; the theme test pins that as the regression guard.
-5. IN FLIGHT - base renderer implementing docs/blueprints/base-renderer.md
-   (codex HIGH, result .codex/renderer-result.md): committed synthetic demo
-   ops per fixture (Part 0), kindMeta/hover state additions (Part 1), viz
-   modules (Part 2: instanced nodes, merged shader edges with dual color
-   buffers, distance-culled halos, quality tiers, picking-as-dispatch,
-   reduced-motion camera). On landing: verify + I4 spot-check + commit,
-   then DIRECTOR VISUAL CHECK via playwright headed (screenshot, console),
-   then remaining Phase 3: labels + motion polish, view modes, detail
-   panels, a11y architecture (Session A), wizard/forms (Session B), story
-   viewing, snapshot acceptance run.
+5. DONE - base renderer landed (26 tests, snapshot 0.55MB, 120 entities
+   projected, I4 dispatch-only verified) AND director visual check
+   performed (screenshot: docs/design/screenshots/base-renderer-2026-07-06.png).
+   VISUAL FINDINGS for the next viz cycle (S3-A in PROJECT_PLAN):
+   - node instance colors are not reaching the material - node bodies
+     render near-black; only halos carry color (check instanceColor
+     wiring / material color multiplication / lighting-emissive share)
+   - edge/node visual hierarchy inverted: edges dominate, nodes vanish
+   - halo distance-culling appears too aggressive (2 visible of 120)
+   - background reads flat black; verify the gradient+vignette quad is
+     actually in the scene
+6. PLANNING DOCS added (this commit): docs/PROJECT_PLAN.md (full plan to
+   v0.1.0 with session shapes and Fable/Codex routing) and
+   docs/NEXT_SESSION.md (60-second resume brief + the human interview -
+   run it when the human is next present). CLAUDE.md reading order and
+   session-end protocol updated accordingly.
+
+Next build session is S3-A per PROJECT_PLAN: fix the four visual findings,
+then labels, then motion - with a benchmark re-run against the p95 goal.
 
 Review debt to schedule (routing policy standing job): a codex review diff
 pass over the accumulated core implementation commits before Phase 2 close.

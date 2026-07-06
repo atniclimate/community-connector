@@ -1,8 +1,11 @@
 # Community Navigator - Contract Document
 
 > Durable contract for every Claude Code session on this project. Read this first,
-> then `HANDOFF.md` (live state, outranks memory), then the current phase's ADRs in
-> `docs/adr/`. The full founding brief is archived at `docs/LAUNCH_PROMPT.md`.
+> then `HANDOFF.md` (live state, outranks memory), then `docs/PROJECT_PLAN.md`
+> (the session-by-session plan and Fable/Codex routing model), then the current
+> phase's ADRs in `docs/adr/`. When the human is present at session start, also
+> read `docs/NEXT_SESSION.md` and offer them its brief and interview. The full
+> founding brief is archived at `docs/LAUNCH_PROMPT.md`.
 
 Product name: **Community Navigator**. Repo folder: `community-connector` (mandated;
 see DECISIONS.md D-001). All docs use hyphens, never em dashes.
@@ -160,8 +163,9 @@ those, and any file pairing a real name with contact info.
 `HANDOFF.md` outranks memory. At ~70% context or session end, execute the session-end
 protocol (docs/LAUNCH_PROMPT.md section 9): land or park work, run the verification
 loop, update HANDOFF.md (phase status, commits, open gates, degraded modes, next
-three actions, live warnings), append DECISIONS.md entries, commit everything, print
-a human summary with one-line-answerable gate questions.
+three actions, live warnings), refresh the 60-second brief in docs/NEXT_SESSION.md,
+append DECISIONS.md entries, commit everything, print a human summary with
+one-line-answerable gate questions.
 
 ## Phase plan (acceptance criteria in docs/LAUNCH_PROMPT.md section 5)
 
