@@ -95,15 +95,18 @@ budget).
    kept at app/spike as the regression benchmark.
 2. DONE - brief round 2 judged and applied (D-018; budget spent; brief is
    now ADR-004-consistent and is Phase 3's working document).
-3. IN FLIGHT - app state machine + wasm worker integration implementing
-   docs/blueprints/app-state.md (codex, task .codex/task-app-state.md,
-   result .codex/app-state-result.md). On landing: verify (app: typecheck,
-   build, build:smoke, npm test; root: pii-scan), commit, then next:
-4. Template-driven theming pipeline from the brief section 5 (tokens from
-   group template JSON, contrast + CVD enforcement, legend indicator) over
-   both fixture templates - blueprint it from brief sections 5 + 9 item 1
-   (DTCG token schema + default Hearthlight template), then the base
-   renderer (brief section 9 items per the rewritten checklist).
+3. DONE - state machine + wasm worker landed, I4 spot-checked, committed
+   (7 vitest tests; stale-revision rejection; correlation-id protocol).
+4. IN FLIGHT - theming pipeline implementing docs/blueprints/theming.md
+   (codex, result .codex/theming-result.md): OKLCH color math in-repo,
+   deterministic derive order (merge -> variants -> contrast floor -> CVD
+   distance), ThemeReport with I12 adjustments/warnings, theme slice in the
+   store, schemas/theme-tokens.schema.json. On landing: verify (app checks
+   + npm test; pii-scan), judge fixture adjustment outcomes, commit, then:
+5. The base renderer (brief section 9 rewritten checklist, ADR-004 path):
+   per-kind InstancedMesh + merged LineSegments edge layer reading the wasm
+   projection through the store, quality-tier manager early, halos
+   distance-culled/tier-gated, then labels. Blueprint next.
 
 Review debt to schedule (routing policy standing job): a codex review diff
 pass over the accumulated core implementation commits before Phase 2 close.
