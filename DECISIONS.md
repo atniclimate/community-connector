@@ -101,3 +101,32 @@ no round 2 for ADR-001 - the amendments are additive specifications, not
 structural changes; the two-round budget is preserved for ADR-002, which
 inherits two hard requirements (op idempotency by UUIDv7 id, custody event
 ordering) from this round's advisories.
+
+## D-011 (2026-07-06) - Human gate answers received
+
+The human answered the four open gates in one line: (1) git identity
+`Patrick Freeland <accounts@indigenousaccess.org>` CONFIRMED; (2) naming
+CONFIRMED as-is (product Community Navigator, folder community-connector);
+(3) license: "polyform" - the director selected **PolyForm Noncommercial
+1.0.0** as the variant (the family's mainstream choice; permits free
+noncommercial community use, forbids commercial exploitation). LICENSE.md
+added from the canonical polyformproject.org text via codex grind.
+**Remaining one-liner for the human: confirm Noncommercial vs another
+PolyForm variant (Internal Use, Small Business).** (4) Codex sandbox:
+"figure it out" - director keeps the danger-full-access bypass with D-008
+mitigations; fixing the elevated sandbox would mean risky surgery on the
+desktop app's codex config for marginal benefit on blueprint-constrained
+tasks.
+
+## D-012 (2026-07-06) - Design brief round 1: REDESIGN verdict, directed revision
+
+Codex review returned 10 blocking objections and verdict REDESIGN on
+docs/design/DESIGN_BRIEF.md. Director ruling: the aesthetic direction stands;
+the failures are implementation overclaims (3d-force-graph instancing,
+uniform-only animation), an under-specified 5MB budget, a real theming
+contradiction (colors-unmangled vs contrast enforcement - resolved: intent
+leads, legibility wins), and a11y gaps (resolved: parallel DOM is the primary
+equivalent interface). Revision applied by codex grind per
+.codex/task-brief-revision.md; a Phase 3 rendering spike is now checklist
+item 1. Critique round 2 DEFERRED to Phase 3 start, when spike results exist
+to critique against - the two-round budget is not spent, it is parked.
