@@ -180,3 +180,26 @@ for Phase 2: the phase plan assigns the SyncTransport trait and local
 adapter to Phase 5; ADR-002 A-B8 defines the contract it must meet then.
 Fixes applied via codex grind from .codex/task-core-fixes.md; director
 re-verified and committed.
+
+## D-017 (2026-07-06) - Renderer decided on measured evidence (ADR-004)
+
+The rendering spike ran on the reference Iris Xe in headed Chrome 149,
+driven via playwright-cli (the claude-in-chrome extension was not
+connected; playwright headed was the second automation path and worked).
+Numbers in ADR-004: instanced 33.5 avg FPS at 5 draw calls (passes);
+stock 3d-force-graph 26.1 and three-forcegraph 22.0 at ~10k draw calls
+(fail). Decision: custom instanced Three layer owns all rendering; one
+merged-LineSegments edge system; graph libraries demoted to spike-only
+devDependencies. Headless control run agreed on ordering. The spike
+harness (app/spike) is the standing regression benchmark.
+
+## D-018 (2026-07-06) - Design brief round 2: accepted with amendments; budget spent
+
+Round 2 (codex review, with ADR-004 evidence in hand) found 5 ADR
+contradictions, 1 genuinely unresolved round-1 item (emitParticle
+reintroduced the library edge API), and 7 checklist corrections - all
+accepted and applied via directed grind revision (gpt-5.5 medium per
+D-014; an initial wrong-tier launch at mini/low was caught and killed
+within a minute). Director grep-verified the revision. The brief's
+two-round budget is now spent; it is Phase 3's working document, revised
+further only by ADR-anchored evidence.

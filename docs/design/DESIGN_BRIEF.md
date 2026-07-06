@@ -17,14 +17,14 @@ The emotional target for the first 10 seconds: splash fades, the whole community
 All values below are tokens in the theme/config layer. Token names are indicative; the schema is defined in Section 5.
 
 ### 2.1 Renderer foundation
-Section 2 describes candidate rendering techniques, not settled implementation. The rendering spike in Section 9 decides whether the app uses a custom instanced Three layer, `three-forcegraph`, or stock `3d-force-graph`; after that decision, exactly one edge system owns edge rendering. Any claim below about draw calls, buffers, hover behavior, merged edges, or focus blending is an initial allocation to validate on the reference machine, not a guarantee.
+ADR-004 decides the renderer: the product app uses a custom instanced Three layer, one merged `LineSegments` edge system, and no product runtime dependency on the compared graph libraries. Spike-only devDependencies are `3d-force-graph` and `three-forcegraph`. Draw calls, buffers, hover behavior, merged edges, and focus blending below are implementation allocations for that accepted path, with frame tails re-measured whenever material renderer changes land.
 
 | Concern | Starting value | Token |
 |---|---|---|
 | Tone mapping | `THREE.NeutralToneMapping` (Khronos PBR Neutral, r162+). Never ACES - it desaturates and hue-shifts community palette colors | `render.toneMapping` |
 | Pixel ratio | `min(devicePixelRatio, 1.5)`; drops to 1.25/1.0 under quality tiers | `render.dprCap` |
 | Antialias | Renderer MSAA on when no composer; FXAA/SMAA final pass only if bloom tier active | `render.aa` |
-| Draw call budget | Initial allocation < 100 per frame, monitored via `renderer.info.render.calls` and validated in the rendering spike | `perf.drawCallBudget` |
+| Draw call budget | Initial allocation < 100 per frame, monitored via `renderer.info.render.calls` and rechecked by the app/spike regression benchmark | `perf.drawCallBudget` |
 
 ### 2.2 Background and depth
 - Single-pass procedural background: radial gradient `bg.center` #0d1017 to `bg.edge` #06080d (tokens - communities may tint the sky), vignette folded into the same shader, dithered with interleaved gradient noise (`(1.0/255.0) * ign(gl_FragCoord.xy) - 0.5/255.0`) to kill banding. Cost < 0.2ms.
@@ -32,21 +32,21 @@ Section 2 describes candidate rendering techniques, not settled implementation. 
 - Depth cue: `THREE.FogExp2`, color identical to `bg.edge`, density tuned so the far half of the node cloud shifts perceptibly toward the background (`scene.fogDensity`, start 0.0009 at layout scale 500 and tune on real data). No depth of field, ever.
 
 ### 2.3 Nodes
-- Candidate custom path: one `THREE.InstancedMesh` per entity-kind shape (6 shapes max: sphere, cube, octahedron, tetrahedron, torus, cone - CVD redundancy, Section 7), low-poly (icosahedron detail 1 or 6-segment sphere, `node.geometryDetail`). The spike must prove this path against `three-forcegraph` and stock `3d-force-graph`; `nodeThreeObject` alone is not assumed to yield scalable instancing. If the custom path wins, picking uses raycast `instanceId`.
-- Candidate material path: MeshLambert-style diffuse lighting plus emissive contribution at partial intensity (`node.emissiveShare` 0.45) so nodes read self-lit. No MeshStandardMaterial/PBR. If mass focus blending uses resident buffer states, this becomes a custom shader material that preserves the Lambert + emissive look.
+- Custom ADR-004 path: one `THREE.InstancedMesh` per entity-kind shape (6 shapes max: sphere, cube, octahedron, tetrahedron, torus, cone - CVD redundancy, Section 7), low-poly (icosahedron detail 1 or 6-segment sphere, `node.geometryDetail`). Picking uses raycast `instanceId`; positions arrive from the WASM projection, not browser force simulation.
+- Material path: MeshLambert-style diffuse lighting plus emissive contribution at partial intensity (`node.emissiveShare` 0.45) so nodes read self-lit. No MeshStandardMaterial/PBR. If mass focus blending uses resident buffer states, this becomes a custom shader material that preserves the Lambert + emissive look.
 - Lighting (all tokens): cool key from camera-up (`light.key.color` #cfd8e6, intensity 0.9), warm fill low-opposite (`light.fill.color` #ffd9a8, intensity 0.5), ambient 0.25. The warm fill is a primary warmth lever.
 - Per-instance color and scale live in instance buffers; hover and selected changes may use a small per-frame JS damp loop writing instance attributes for the hovered or selected set, capped at 32 nodes. Mass transitions (global dim, focus mode) blend between two resident buffer states via one uniform and require custom shader material(s), not stock `LineBasicMaterial` or `MeshLambert` alone.
 - Sizes: resting radius from degree, mapped to `node.sizeRange` [3, 10]; primary tier 10, secondary 7, ghost 3 (predecessor's proven three-tier emphasis).
 
 ### 2.4 Glow
-- Candidate base glow: back-side fresnel halo shells (GitHub globe technique) - a second InstancedMesh sharing node positions at `halo.scale` 1.15x, `THREE.BackSide`, fresnel alpha falloff (c 0.6, p 6, `halo.falloff`). Faint on resting nodes (`halo.restingAlpha` 0.15), strong on selected (`halo.selectedAlpha` 0.8). Target is zero postprocessing on Tier B and an initial allocation of one draw call per kind, subject to spike validation. The focus ring derives from the template background tokens, not a fixed-sky assumption.
-- Bloom: quality Tier A only (discrete GPUs). pmndrs postprocessing SelectiveBloom at half resolution, `bloom.threshold` 0.85, `bloom.strength` 0.65, `bloom.radius` 0.5, luminanceSmoothing 0.3, feeding only emissive-boosted selected/story nodes (emissive intensity vocabulary from the predecessor: selected 2.5, neighbors 0.8, story path 2.0, convergence hubs clamped 3.5). **Conflict resolved:** the predecessor audit says keep UnrealBloomPass; visual-language and perf-a11y say halo-first. We keep the bloom *look* but invert the default: halo shaders are the base glow on all tiers, bloom is an additive luxury on Tier A. Iris Xe never runs a composer. Tradeoff: Tier B loses light-leak across neighbors; the halo shell preserves 90% of the read at ~5% of the cost.
+- Base glow: back-side fresnel halo shells (GitHub globe technique) - a second InstancedMesh sharing node positions at `halo.scale` 1.15x, `THREE.BackSide`, fresnel alpha falloff (c 0.6, p 6, `halo.falloff`). Halos are conditional from day one: distance-culled, quality-tier gated, faint on resting nodes (`halo.restingAlpha` 0.15), strong on selected (`halo.selectedAlpha` 0.8), and degraded first when the quality-tier manager detects fill-rate pressure. ADR-004 names halo overdraw as the first optimization target, so halo visibility cannot be hardwired into any tier. The focus ring derives from the template background tokens, not a fixed-sky assumption.
+- Bloom: quality Tier A only (discrete GPUs). pmndrs postprocessing SelectiveBloom at half resolution, `bloom.threshold` 0.85, `bloom.strength` 0.65, `bloom.radius` 0.5, luminanceSmoothing 0.3, feeding only emissive-boosted selected/story nodes (emissive intensity vocabulary from the predecessor: selected 2.5, neighbors 0.8, story path 2.0, convergence hubs clamped 3.5). **Conflict resolved:** the predecessor audit says keep UnrealBloomPass; visual-language and perf-a11y say halo-first. We keep the bloom look but invert the default: halo shaders carry the base glow when the active tier allows them, bloom is an additive luxury on Tier A, and Iris Xe never runs a composer.
 
 ### 2.5 Edges
 Three-layer ladder (3,000-10,000 edges):
-1. Base: one edge system owns rendering after the rendering spike. Candidate paths are a library link stack or a custom merged `LineSegments` BufferGeometry, but never both at once. If the custom path wins, per-vertex colors blend 50/50 from endpoint node colors, alpha comes from weight (`edge.alphaRange` [0.08, 0.6], predecessor formula `0.35 + (width-2)/8 * 0.5` as the starting map), `transparent: true`, `depthWrite: false`, and the target is one draw call. Base color buffers are prepared at load and on theme/scheme switch; focus animation needs a separate resident target state and custom shader blend, not repeated library link updates.
+1. Base: ADR-004 decides one edge system: a custom merged `LineSegments` BufferGeometry. Per-vertex colors blend 50/50 from endpoint node colors, alpha comes from weight (`edge.alphaRange` [0.08, 0.6], predecessor formula `0.35 + (width-2)/8 * 0.5` as the starting map), `transparent: true`, `depthWrite: false`, and the target is one draw call. Base color buffers are prepared at load and on theme/scheme switch; focus animation needs a separate resident target state and custom shader blend, not repeated link updates.
 2. Curvature: bezier curves only for parallel multi-edges between the same pair (`edge.multiEdgeCurvature` 0.3); everything else straight (or `edge.baseCurvature` 0.05 to separate near-coincident lines).
-3. Emphasis: directional particles only on edges above a weight percentile computed from the data at export time (`edge.particleTopPercent`, null = derive), with an absolute cap of `edge.particleEdgeCap` 300 edges x `edge.particlesPerEdge` 2 = 600 particles max. Speed 0.006, width 2.5 (3.0 highlighted). Narrative "cascade" bursts reuse `emitParticle` (burst 5, interval 30ms, 300ms between hops) with AbortController cancellation, not activation-id flags.
+3. Emphasis: directional particles only on edges above a weight percentile computed from the data at export time (`edge.particleTopPercent`, null = derive), with an absolute cap of `edge.particleEdgeCap` 300 edges x `edge.particlesPerEdge` 2 = 600 particles max. Speed 0.006, width 2.5 (3.0 highlighted). Narrative "cascade" bursts and edge particles use a custom particle layer keyed by the merged edge index, with AbortController cancellation, not activation-id flags.
 
 ### 2.6 Labels
 - troika-three-text SDF labels (worker-generated atlas, crisp at any zoom). **Conflict resolved:** predecessor's SpriteText re-rasters canvas textures on every text change and blurs during camera flights; troika wins. We keep the predecessor's zoom-adaptive *policy* (distance thresholds gate initials -> last name -> full name; primary-tier people earn labels at greater distance) as the LOD brain on top of troika rendering.
@@ -56,7 +56,7 @@ Three-layer ladder (3,000-10,000 edges):
 - Exactly one HTML tooltip element (name + kind + affiliation), solid Material A surface, projected to screen space, viewport-clamped, appears on keyboard focus as well as hover, dismissible with Escape.
 
 ### 2.7 Focus mode
-Dim-and-desaturate, never hide. Priority ladder resolved in ONE pure function per state change (the predecessor re-implemented it in five accessors and shipped desync bugs): transition > analysis > story path > selection > user filter > view-mode ghost > base. Selected at full brightness + strong halo; 1-hop neighbors elevated; everything else to the dimmed token (L 0.35, C 0.03, toward the template-derived background/fog color). Candidate custom path: write the new node and edge target states once per discrete state change, keep prior and target states resident in attributes, and animate the mass blend with `uFocusBlend`. That path requires custom shader material(s); stock `LineBasicMaterial` or `MeshLambert` alone cannot perform the blend. Hover and selected micro-emphasis may use the capped JS damp loop from Section 2.3.
+Dim-and-desaturate, never hide. Priority ladder resolved in ONE pure function per state change (the predecessor re-implemented it in five accessors and shipped desync bugs): transition > analysis > story path > selection > user filter > view-mode ghost > base. Selected at full brightness + strong halo when the active quality tier allows it; 1-hop neighbors elevated; everything else to the dimmed token (L 0.35, C 0.03, toward the template-derived background/fog color). The custom ADR-004 path writes new node and edge target states once per discrete state change, keeps prior and target states resident in attributes, and animates the mass blend with `uFocusBlend`. That path requires custom shader material(s); stock `LineBasicMaterial` or `MeshLambert` alone cannot perform the blend. Hover and selected micro-emphasis may use the capped JS damp loop from Section 2.3.
 
 ## 3. Motion system
 
@@ -86,7 +86,7 @@ Durations and easings are theme tokens emitted as CSS custom properties so DOM a
 | `motion.layoutChange` | ~1000ms position tween | ease-in-out cubic | view-mode relayout | jump to final positions |
 
 ### 3.2 Camera choreography rules (vection safety)
-1. Dolly along the origin-through-node line (distance ratio pattern from the 3d-force-graph example); never animate FOV.
+1. Dolly along the origin-through-node line (predecessor distance-ratio pattern); never animate FOV.
 2. Aim locks in the first third of the flight (keep the library's lookAt-over-duration/3 behavior); position keeps traveling.
 3. Fixed world-up, zero roll, ever. Single arc or straight paths, no S-curves.
 4. During flights: fade particles out and dim peripheral nodes ~30% (cuts optical flow AND GPU load mid-flight); restore on arrival.
@@ -96,8 +96,8 @@ Durations and easings are theme tokens emitted as CSS custom properties so DOM a
 8. Story presets are view modes + filtered `zoomToFit(1200ms, 20px, visibilityPredicate)`, never saved camera coordinates - they survive any relayout or dataset.
 9. Panel + camera coordination: both fire from one event; panel finishes (240ms) inside the flight's first third; camera lookAt offsets by half the panel width so the focused node centers in the *visible* region. Close reverses: panel out fast, camera relaxes after.
 
-### 3.3 Animating thousands of nodes: candidate shader-uniform strategy
-Never per-node JS tweens for mass state changes. The candidate custom path keeps state in per-instance attributes written on discrete user events, keeps previous and target states resident, and keeps progress in uniforms:
+### 3.3 Animating thousands of nodes: shader-uniform strategy
+Never per-node JS tweens for mass state changes. The custom ADR-004 path keeps state in per-instance attributes written on discrete user events, keeps previous and target states resident, and keeps progress in uniforms:
 - `aHighlight` (0 = dim, 1 = neighbor, 2 = selected) - a discrete target-state buffer update on click, with byte size measured in the spike rather than asserted here.
 - `uFocusBlend` 0 -> 1 over `motion.focus` by one tween; a custom shader mixes base color toward dim/highlight targets.
 - `aDelay` (distance-from-selected stagger) with in-shader local progress `clamp((uFocusBlend*T - aDelay)/dur, 0, 1)` - a full outward ripple for the cost of the same blend uniform if the custom shader path wins. Total window clamped to 500ms.
@@ -176,34 +176,34 @@ At template load, before first render:
 
 ## 6. Performance budget
 
-Target: initial allocation to validate in the rendering spike on the reference machine (i5-1340P, Iris Xe): 30 FPS floor at 1080p, DPR 1.5, 5,000 nodes / 10,000 edges. Frame envelope 33.3ms; budget 25ms of app work (browser compositing headroom). Thermal variance between Iris Xe laptops is real, so all numbers here are starting allocations, not guarantees.
+Target: maintain a 30 FPS average floor on the reference machine (i5-1340P, Iris Xe) at 1080p, DPR 1.5, 5,000 nodes / 10,000 edges. ADR-004 measured the accepted custom instanced path at 33.5 average FPS, p95 70.3ms, and worst 90.1ms with no labels. The average passes; the tail does not yet meet the interactive frame goal. Tail goal: p95 under 50ms after halo mitigation, unvalidated until the next re-measurement. Thermal variance between Iris Xe laptops is real, so all numbers here are allocations and measured baselines, not guarantees.
 
 | Line item | Budget (Tier B, Iris Xe) |
 |---|---|
 | JS: instance/uniform updates, picking, tooltip projection, WASM calls | <= 8ms |
-| Candidate node instances (<= 10 draw calls, one per kind shape, if custom path wins) | ~3ms |
-| Candidate halo shells (instanced, bounded quad size 1.5-2x radius) | ~2ms |
-| Candidate custom edge layer (target 1 draw call; fill-rate is the real cost) | ~4ms |
+| Node instances (<= 10 draw calls, one per kind shape) | ~3ms |
+| Conditional halo shells (instanced, bounded quad size 1.5-2x radius, distance-culled and tier-gated) | ~2ms target, first mitigation target |
+| Custom merged edge layer (target 1 draw call; fill-rate is the real cost) | ~4ms |
 | Particles (<= 600) | ~2ms |
 | Labels (<= 60 troika draws) | ~1.5ms |
 | Background + fog + starfield | ~0.5ms |
 | Headroom | ~4ms |
 
-**First-render budget:** font and SDF atlas preparation must stay off the critical path; interactive readiness is under 5 seconds. If that cannot hold in the spike, the allocation is wrong.
+**First-render budget:** font and SDF atlas preparation must stay off the critical path; interactive readiness is under 5 seconds. If that cannot hold in the regression benchmark, the allocation is wrong.
 
 **Ceilings (tokens):** 5,000 nodes; 10,000 edges in one geometry; 600 particles absolute; 60 visible labels (150 hard max); < 100 draw calls; DPR 1.5. Layout is always precomputed (cooldownTicks 0, no browser simulation; live relayout runs in the WASM core or a worker and hands back positions).
 
 **Quality tiers (GitHub globe pattern):**
 - Tier A (discrete GPU): DPR up to 2.0, selective half-res bloom on, full particle budget.
-- Tier B (Iris Xe target, default): DPR 1.5, halo glow only, particles top 5% capped.
+- Tier B (Iris Xe target, default): DPR 1.5, distance-culled and tier-gated halo glow, particles top 5% capped.
 - Tier C: DPR 1.0, particles off, resting halos off, label cap 30, hover raycast throttled.
 - Tier D (emergency floor): half-resolution render upscaled; far nodes as a Points impostor layer.
 
-**Degradation order:** bloom -> DPR -> particles -> resting halos -> label cap -> far-node Points LOD -> half-res render. **Detection:** 2-second startup probe (median frame time on a representative scene, cached in localStorage) picks the initial tier; at runtime, a rolling 3s median frame time > 33ms steps down one tier; step up only after 30s under 20ms (hysteresis). The tier is a user-visible setting - the machine's guess never overrides the person.
+**Degradation order:** halos first when fill-rate or dolly-in p95 spikes appear, then bloom -> DPR -> particles -> label cap -> far-node Points LOD -> half-res render. **Detection:** 2-second startup probe (median frame time on a representative scene, cached in localStorage) picks the initial tier; at runtime, a rolling 3s median frame time > 33ms steps down one tier; step up only after 30s under 20ms (hysteresis). The tier is a user-visible setting - the machine's guess never overrides the person.
 
 **Idle economics:** render-on-demand. With frozen layout the scene is static unless the camera, a hover/selection, or particles animate. Dirty-flag the loop; pause after N seconds idle and on `visibilitychange` (`pauseAnimation()`/`resumeAnimation()`); resume instantly on pointerdown/wheel/keydown/focus. Reduced-motion mode disables the loop-keepers entirely and is therefore also the performance floor mode - one shared code path.
 
-**Bundle budget (5MB single file):** the 5MB budget is RAW bytes of `dist/index.html` as measured by `scripts/check-size.mjs`, not gzip or brotli size. Allocations are code + libraries + fonts <= 2.0MB, embedded graph data <= 2.5MB, and 0.5MB headroom. Snapshots embed a permission-filtered PROJECTION for one explicit viewer context, with provenance summaries and tier summaries only; full provenance envelopes remain in the store. The snapshot is a versioned export format, formalized in Phase 4. If the projection cannot fit the raw-byte budget, `scripts/check-size.mjs` fails the build loudly; it never drops data, strips provenance summaries, swaps to a lower-fidelity projection, or degrades silently. `vite-plugin-singlefile` + `resolve.dedupe: ['three']`, exact-pinned three/3d-force-graph versions, Vite 7.x pin encoded in package.json, and the bundle-size CI check enforce the same raw-byte limit.
+**Bundle budget (5MB single file):** the 5MB budget is RAW bytes of `dist/index.html` as measured by `scripts/check-size.mjs`, not gzip or brotli size. Allocations are code + libraries + fonts <= 2.0MB, embedded graph data <= 2.5MB, and 0.5MB headroom. Runtime bundle math covers real product runtime dependencies only: three, troika if adopted, app code, and wasm. Snapshots embed a permission-filtered PROJECTION for one explicit viewer context, with provenance summaries and tier summaries only; full provenance envelopes remain in the store. The snapshot is a versioned export format, formalized in Phase 4. If the projection cannot fit the raw-byte budget, `scripts/check-size.mjs` fails the build loudly; it never drops data, strips provenance summaries, swaps to a lower-fidelity projection, or degrades silently. `vite-plugin-singlefile` + `resolve.dedupe: ['three']`, exact graphics-stack pins encoded in package.json, and the bundle-size CI check enforce the same raw-byte limit.
 
 ## 7. Accessibility commitments
 
@@ -222,13 +222,13 @@ Mapped to the R9 launch criteria (R9.1 ARIA, R9.2 keyboard, R9.3 reduced motion,
 ## 8. What we are NOT doing
 
 Rendering and color:
-1. **No 3d-force-graph default per-node meshes at scale without proof** - documented collapse at 5k-7k elements; scalable rendering must be proven in the spike.
+1. **No product runtime dependency on spike renderer libraries** - ADR-004 rejects the library graph stacks for product code. Spike-only devDependencies are `3d-force-graph` and `three-forcegraph`.
 2. **No full-resolution UnrealBloomPass** - the documented Intel-GPU failure mode (20-40 FPS, GPU pegged); bloom is selective, half-res, Tier A only.
 3. **No ACES Filmic tone mapping** - it desaturates and hue-shifts the community-supplied colors that ARE the data; Neutral only.
 4. **No pure #000 background / pure #FFF text** - banding, halation for astigmatic users, defeats fog layering, and reads surveillance-hacker.
 5. **No MeshStandardMaterial/PBR on nodes** - wastes fragment budget for a look Lambert + emissive does better here.
 6. **No DoF, SSAO, film grain, or OutlinePass render passes** - each adds fullscreen passes the iGPU cannot afford; fog is the depth cue, DOM ring is the focus indicator, grain folds into the background shader if ever wanted.
-7. **No per-edge transparent meshes with depthWrite** - the classic iGPU fill-rate killer; if the custom edge path wins, it uses one merged vertex-colored geometry with depthWrite off.
+7. **No per-edge transparent meshes with depthWrite** - the classic iGPU fill-rate killer; the ADR-004 edge path uses one merged vertex-colored geometry with depthWrite off.
 8. **No labeling every node, per-node sprites, or per-node HTML overlays** - grid-culled SDF set + one DOM tooltip only.
 9. **No uniform neon saturation** - max-chroma-everywhere is the surveillance signature and vibrates on dark; resting C 0.10-0.13, saturation spent on selection.
 10. **No animated starfield or non-optional idle rotation** - large-field ambient motion is the prefers-reduced-motion trigger class; drift is slow, yielding, and off under RM.
@@ -255,8 +255,8 @@ Chrome and architecture:
 27. **No always-running render loop in hidden or idle tabs** - render-on-demand; a community tool lives in a tab all day.
 28. **No loose 0.x dependency ranges on the graphics stack** - three breaks APIs between minors; exact pins + CI bundle check.
 29. **No exact-color preservation promise** - community intent leads, legibility wins, and the deterministic accessibility pipeline may adjust supplied colors.
-30. **No promise that `nodeThreeObject` alone yields scalable instancing** - the rendering spike must prove the actual path on the reference machine.
-31. **No simultaneous ownership of edge rendering by the library link stack and a custom geometry** - one edge system must win after the spike.
+30. **No promise that `nodeThreeObject` alone yields scalable instancing** - ADR-004 selects owned instancing rather than per-node object factories.
+31. **No simultaneous ownership of edge rendering by the library link stack and a custom geometry** - ADR-004 selects one merged edge system.
 32. **No blanket claim that all hover, selected, and focus changes are buffer writes only** - a capped JS damp loop is allowed for small hovered or selected sets.
 33. **No claim that mass focus blending works with stock `LineBasicMaterial` or `MeshLambert` alone** - the blend path needs custom shader material(s).
 34. **No fixed-sky assumption for focus indicators** - focus rings derive from the actual template background tokens.
@@ -269,30 +269,31 @@ Chrome and architecture:
 
 Ordered; each item is one work unit with a testable output.
 
-1. Rendering spike: prototype custom instanced Three layer vs `three-forcegraph` vs stock `3d-force-graph`; acceptance is 30 FPS at 5,000 nodes / 10,000 edges, DPR 1.5, thermally steady, on the reference machine (i5-1340P, Iris Xe). Exactly one edge system owns edge rendering after the spike. Then define the DTCG token schema (color roles, motion, radius, vocabulary, kinds) and author the default "Hearthlight" group template JSON - the default theme is just another template.
+1. Define the DTCG-style token schema (color roles, motion, radius, vocabulary, kinds) and author the default "Hearthlight" group template JSON - the default theme is just another template.
 2. Build the OKLCH derivation module: kind ramps, surface ladder, state offsets; emit CSS custom properties at load.
 3. Add the APCA text-color solver (apca-w3) + WCAG 4.5:1 floor check + 3:1 non-text auto-nudge, wired into template load.
 4. Add the CVD validator (3 simulation matrices + CIEDE2000) and the friendly diagnostics surface for template errors (also consumes story-path/view-mode validation).
 5. Renderer bootstrap: NeutralToneMapping, DPR cap token, background gradient shader with IGN dither + vignette, static starfield, FogExp2 tied to bg tokens, 3-light rig from tokens.
-6. Renderer path from spike: if the custom path wins, implement per-kind InstancedMesh (6 shapes), instanceColor/scale buffers, instanceId picking, positions from the WASM projection (cooldownTicks 0); otherwise document the selected library path and equivalent constraints.
-7. Fresnel halo shell layer (instanced, BackSide, falloff tokens) with resting/selected alpha states.
-8. Edge layer selected by the spike: exactly one owner; if custom wins, single LineSegments geometry, endpoint-blended vertex colors, weight-mapped alpha, depthWrite off, and multi-edge curvature pass.
-9. Focus-mode pipeline: adjacency index at load, single pure state-resolver function, candidate aHighlight/aDelay attributes, candidate uFocusBlend uniform, 300ms blend + 500ms-capped stagger, RM branch, with custom shader material(s) if the resident-buffer blend path wins.
-10. Motion module: token table as CSS custom properties + TS constants, `damp()` helpers, `motionEnabled` state (media query + change listener + visible calm-mode toggle).
-11. Camera choreography: fly-to with early aim-lock and panel-offset centering, view-mode zoomToFit presets, vection rules (particle fade + peripheral dim during flights), RM crossfade-cut path.
-12. Idle drift: autoRotateSpeed 0.2 with deltaTime, pause-on-interaction, 10s resume with 2s ease-in, engagement vetoes, RM off.
-13. Particle layer: export-time percentile flagging with absolute caps, emitParticle cascade with AbortController, visible pause control (WCAG 2.2.2).
-14. Label system: troika-three-text with subsetted woff, screen-grid density culling, zoom-adaptive progressive disclosure, dark halos, fade-before-fog, single DOM tooltip (keyboard-triggerable, Escape-dismissible).
-15. Quality tier manager: 2s startup probe cached in localStorage, rolling-median runtime stepping with hysteresis, user-visible override; tiers A-D wired to bloom/DPR/particles/halos/labels.
-16. Render-on-demand loop: dirty-flag invalidation, visibilitychange + idle pause, instant resume.
-17. Selective bloom Tier A path: pmndrs composer, half-res, threshold 0.85, FXAA final pass, fully absent on Tier B and below.
-18. Panel shell component (header/body/sticky-footer grid), Material A/B tokens, transparency fallback ladder, one focus-trap implementation.
-19. Desktop layout: toolbar + left list panel + right detail panel, edge-docked, collapsible, debounced canvas resize, clip-path guard.
-20. 375px layout: non-modal bottom sheet with 3 snap points (button drag handle, translateY only), hamburger left panel, 24px targets, enlarged touch raycast radius.
-21. Typography: subset Atkinson Hyperlegible Next (woff2 DOM + woff troika), data-URI embed, character-set audit build step, fallback stack.
-22. Parallel DOM layer: Data Navigator-pattern structure from the WASM projection, virtualized, bidirectional selection sync, canvas summary region, debounced aria-live announcer.
-23. Keyboard traversal: roving tabindex composite, neighbor arrow grammar, type-ahead, projected DOM focus ring with contrast guarantees.
-24. Splash screen: SVG/CSS composition, min-display reconciliation with engine-ready gate, 700ms exit into gentle zoomToFit, RM crossfade.
-25. Warmth pass: legend generated from theme, empty-state SVG system on currentColor, avatar chips, template vocabulary threading, governance block on detail panels.
-26. Build hardening: singlefile Vite config with three dedupe, exact version pins, JSON exporter field-stripping/quantization, 5MB CI bundle check.
-27. Acceptance run: WCAG 2.2 criteria map (2.1.1, 2.2.2, 1.4.11, 1.4.13, 2.4.7/11/13, 2.5.8, 4.1.3) + 30 FPS verification on Iris Xe reference hardware + 375px walkthrough + RM walkthrough, all against the default template and one deliberately hostile test template.
+6. ADR-004 renderer path: implement per-kind InstancedMesh (6 shapes), instanceColor/scale buffers, instanceId picking, and positions from the WASM projection (cooldownTicks 0).
+7. Quality tier manager: 2s startup probe cached in localStorage, rolling-median runtime stepping with hysteresis, user-visible override; tiers A-D wired to degrade halos first, then bloom/DPR/particles/labels.
+8. Fresnel halo shell layer (instanced, BackSide, falloff tokens) with distance-culling, quality-tier gating, and resting/selected alpha states.
+9. Label system: troika-three-text with subsetted woff, screen-grid density culling, zoom-adaptive progressive disclosure, dark halos, fade-before-fog, single DOM tooltip (keyboard-triggerable, Escape-dismissible).
+10. Particle layer: custom edge-indexed emitter keyed by the merged edge index, export-time percentile flagging with absolute caps, cascade bursts with AbortController, visible pause control (WCAG 2.2.2).
+11. Edge layer: single merged `LineSegments` geometry, endpoint-blended vertex colors, weight-mapped alpha, depthWrite off, and multi-edge curvature pass.
+12. Wire app/spike as the regression benchmark after the base renderer and edge layer land; rerun and update ADR-004's table on material renderer changes.
+13. Focus-mode pipeline: adjacency index at load, single pure state-resolver function, aHighlight/aDelay attributes, uFocusBlend uniform, 300ms blend + 500ms-capped stagger, RM branch, with custom shader material(s) for the resident-buffer blend path.
+14. Motion module: token table as CSS custom properties + TS constants, `damp()` helpers, `motionEnabled` state (media query + change listener + visible calm-mode toggle).
+15. Camera choreography: fly-to with early aim-lock and panel-offset centering, view-mode zoomToFit presets, vection rules (particle fade + peripheral dim during flights), RM crossfade-cut path.
+16. Idle drift: autoRotateSpeed 0.2 with deltaTime, pause-on-interaction, 10s resume with 2s ease-in, engagement vetoes, RM off.
+17. Render-on-demand loop: dirty-flag invalidation, visibilitychange + idle pause, instant resume.
+18. Selective bloom Tier A path: pmndrs composer, half-res, threshold 0.85, FXAA final pass, fully absent on Tier B and below.
+19. Panel shell component (header/body/sticky-footer grid), Material A/B tokens, transparency fallback ladder, one focus-trap implementation.
+20. Desktop layout: toolbar + left list panel + right detail panel, edge-docked, collapsible, debounced canvas resize, clip-path guard.
+21. 375px layout: non-modal bottom sheet with 3 snap points (button drag handle, translateY only), hamburger left panel, 24px targets, enlarged touch raycast radius.
+22. Typography: subset Atkinson Hyperlegible Next (woff2 DOM + woff troika), data-URI embed, character-set audit build step, fallback stack.
+23. Parallel DOM layer: Data Navigator-pattern structure from the WASM projection, virtualized, bidirectional selection sync, canvas summary region, debounced aria-live announcer.
+24. Keyboard traversal: roving tabindex composite, neighbor arrow grammar, type-ahead, projected DOM focus ring with contrast guarantees.
+25. Splash screen: SVG/CSS composition, min-display reconciliation with engine-ready gate, 700ms exit into gentle zoomToFit, RM crossfade.
+26. Warmth pass: legend generated from theme, empty-state SVG system on currentColor, avatar chips, template vocabulary threading, governance block on detail panels.
+27. Build hardening: singlefile Vite config with three dedupe, exact version pins, JSON exporter field-stripping/quantization, 5MB CI bundle check.
+28. Acceptance run: WCAG 2.2 criteria map (2.1.1, 2.2.2, 1.4.11, 1.4.13, 2.4.7/11/13, 2.5.8, 4.1.3) + 30 FPS average verification on Iris Xe reference hardware + p95 tail re-measurement + 375px walkthrough + RM walkthrough, all against the default template and one deliberately hostile test template.
