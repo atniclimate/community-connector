@@ -68,9 +68,38 @@ wasm32-unknown-unknown -p <crate>, pii-scan - then atomic commit, then
    mitigates; D2 typed-array escape hatch if browser profiling demands),
    and wasm-side timings should be re-measured in the smoke page before
    Phase 3 relies on them.
-6. IN FLIGHT: closing codex review over the whole core
-   (.codex/task-core-review.md -> .codex/core-review.md) -> director judges
-   findings -> fixes -> Phase 2 core CLOSED (frontend work is Phase 3).
+6. DONE: closing review returned FIXES-REQUIRED (archived at
+   docs/analysis/core-review-phase2-2026-07-06.md); director rulings in
+   D-016; all accepted fixes applied, spot-checked, re-verified, committed.
+
+**PHASE 2 CORE: CLOSED** (2026-07-06). cn-sync is intentionally a
+placeholder - the SyncTransport trait + local adapter are Phase 5 scope per
+the phase plan (D-016); ADR-002 A-B8 defines the contract they must meet.
+
+## Next phase: Phase 3 - Frontend
+
+Driven by docs/design/DESIGN_BRIEF.md (revised; its critique round 2 is
+parked until spike evidence exists). Acceptance: CLAUDE.md phase plan
+(viz + view modes, template-driven color, stories, detail panels, wizard +
+profile editor, explicit state machine per I4, tsc + vite build clean, both
+fixture groups load and render, R9 accessibility criteria, snapshot under
+budget).
+
+### Exact next three actions
+
+1. THE RENDERING SPIKE (design brief section 9 item 1): prototype custom
+   instanced Three layer vs three-forcegraph vs stock 3d-force-graph at
+   5k nodes / 10k edges from a generated synthetic projection; acceptance
+   30 FPS at DPR 1.5 thermally steady on this machine; ONE edge system.
+   Deps land in app/ (three, 3d-force-graph pinned versions into
+   docs/ENVIRONMENT.md). Decision recorded as ADR-004 (renderer choice).
+2. Design brief critique round 2 (codex review) WITH spike numbers in hand;
+   revise brief; then app state machine skeleton (I4) + wasm worker
+   integration (ADR-003 D5: worker owns the CnApi instance; monotonic
+   revision enforcement).
+3. Template-driven theming pipeline from the brief section 5 (tokens from
+   group template JSON, contrast + CVD enforcement, legend indicator) over
+   both fixture templates.
 
 Review debt to schedule (routing policy standing job): a codex review diff
 pass over the accumulated core implementation commits before Phase 2 close.
