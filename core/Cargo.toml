@@ -1,0 +1,18 @@
+[workspace]
+resolver = "3"
+members = [
+    "crates/cn-model",
+    "crates/cn-schema",
+    "crates/cn-perm",
+    "crates/cn-graph",
+    "crates/cn-store",
+    "crates/cn-sync",
+    "crates/cn-ingest",
+    "crates/cn-wasm",
+    "cli",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+

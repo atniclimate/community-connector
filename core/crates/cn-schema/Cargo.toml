@@ -1,0 +1,8 @@
+[package]
+name = "cn-schema"
+version.workspace = true
+edition.workspace = true
+publish = false
+
+[dependencies]
+

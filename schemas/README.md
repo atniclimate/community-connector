@@ -1,0 +1,1 @@
+JSON Schemas for group templates, ingest formats, Codex output contracts, and story paths. Every schema carries an explicit version so readers can reject unknown majors loudly, per the repository invariants.
