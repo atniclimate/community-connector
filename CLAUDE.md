@@ -140,6 +140,15 @@ those, and any file pairing a real name with contact info.
 - **Cadence:** many small completed units over one heroic branch. Report Codex usage
   at ~50% of session budget. A 2x estimate blowout is a ladder trigger, not a reason
   to grind harder.
+- **Atomic writes and commits (human directive, 2026-07-06):** every completed,
+  verified unit commits immediately as its own conventional commit - never ask
+  permission to commit, never batch units, never leave a verified unit sitting
+  uncommitted. Files are written whole (no partial staged states between units).
+- **Token routing (human directive, 2026-07-06):** the routing policy in
+  docs/CODEX_GUIDE.md section 7 is mandatory practice, not advice: Codex absorbs
+  research, first drafts, mechanical implementation, and bulk transforms; Claude
+  reads compressed outputs, judges, and commits. Re-arm a one-shot 8:00 AM local
+  resume cron each session while this directive stands, in case usage exhausts.
 - **Usage failover (human directive, 2026-07-06):** if Claude usage limit reaches
   ~98%, offload the active job to Codex (`grind` profile for mechanical work,
   `review` for judgment-adjacent checks), park director-level judgment work in
