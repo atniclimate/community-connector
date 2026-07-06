@@ -1,0 +1,4 @@
+#!/bin/sh
+# PII tripwire (AGENTS.md I1) - blocks commits containing PII patterns.
+# Installed via: git config core.hooksPath scripts/hooks  (scripts/install-hooks.ps1)
+pwsh -NoProfile -File "$(git rev-parse --show-toplevel)/scripts/pii-scan.ps1" -Staged

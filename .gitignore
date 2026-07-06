@@ -1,0 +1,24 @@
+# Build output
+target/
+dist/
+node_modules/
+pkg/
+.vite/
+*.tsbuildinfo
+
+# Codex scratch space
+.codex/
+
+# Env files and secrets
+.env
+.env.*
+
+# Defensive PII patterns (AGENTS.md I1; predecessor exclusion list)
+source_data/
+research_edges/
+*_partners*
+*participants*
+
+# OS noise
+Thumbs.db
+.DS_Store
