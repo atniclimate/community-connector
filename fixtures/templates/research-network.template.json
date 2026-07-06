@@ -81,7 +81,7 @@
     }
   ],
   "edge_kinds": [
-    { "id": "coauthored", "label": "co-authored with", "from": ["person"], "to": ["person"], "directed": false, "weighted": true },
+    { "id": "coauthored", "label": "co-authored with", "from": ["person"], "to": ["person"], "directed": false, "weighted": "optional" },
     { "id": "authored", "label": "authored", "from": ["person"], "to": ["publication"], "directed": true },
     { "id": "affiliated_with", "label": "affiliated with", "from": ["person"], "to": ["organization"], "directed": true },
     { "id": "studies", "label": "studies", "from": ["person", "publication"], "to": ["species", "study_area"], "directed": true },

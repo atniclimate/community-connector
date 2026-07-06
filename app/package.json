@@ -7,9 +7,12 @@
     "dev": "vite",
     "typecheck": "tsc --noEmit",
     "build": "vite build",
+    "validate:templates": "node scripts/validate-templates.mjs",
     "build:snapshot": "vite build --mode snapshot && node ../scripts/check-size.mjs dist/index.html"
   },
   "devDependencies": {
+    "ajv": "^8.20.0",
+    "ajv-formats": "^3.0.1",
     "typescript": "^6.0.3",
     "vite": "^7.3.6",
     "vite-plugin-singlefile": "^2.3.3"

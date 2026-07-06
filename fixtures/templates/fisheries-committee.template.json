@@ -84,7 +84,7 @@
   "edge_kinds": [
     { "id": "has_skill", "label": "brings", "from": ["person"], "to": ["skill_resource"], "directed": true },
     { "id": "raised_need", "label": "raised", "from": ["person"], "to": ["need"], "directed": true },
-    { "id": "need_met_by", "label": "could be met by", "from": ["need"], "to": ["skill_resource", "person", "project"], "directed": true, "weighted": true },
+    { "id": "need_met_by", "label": "could be met by", "from": ["need"], "to": ["skill_resource", "person", "project"], "directed": true, "weighted": "optional" },
     { "id": "stewards", "label": "stewards", "from": ["person"], "to": ["fishing_site"], "directed": true },
     { "id": "works_on", "label": "works on", "from": ["person"], "to": ["project"], "directed": true },
     { "id": "attends", "label": "attends", "from": ["person"], "to": ["gathering"], "directed": true }

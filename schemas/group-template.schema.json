@@ -1,0 +1,250 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://community-navigator.example.test/schemas/group-template/0.1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "template_id",
+    "name",
+    "description",
+    "kinds",
+    "edge_kinds"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "0.1.0"
+    },
+    "template_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$"
+    },
+    "name": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "vocabulary": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "kinds": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "label",
+          "shape",
+          "color_role",
+          "attributes"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_-]*$"
+          },
+          "label": {
+            "type": "string"
+          },
+          "shape": {
+            "type": "string",
+            "enum": [
+              "sphere",
+              "cube",
+              "octahedron",
+              "tetrahedron",
+              "torus",
+              "cone"
+            ]
+          },
+          "color_role": {
+            "type": "string",
+            "pattern": "^kind-[1-9][0-9]*$"
+          },
+          "attributes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "type"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_]*$"
+                },
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "text",
+                    "number",
+                    "enum",
+                    "tags",
+                    "date",
+                    "geo",
+                    "link",
+                    "media"
+                  ]
+                },
+                "required": {
+                  "type": "boolean"
+                },
+                "default_visibility": {
+                  "type": "string",
+                  "enum": [
+                    "private",
+                    "trusted",
+                    "group",
+                    "network",
+                    "public"
+                  ]
+                },
+                "format": {
+                  "type": "string",
+                  "enum": [
+                    "email",
+                    "url"
+                  ]
+                },
+                "values": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "allOf": [
+                {
+                  "if": {
+                    "properties": {
+                      "type": {
+                        "const": "enum"
+                      }
+                    },
+                    "required": [
+                      "type"
+                    ]
+                  },
+                  "then": {
+                    "required": [
+                      "values"
+                    ]
+                  },
+                  "else": {
+                    "not": {
+                      "required": [
+                        "values"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "if": {
+                    "properties": {
+                      "type": {
+                        "const": "link"
+                      }
+                    },
+                    "required": [
+                      "type"
+                    ]
+                  },
+                  "then": {},
+                  "else": {
+                    "not": {
+                      "required": [
+                        "format"
+                      ]
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    "edge_kinds": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "label",
+          "from",
+          "to",
+          "directed"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_-]*$"
+          },
+          "label": {
+            "type": "string"
+          },
+          "from": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_-]*$"
+            }
+          },
+          "to": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_-]*$"
+            }
+          },
+          "directed": {
+            "type": "boolean"
+          },
+          "weighted": {
+            "type": "string",
+            "enum": [
+              "required",
+              "optional",
+              "forbidden"
+            ]
+          }
+        }
+      }
+    },
+    "theme": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode",
+        "roles"
+      ],
+      "properties": {
+        "mode": {
+          "type": "string"
+        },
+        "roles": {
+          "type": "object",
+          "additionalProperties": false,
+          "patternProperties": {
+            "^kind-[1-9][0-9]*$": {
+              "type": "string",
+              "pattern": "^#[0-9a-f]{6}$"
+            }
+          }
+        }
+      }
+    }
+  }
+}
