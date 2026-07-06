@@ -7,17 +7,20 @@ import {
   IcosahedronGeometry,
   InstancedMesh,
   Matrix4,
-  MeshLambertMaterial,
   Object3D,
   OctahedronGeometry,
+  ShaderMaterial,
   SphereGeometry,
   TetrahedronGeometry,
   TorusGeometry,
+  UniformsLib,
+  UniformsUtils,
+  Vector3,
   type BufferGeometry,
 } from "three";
 import type { KindMeta, ProjectionDto, ProjectionEntityDto, ShapeName } from "../state/state";
 import type { Theme } from "../theme/tokens";
-import { RENDER_TOKENS } from "./config";
+import { RENDER_COLORS, RENDER_TOKENS } from "./config";
 import type { LayoutResult } from "./layout";
 import { degreeByEntityId, kindColor, projectedEdges } from "./projection";
 
@@ -42,6 +45,14 @@ const TORUS_RADIAL_SEGMENTS = 6;
 const TORUS_TUBULAR_SEGMENTS = 12;
 const CONE_RADIUS = 1;
 const CONE_HEIGHT = 2;
+const FULL_COLOR_SHARE = 1;
+const NODE_DIFFUSE_SHARE = FULL_COLOR_SHARE - RENDER_TOKENS.node.emissiveShare;
+const KEY_DIRECTION_X = -0.35;
+const KEY_DIRECTION_Y = 0.8;
+const KEY_DIRECTION_Z = 0.45;
+const FILL_DIRECTION_X = 0.45;
+const FILL_DIRECTION_Y = -0.55;
+const FILL_DIRECTION_Z = 0.65;
 const MATRIX = new Matrix4();
 const DUMMY = new Object3D();
 
@@ -73,10 +84,62 @@ export function degreeToScale(degree: number): number {
   return RENDER_TOKENS.node.minRadius + t * (RENDER_TOKENS.node.maxRadius - RENDER_TOKENS.node.minRadius);
 }
 
-function material(): MeshLambertMaterial {
-  return new MeshLambertMaterial({
-    vertexColors: true,
-    emissive: new Color(RENDER_TOKENS.node.minDegree, RENDER_TOKENS.node.minDegree, RENDER_TOKENS.node.minDegree),
+function material(): ShaderMaterial {
+  return new ShaderMaterial({
+    fog: true,
+    uniforms: UniformsUtils.merge([
+      UniformsLib.fog,
+      {
+        uDiffuseShare: { value: NODE_DIFFUSE_SHARE },
+        uNodeEmissiveShare: { value: RENDER_TOKENS.node.emissiveShare },
+        uKeyColor: { value: new Color(RENDER_COLORS.keyLight) },
+        uFillColor: { value: new Color(RENDER_COLORS.fillLight) },
+        uKeyDirection: { value: new Vector3(KEY_DIRECTION_X, KEY_DIRECTION_Y, KEY_DIRECTION_Z) },
+        uFillDirection: { value: new Vector3(FILL_DIRECTION_X, FILL_DIRECTION_Y, FILL_DIRECTION_Z) },
+        uKeyIntensity: { value: RENDER_TOKENS.scene.keyIntensity },
+        uFillIntensity: { value: RENDER_TOKENS.scene.fillIntensity },
+        uAmbientIntensity: { value: RENDER_TOKENS.scene.ambientIntensity },
+      },
+    ]),
+    vertexShader: `
+      #include <common>
+      #include <fog_pars_vertex>
+      varying vec3 vNodeColor;
+      varying vec3 vNodeNormal;
+      void main() {
+        vNodeColor = instanceColor;
+        vNodeNormal = normalize(normalMatrix * mat3(instanceMatrix) * normal);
+        vec4 mvPosition = modelViewMatrix * instanceMatrix * vec4(position, 1.0);
+        gl_Position = projectionMatrix * mvPosition;
+        #include <fog_vertex>
+      }
+    `,
+    fragmentShader: `
+      #include <common>
+      #include <fog_pars_fragment>
+      varying vec3 vNodeColor;
+      varying vec3 vNodeNormal;
+      uniform float uDiffuseShare;
+      uniform float uNodeEmissiveShare;
+      uniform vec3 uKeyColor;
+      uniform vec3 uFillColor;
+      uniform vec3 uKeyDirection;
+      uniform vec3 uFillDirection;
+      uniform float uKeyIntensity;
+      uniform float uFillIntensity;
+      uniform float uAmbientIntensity;
+      void main() {
+        vec3 normal = normalize(vNodeNormal);
+        float key = max(dot(normal, normalize(uKeyDirection)), 0.0) * uKeyIntensity;
+        float fill = max(dot(normal, normalize(uFillDirection)), 0.0) * uFillIntensity;
+        vec3 lambert = (vec3(uAmbientIntensity) + uKeyColor * key + uFillColor * fill) * uDiffuseShare;
+        vec3 outgoingLight = vNodeColor * (lambert + vec3(uNodeEmissiveShare));
+        gl_FragColor = vec4(outgoingLight, 1.0);
+        #include <tonemapping_fragment>
+        #include <colorspace_fragment>
+        #include <fog_fragment>
+      }
+    `,
   });
 }
 

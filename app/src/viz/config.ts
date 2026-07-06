@@ -17,6 +17,7 @@ export const RENDER_TOKENS = {
     maxRadius: 10,
     minDegree: 0,
     referenceDegree: 12,
+    emissiveShare: 0.45,
     selectedScale: 1.2,
     dimmedScale: 0.75,
     geometryDetail: 1,
@@ -35,8 +36,8 @@ export const RENDER_TOKENS = {
     restingAlpha: 0.15,
     selectedAlpha: 0.8,
     maxVisible: 300,
-    tierBDistance: 650,
-    tierADistance: 900,
+    tierBDistance: 1600,
+    tierADistance: 2200,
   },
   quality: {
     emaAlpha: 0.08,

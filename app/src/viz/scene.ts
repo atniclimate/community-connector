@@ -1,17 +1,17 @@
 import {
   AmbientLight,
-  BackSide,
   BufferAttribute,
   BufferGeometry,
   Color,
   DirectionalLight,
+  DoubleSide,
   FogExp2,
   Mesh,
+  PlaneGeometry,
   Points,
   PointsMaterial,
   ShaderMaterial,
   Scene,
-  SphereGeometry,
 } from "three";
 import type { Theme } from "../theme/tokens";
 import { RENDER_COLORS, RENDER_TOKENS } from "./config";
@@ -29,11 +29,10 @@ const LCG_C = 1013904223;
 const UINT32_MOD = 0x100000000;
 const UNIT = 1;
 const DOUBLE = 2;
-const BACKGROUND_WIDTH_SEGMENTS = 32;
-const BACKGROUND_HEIGHT_SEGMENTS = 16;
-const BACKGROUND_RADIUS_MULTIPLIER = 2;
+const BACKGROUND_SIZE = 2;
 const VIGNETTE_EDGE = 0.85;
 const DITHER_SCALE = 255;
+const BACKGROUND_RENDER_ORDER = -1000;
 
 function token(theme: Theme | null, key: string, fallback: string): string {
   return theme?.tokens[key]?.hex ?? fallback;
@@ -69,14 +68,11 @@ function starfield(): Points {
   return new Points(geometry, material);
 }
 
-function background(center: string, edge: string): Mesh<SphereGeometry, ShaderMaterial> {
-  const geometry = new SphereGeometry(
-    RENDER_TOKENS.scene.starRadius * BACKGROUND_RADIUS_MULTIPLIER,
-    BACKGROUND_WIDTH_SEGMENTS,
-    BACKGROUND_HEIGHT_SEGMENTS,
-  );
+function background(center: string, edge: string): Mesh<PlaneGeometry, ShaderMaterial> {
+  const geometry = new PlaneGeometry(BACKGROUND_SIZE, BACKGROUND_SIZE);
   const material = new ShaderMaterial({
-    side: BackSide,
+    side: DoubleSide,
+    depthTest: false,
     depthWrite: false,
     uniforms: {
       uCenter: { value: new Color(center) },
@@ -85,15 +81,15 @@ function background(center: string, edge: string): Mesh<SphereGeometry, ShaderMa
       uDitherScale: { value: DITHER_SCALE },
     },
     vertexShader: `
-      varying vec3 vWorld;
+      varying vec2 vUv;
       void main() {
-        vec4 world = modelMatrix * vec4(position, 1.0);
-        vWorld = normalize(world.xyz);
-        gl_Position = projectionMatrix * viewMatrix * world;
+        vUv = uv;
+        gl_Position = vec4(position.xy, 1.0, 1.0);
       }
     `,
     fragmentShader: `
-      varying vec3 vWorld;
+      #include <common>
+      varying vec2 vUv;
       uniform vec3 uCenter;
       uniform vec3 uEdge;
       uniform float uVignetteEdge;
@@ -102,14 +98,19 @@ function background(center: string, edge: string): Mesh<SphereGeometry, ShaderMa
         return fract(52.9829189 * fract(dot(p, vec2(0.06711056, 0.00583715))));
       }
       void main() {
-        float radial = smoothstep(0.0, uVignetteEdge, length(vWorld.xy));
+        vec2 centered = vUv * 2.0 - 1.0;
+        float radial = smoothstep(0.0, uVignetteEdge, length(centered));
         vec3 color = mix(uCenter, uEdge, radial);
         color += (ign(gl_FragCoord.xy) - 0.5) / uDitherScale;
         gl_FragColor = vec4(color, 1.0);
+        #include <colorspace_fragment>
       }
     `,
   });
-  return new Mesh(geometry, material);
+  const mesh = new Mesh(geometry, material);
+  mesh.frustumCulled = false;
+  mesh.renderOrder = BACKGROUND_RENDER_ORDER;
+  return mesh;
 }
 
 export function createVizScene(theme: Theme | null): SceneSetup {

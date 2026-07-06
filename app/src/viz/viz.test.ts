@@ -4,11 +4,22 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { Color, Raycaster } from "three";
+import {
+  Color,
+  InstancedMesh,
+  Matrix4,
+  Mesh,
+  Object3D,
+  Raycaster,
+  ShaderMaterial,
+  Vector3,
+} from "three";
 import type { ProjectionDto } from "../state/state";
 import type { Theme } from "../theme/tokens";
 import { motionSettings } from "./camera";
+import { RENDER_TOKENS } from "./config";
 import { buildEdgeBuffers, expectedEdgeVertexCount, weightToAlpha } from "./edges";
+import { buildHaloLayer } from "./halos";
 import { computeLayout, layoutSnapshot } from "./layout";
 import { buildNodeLayer, degreeToScale, degreesForProjection, recolorNodeLayer } from "./nodes";
 import {
@@ -18,6 +29,7 @@ import {
   type PickDispatch,
 } from "./picking";
 import { profileForTier, QualityManager } from "./quality";
+import { createVizScene } from "./scene";
 
 const entityA = "entity-a";
 const entityB = "entity-b";
@@ -108,6 +120,28 @@ describe("nodes", () => {
     layer.dispose();
   });
 
+  it("splits per-instance kind color between diffuse and emissive material paths", () => {
+    const data = projection();
+    const layer = buildNodeLayer({
+      projection: data,
+      layout: computeLayout(data.entities ?? []),
+      kindMeta: kindMeta(),
+      theme: theme(),
+      degrees: degreesForProjection(data),
+    });
+    const material = layer.records[0]?.mesh.material;
+    if (!(material instanceof ShaderMaterial)) {
+      throw new Error("missing node material");
+    }
+    const diffuseShare = 1 - RENDER_TOKENS.node.emissiveShare;
+
+    expect(material.vertexShader).toContain("vNodeColor = instanceColor");
+    expect(material.fragmentShader).toContain("uNodeEmissiveShare");
+    expect(material.uniforms.uDiffuseShare?.value).toBeCloseTo(diffuseShare);
+    expect(material.uniforms.uNodeEmissiveShare?.value).toBe(RENDER_TOKENS.node.emissiveShare);
+    layer.dispose();
+  });
+
   it("maps degree to bounded scale", () => {
     expect(degreeToScale(-1)).toBe(3);
     expect(degreeToScale(99)).toBe(10);
@@ -126,6 +160,54 @@ describe("edges", () => {
     expect(buffers.colors[3] ?? Number.NaN).toBeCloseTo(weightToAlpha(5));
     expect(weightToAlpha(-99)).toBe(0.08);
     expect(weightToAlpha(99)).toBe(0.6);
+  });
+});
+
+describe("halos", () => {
+  it("keeps resting halos visible across the small default scene and scales shells around nodes", () => {
+    const data = projection();
+    const layout = computeLayout(data.entities ?? []);
+    const layer = buildHaloLayer({
+      projection: data,
+      layout,
+      kindMeta: kindMeta(),
+      theme: theme(),
+      tier: "B",
+      cameraPosition: new Vector3(0, 0, RENDER_TOKENS.camera.initialZ),
+    });
+    const haloCount = layer.group.children.reduce(
+      (sum, child) => sum + (child instanceof InstancedMesh ? child.count : 0),
+      0,
+    );
+    const firstMesh = layer.group.children[0];
+    if (!(firstMesh instanceof InstancedMesh)) {
+      throw new Error("missing halo mesh");
+    }
+    const matrix = new Matrix4();
+    const decomposed = new Object3D();
+    firstMesh.getMatrixAt(0, matrix);
+    matrix.decompose(decomposed.position, decomposed.quaternion, decomposed.scale);
+
+    expect(haloCount).toBe(data.entities?.length);
+    expect(decomposed.scale.x).toBeGreaterThan(degreeToScale(1));
+    layer.dispose();
+  });
+});
+
+describe("scene", () => {
+  it("creates a non-occluding gradient background quad with fog from theme tokens", () => {
+    const setup = createVizScene(theme());
+    const background = setup.scene.children.find((child) => child instanceof Mesh && child.material instanceof ShaderMaterial);
+    if (!(background instanceof Mesh) || !(background.material instanceof ShaderMaterial)) {
+      throw new Error("missing background mesh");
+    }
+
+    expect(background.geometry.type).toBe("PlaneGeometry");
+    expect(background.frustumCulled).toBe(false);
+    expect(background.material.depthTest).toBe(false);
+    expect(background.material.fragmentShader).toContain("colorspace_fragment");
+    expect(setup.scene.fog?.color.getHexString()).toBe("06080d");
+    setup.dispose();
   });
 });
 
