@@ -59,10 +59,18 @@ wasm32-unknown-unknown -p <crate>, pii-scan - then atomic commit, then
    docs/blueprints/cn-api.md is DONE and committed; the task implements
    cn-api + cn-wasm bindings + smoke page + measurement gate in one go;
    verification includes wasm-pack build and npm smoke:node from app/).
-5. cn-api lands -> verify/commit -> run the ignored measurement_gate test,
-   record its numbers in HANDOFF -> codex review diff pass over all core
-   implementation commits (the standing job) -> judge findings -> Phase 2
-   close or fix list.
+5. DONE: cn-api landed, verified (incl. Node wasm smoke PASS), committed.
+   Measurement gate numbers (native, i5-1340P, 5,000 entities + 10,000
+   edges, member viewer, 2026-07-06): fold 255ms; projection compute 133ms;
+   projection JSON 2.88MB; ops JSONL 16.4MB; state JSON proxy 9.87MB.
+   Assessment: within gates for v0. Watch items for Phase 3: projection
+   JSON is 2.9MB per full recompute crossing the wasm boundary (D3 caching
+   mitigates; D2 typed-array escape hatch if browser profiling demands),
+   and wasm-side timings should be re-measured in the smoke page before
+   Phase 3 relies on them.
+6. IN FLIGHT: closing codex review over the whole core
+   (.codex/task-core-review.md -> .codex/core-review.md) -> director judges
+   findings -> fixes -> Phase 2 core CLOSED (frontend work is Phase 3).
 
 Review debt to schedule (routing policy standing job): a codex review diff
 pass over the accumulated core implementation commits before Phase 2 close.

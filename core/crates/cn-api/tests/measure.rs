@@ -158,8 +158,22 @@ fn edge(n: u128, from: u128, to: u128) -> Edge {
 #[test]
 #[ignore]
 fn measurement_gate() {
-    let mut ops = Vec::with_capacity(15_001);
+    let mut ops = Vec::with_capacity(15_002);
     ops.push(group_create());
+    // The measured viewer must be an active member or the projection under
+    // measurement is empty (Group-visibility values require Group access).
+    ops.push(op(
+        5_999,
+        OpKind::MembershipAdd {
+            membership: Membership::new(
+                id(40),
+                group_id(),
+                person(1),
+                GroupRole::Member,
+                envelope(person(1)),
+            ),
+        },
+    ));
     for n in 1..=5_000 {
         ops.push(op(n + 1, OpKind::EntityCreate { entity: entity(n) }));
     }
@@ -189,10 +203,26 @@ fn measurement_gate() {
     );
     let projection_json = serde_json::to_vec(&projection).expect("serialize projection");
     let projection_ms = projection_started.elapsed().as_millis();
-    let state_bytes = serde_json::to_vec(&state).expect("serialize state").len();
+    // Size proxy over the public collections: GroupState itself carries a
+    // private tuple-keyed clock map that serde_json cannot key.
+    let state_bytes = serde_json::to_vec(&state.entities)
+        .expect("serialize entities")
+        .len()
+        + serde_json::to_vec(&state.edges)
+            .expect("serialize edges")
+            .len()
+        + serde_json::to_vec(&state.memberships)
+            .expect("serialize memberships")
+            .len()
+        + serde_json::to_vec(&state.trust_grants)
+            .expect("serialize trust grants")
+            .len()
+        + serde_json::to_vec(&state.stories)
+            .expect("serialize stories")
+            .len();
     println!("fold_wall_ms={fold_ms}");
     println!("projection_wall_ms={projection_ms}");
     println!("projection_json_bytes={}", projection_json.len());
     println!("ops_jsonl_bytes={}", ops_jsonl.len());
-    println!("state_json_bytes={state_bytes}");
+    println!("state_json_bytes_proxy={state_bytes}");
 }
