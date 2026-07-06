@@ -52,43 +52,15 @@ describe("theme derivation", () => {
   it("derives the fisheries fixture with expected report outcomes", () => {
     const derived = deriveTheme(fixture("fisheries-committee.template.json"));
 
-    expect(derived.report.adjustments.map((entry) => entry.token)).toEqual([
-      "kind.need.base",
-      "kind.need.base",
-      "kind.need.base",
-      "kind.need.base",
-      "kind.need.base",
-      "kind.skill_resource.base",
-      "kind.skill_resource.base",
-      "kind.skill_resource.base",
-    ]);
-    expect(derived.report.warnings.map((warning) => ({ code: warning.code, tokens: warning.tokens }))).toEqual([
-      {
-        code: "theme.cvd-distance-cap",
-        tokens: ["kind.fishing_site.base", "kind.skill_resource.base"],
-      },
-    ]);
+    expect(derived.report.adjustments).toEqual([]);
+    expect(derived.report.warnings).toEqual([]);
   });
 
   it("derives the research fixture with expected report outcomes", () => {
     const derived = deriveTheme(fixture("research-network.template.json"));
 
-    expect(derived.report.adjustments.map((entry) => entry.token)).toEqual([
-      "kind.study_area.base",
-      "kind.publication.base",
-      "kind.publication.base",
-      "kind.publication.base",
-      "kind.publication.base",
-      "kind.publication.base",
-      "kind.publication.base",
-      "kind.publication.base",
-    ]);
-    expect(derived.report.warnings.map((warning) => ({ code: warning.code, tokens: warning.tokens }))).toEqual([
-      {
-        code: "theme.cvd-distance-cap",
-        tokens: ["kind.publication.base", "kind.study_area.base"],
-      },
-    ]);
+    expect(derived.report.adjustments).toEqual([]);
+    expect(derived.report.warnings).toEqual([]);
   });
 
   it("records adjustments and warnings for a hostile narrow palette", () => {

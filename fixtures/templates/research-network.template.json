@@ -90,12 +90,12 @@
   "theme": {
     "mode": "default-dark",
     "roles": {
-      "kind-1": "#e8a87c",
-      "kind-2": "#7ca6e8",
-      "kind-3": "#9c8ce8",
-      "kind-4": "#7ce8b2",
-      "kind-5": "#e8d47c",
-      "kind-6": "#e87ca6"
+      "kind-1": "#e69f00",
+      "kind-2": "#56b4e9",
+      "kind-3": "#009e73",
+      "kind-4": "#f0e442",
+      "kind-5": "#d55e00",
+      "kind-6": "#cc79a7"
     }
   }
 }
