@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 
 use cn_graph::GraphIndex;
 use cn_model::{
@@ -206,8 +206,4 @@ pub(crate) fn merge_report(target: &mut StoreReport, next: StoreReport) {
     target.warnings.extend(next.warnings);
     target.applied = target.applied.saturating_add(next.applied);
     target.deduped = target.deduped.saturating_add(next.deduped);
-}
-
-pub(crate) fn projected_entity_ids(projection: &Projection) -> BTreeSet<cn_model::EntityId> {
-    projection.entities.iter().map(|entity| entity.id).collect()
 }

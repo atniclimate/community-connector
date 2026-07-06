@@ -43,13 +43,36 @@ pub enum FieldKey {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
-enum ObjectKey {
+pub(crate) enum ObjectKey {
     Group(GroupId),
     Entity(EntityId),
     Edge(EdgeId),
     Membership(MembershipId),
     TrustGrant(TrustGrantId),
     Story(StoryId),
+}
+
+/// Serializable snapshot entry for tuple-keyed field clocks.
+#[cfg(not(target_arch = "wasm32"))]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub(crate) struct FieldClockEntry {
+    pub object: ObjectKey,
+    pub field: FieldKey,
+    pub sort_key: SortKey,
+}
+
+/// Snapshot input bundle for rebuilding private fold metadata.
+#[cfg(not(target_arch = "wasm32"))]
+pub(crate) struct SnapshotParts {
+    pub group: Option<Group>,
+    pub template: Option<cn_schema::GroupTemplate>,
+    pub entities: BTreeMap<EntityId, Entity>,
+    pub edges: BTreeMap<EdgeId, Edge>,
+    pub memberships: BTreeMap<MembershipId, Membership>,
+    pub trust_grants: BTreeMap<TrustGrantId, TrustGrant>,
+    pub stories: BTreeMap<StoryId, Story>,
+    pub field_clocks: BTreeMap<(ObjectKey, FieldKey), SortKey>,
+    pub seen: BTreeSet<OpId>,
 }
 
 /// Machine-readable fold report.
@@ -66,8 +89,20 @@ pub struct StoreReport {
 pub struct QuarantineEntry {
     pub op_id: OpId,
     pub responsible_human: PersonId,
+    pub subject: Option<SubjectRef>,
     pub reason: QuarantineReason,
     pub findings: Vec<cn_schema::Finding>,
+}
+
+/// Typed object reference for structural report redaction.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub enum SubjectRef {
+    Entity(EntityId),
+    Edge(EdgeId),
+    Story(StoryId),
+    Membership(MembershipId),
+    TrustGrant(TrustGrantId),
+    Group(GroupId),
 }
 
 /// Quarantine reason.
@@ -87,12 +122,17 @@ pub enum QuarantineReason {
 pub struct StoreFinding {
     pub code: String,
     pub message: String,
+    pub subject: Option<SubjectRef>,
 }
 
 enum ApplyResult {
     Applied,
     Deduped,
-    Quarantined(QuarantineReason, Vec<cn_schema::Finding>),
+    Quarantined(
+        QuarantineReason,
+        Option<SubjectRef>,
+        Vec<cn_schema::Finding>,
+    ),
 }
 
 /// Folds operations in ADR-002 D5 canonical order.
@@ -118,27 +158,36 @@ impl GroupState {
     }
 
     #[cfg(not(target_arch = "wasm32"))]
-    pub(crate) fn from_snapshot_parts(
-        group: Option<Group>,
-        template: Option<cn_schema::GroupTemplate>,
-        entities: BTreeMap<EntityId, Entity>,
-        edges: BTreeMap<EdgeId, Edge>,
-        memberships: BTreeMap<MembershipId, Membership>,
-        trust_grants: BTreeMap<TrustGrantId, TrustGrant>,
-        stories: BTreeMap<StoryId, Story>,
-    ) -> Self {
+    pub(crate) fn from_snapshot_parts(parts: SnapshotParts) -> Self {
         Self {
-            group,
-            template,
-            entities,
-            edges,
-            memberships,
-            trust_grants,
-            stories,
-            field_clocks: BTreeMap::new(),
-            seen: BTreeSet::new(),
+            group: parts.group,
+            template: parts.template,
+            entities: parts.entities,
+            edges: parts.edges,
+            memberships: parts.memberships,
+            trust_grants: parts.trust_grants,
+            stories: parts.stories,
+            field_clocks: parts.field_clocks,
+            seen: parts.seen,
             quarantine: Vec::new(),
         }
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    pub(crate) fn field_clock_entries(&self) -> Vec<FieldClockEntry> {
+        self.field_clocks
+            .iter()
+            .map(|((object, field), sort_key)| FieldClockEntry {
+                object: object.clone(),
+                field: field.clone(),
+                sort_key: sort_key.clone(),
+            })
+            .collect()
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    pub(crate) fn seen_entries(&self) -> Vec<OpId> {
+        self.seen.iter().copied().collect()
     }
 
     /// Applies one operation, then re-examines missing-target quarantine to fixpoint.
@@ -149,17 +198,18 @@ impl GroupState {
                 self.admit_fixpoint(report);
             }
             ApplyResult::Deduped => report.deduped += 1,
-            ApplyResult::Quarantined(QuarantineReason::MissingTarget, _) => {
+            ApplyResult::Quarantined(QuarantineReason::MissingTarget, subject, _) => {
+                report.quarantined.push(quarantine_entry(
+                    &op,
+                    subject,
+                    QuarantineReason::MissingTarget,
+                    Vec::new(),
+                ));
                 self.quarantine.push(op);
             }
-            ApplyResult::Quarantined(reason, findings) => {
-                report.quarantined.push(QuarantineEntry {
-                    op_id: op.op_id,
-                    responsible_human: op.responsible_human,
-                    reason,
-                    findings,
-                });
-            }
+            ApplyResult::Quarantined(reason, subject, findings) => report
+                .quarantined
+                .push(quarantine_entry(&op, subject, reason, findings)),
         }
     }
 
@@ -173,18 +223,20 @@ impl GroupState {
                     ApplyResult::Applied => {
                         admitted += 1;
                         report.applied += 1;
+                        remove_quarantine_entry(report, op.op_id);
                     }
-                    ApplyResult::Deduped => report.deduped += 1,
-                    ApplyResult::Quarantined(QuarantineReason::MissingTarget, _) => {
+                    ApplyResult::Deduped => {
+                        report.deduped += 1;
+                        remove_quarantine_entry(report, op.op_id);
+                    }
+                    ApplyResult::Quarantined(QuarantineReason::MissingTarget, _, _) => {
                         self.quarantine.push(op);
                     }
-                    ApplyResult::Quarantined(reason, findings) => {
-                        report.quarantined.push(QuarantineEntry {
-                            op_id: op.op_id,
-                            responsible_human: op.responsible_human,
-                            reason,
-                            findings,
-                        });
+                    ApplyResult::Quarantined(reason, subject, findings) => {
+                        remove_quarantine_entry(report, op.op_id);
+                        report
+                            .quarantined
+                            .push(quarantine_entry(&op, subject, reason, findings));
                     }
                 }
             }
@@ -197,12 +249,18 @@ impl GroupState {
     fn flush_quarantine(&mut self, report: &mut StoreReport) {
         self.quarantine.sort_by(|a, b| a.sort_key.cmp(&b.sort_key));
         for op in std::mem::take(&mut self.quarantine) {
-            report.quarantined.push(QuarantineEntry {
-                op_id: op.op_id,
-                responsible_human: op.responsible_human,
-                reason: QuarantineReason::MissingTarget,
-                findings: Vec::new(),
-            });
+            if !report
+                .quarantined
+                .iter()
+                .any(|entry| entry.op_id == op.op_id)
+            {
+                report.quarantined.push(quarantine_entry(
+                    &op,
+                    subject_for_op(&op),
+                    QuarantineReason::MissingTarget,
+                    Vec::new(),
+                ));
+            }
         }
     }
 
@@ -220,19 +278,27 @@ impl GroupState {
 
     fn apply_new(&mut self, op: &Operation) -> ApplyResult {
         if self.group_mismatch(op) {
-            return ApplyResult::Quarantined(QuarantineReason::WrongGroup, Vec::new());
+            return ApplyResult::Quarantined(
+                QuarantineReason::WrongGroup,
+                subject_for_op(op),
+                Vec::new(),
+            );
         }
         match &op.kind {
             OpKind::GroupCreate {
                 group,
                 template_json,
             } => self.apply_group_create(op, group.clone(), template_json),
-            _ if self.group.is_none() => {
-                ApplyResult::Quarantined(QuarantineReason::MissingTarget, Vec::new())
-            }
-            _ if !self.template_known(op) => {
-                ApplyResult::Quarantined(QuarantineReason::TemplateVersionUnknown, Vec::new())
-            }
+            _ if self.group.is_none() => ApplyResult::Quarantined(
+                QuarantineReason::MissingTarget,
+                Some(SubjectRef::Group(op.group_id)),
+                Vec::new(),
+            ),
+            _ if !self.template_known(op) => ApplyResult::Quarantined(
+                QuarantineReason::TemplateVersionUnknown,
+                Some(SubjectRef::Group(op.group_id)),
+                Vec::new(),
+            ),
             OpKind::EntityCreate { entity } => self.apply_entity_create(op, entity.clone()),
             OpKind::EntityLifecycleSet { entity, lifecycle } => {
                 self.set_entity_lifecycle(op, *entity, *lifecycle)
@@ -288,16 +354,32 @@ impl GroupState {
 
     fn apply_group_create(&mut self, op: &Operation, group: Group, json: &str) -> ApplyResult {
         if self.group.is_some() {
-            return ApplyResult::Quarantined(QuarantineReason::DuplicateCreate, Vec::new());
+            return ApplyResult::Quarantined(
+                QuarantineReason::DuplicateCreate,
+                Some(SubjectRef::Group(group.id)),
+                Vec::new(),
+            );
         }
         if group.id != op.group_id || group.template_version != op.template_version {
-            return ApplyResult::Quarantined(QuarantineReason::TemplateVersionUnknown, Vec::new());
+            return ApplyResult::Quarantined(
+                QuarantineReason::TemplateVersionUnknown,
+                Some(SubjectRef::Group(group.id)),
+                Vec::new(),
+            );
         }
         let Ok((template, validation)) = cn_schema::parse_template(json) else {
-            return ApplyResult::Quarantined(QuarantineReason::FailedValidation, Vec::new());
+            return ApplyResult::Quarantined(
+                QuarantineReason::FailedValidation,
+                Some(SubjectRef::Group(group.id)),
+                Vec::new(),
+            );
         };
         if !validation.errors.is_empty() {
-            return ApplyResult::Quarantined(QuarantineReason::FailedValidation, validation.errors);
+            return ApplyResult::Quarantined(
+                QuarantineReason::FailedValidation,
+                Some(SubjectRef::Group(group.id)),
+                validation.errors,
+            );
         }
         self.group = Some(group.clone());
         self.template = Some(template);
@@ -307,13 +389,25 @@ impl GroupState {
 
     fn apply_entity_create(&mut self, op: &Operation, entity: Entity) -> ApplyResult {
         if self.entities.contains_key(&entity.id) {
-            return ApplyResult::Quarantined(QuarantineReason::DuplicateCreate, Vec::new());
+            return ApplyResult::Quarantined(
+                QuarantineReason::DuplicateCreate,
+                Some(SubjectRef::Entity(entity.id)),
+                Vec::new(),
+            );
         }
         if !self.valid_group(entity.group_id) {
-            return ApplyResult::Quarantined(QuarantineReason::WrongGroup, Vec::new());
+            return ApplyResult::Quarantined(
+                QuarantineReason::WrongGroup,
+                Some(SubjectRef::Entity(entity.id)),
+                Vec::new(),
+            );
         }
         if let Some(findings) = self.entity_errors(&entity) {
-            return ApplyResult::Quarantined(QuarantineReason::FailedValidation, findings);
+            return ApplyResult::Quarantined(
+                QuarantineReason::FailedValidation,
+                Some(SubjectRef::Entity(entity.id)),
+                findings,
+            );
         }
         let key = ObjectKey::Entity(entity.id);
         self.record_entity_create(&key, &entity, &op.sort_key);
@@ -323,13 +417,25 @@ impl GroupState {
 
     fn apply_edge_create(&mut self, op: &Operation, edge: Edge) -> ApplyResult {
         if self.edges.contains_key(&edge.id) {
-            return ApplyResult::Quarantined(QuarantineReason::DuplicateCreate, Vec::new());
+            return ApplyResult::Quarantined(
+                QuarantineReason::DuplicateCreate,
+                Some(SubjectRef::Edge(edge.id)),
+                Vec::new(),
+            );
         }
         if !self.entities.contains_key(&edge.from) || !self.entities.contains_key(&edge.to) {
-            return ApplyResult::Quarantined(QuarantineReason::MissingTarget, Vec::new());
+            return ApplyResult::Quarantined(
+                QuarantineReason::MissingTarget,
+                Some(SubjectRef::Edge(edge.id)),
+                Vec::new(),
+            );
         }
         if let Some(findings) = self.edge_errors(&edge) {
-            return ApplyResult::Quarantined(QuarantineReason::FailedValidation, findings);
+            return ApplyResult::Quarantined(
+                QuarantineReason::FailedValidation,
+                Some(SubjectRef::Edge(edge.id)),
+                findings,
+            );
         }
         let key = ObjectKey::Edge(edge.id);
         self.record_edge_create(&key, &edge, &op.sort_key);
@@ -339,10 +445,18 @@ impl GroupState {
 
     fn apply_membership_add(&mut self, op: &Operation, membership: Membership) -> ApplyResult {
         if self.memberships.contains_key(&membership.id) {
-            return ApplyResult::Quarantined(QuarantineReason::DuplicateCreate, Vec::new());
+            return ApplyResult::Quarantined(
+                QuarantineReason::DuplicateCreate,
+                Some(SubjectRef::Membership(membership.id)),
+                Vec::new(),
+            );
         }
         if !self.valid_group(membership.group_id) {
-            return ApplyResult::Quarantined(QuarantineReason::WrongGroup, Vec::new());
+            return ApplyResult::Quarantined(
+                QuarantineReason::WrongGroup,
+                Some(SubjectRef::Membership(membership.id)),
+                Vec::new(),
+            );
         }
         self.record(
             ObjectKey::Membership(membership.id),
@@ -355,7 +469,11 @@ impl GroupState {
 
     fn apply_trust_grant(&mut self, op: &Operation, grant: TrustGrant) -> ApplyResult {
         if self.trust_grants.contains_key(&grant.id) {
-            return ApplyResult::Quarantined(QuarantineReason::DuplicateCreate, Vec::new());
+            return ApplyResult::Quarantined(
+                QuarantineReason::DuplicateCreate,
+                Some(SubjectRef::TrustGrant(grant.id)),
+                Vec::new(),
+            );
         }
         self.record(
             ObjectKey::TrustGrant(grant.id),
@@ -368,17 +486,29 @@ impl GroupState {
 
     fn apply_story_create(&mut self, op: &Operation, story: Story) -> ApplyResult {
         if self.stories.contains_key(&story.id) {
-            return ApplyResult::Quarantined(QuarantineReason::DuplicateCreate, Vec::new());
+            return ApplyResult::Quarantined(
+                QuarantineReason::DuplicateCreate,
+                Some(SubjectRef::Story(story.id)),
+                Vec::new(),
+            );
         }
         if !self.valid_group(story.group_id) {
-            return ApplyResult::Quarantined(QuarantineReason::WrongGroup, Vec::new());
+            return ApplyResult::Quarantined(
+                QuarantineReason::WrongGroup,
+                Some(SubjectRef::Story(story.id)),
+                Vec::new(),
+            );
         }
         if !story
             .steps
             .iter()
             .all(|step| self.entities.contains_key(&step.entity))
         {
-            return ApplyResult::Quarantined(QuarantineReason::MissingTarget, Vec::new());
+            return ApplyResult::Quarantined(
+                QuarantineReason::MissingTarget,
+                Some(SubjectRef::Story(story.id)),
+                Vec::new(),
+            );
         }
         let key = ObjectKey::Story(story.id);
         self.record(key.clone(), FieldKey::StoryTitle, &op.sort_key);
@@ -398,7 +528,11 @@ impl GroupState {
         lifecycle: Lifecycle,
     ) -> ApplyResult {
         if !self.entities.contains_key(&entity) {
-            return ApplyResult::Quarantined(QuarantineReason::MissingTarget, Vec::new());
+            return quarantined(
+                QuarantineReason::MissingTarget,
+                Some(SubjectRef::Entity(entity)),
+                Vec::new(),
+            );
         }
         if self.lww(ObjectKey::Entity(entity), FieldKey::Lifecycle, &op.sort_key)
             && let Some(record) = self.entities.get_mut(&entity)
@@ -417,12 +551,20 @@ impl GroupState {
         instance: AttributeInstance,
     ) -> ApplyResult {
         let Some(record) = self.entities.get(&entity) else {
-            return ApplyResult::Quarantined(QuarantineReason::MissingTarget, Vec::new());
+            return quarantined(
+                QuarantineReason::MissingTarget,
+                Some(SubjectRef::Entity(entity)),
+                Vec::new(),
+            );
         };
         let mut candidate = record.clone();
         candidate.attributes.insert(attr.clone(), instance.clone());
         if let Some(findings) = self.entity_errors(&candidate) {
-            return ApplyResult::Quarantined(QuarantineReason::FailedValidation, findings);
+            return quarantined(
+                QuarantineReason::FailedValidation,
+                Some(SubjectRef::Entity(entity)),
+                findings,
+            );
         }
         if self.lww(
             ObjectKey::Entity(entity),
@@ -438,12 +580,20 @@ impl GroupState {
     /// ADR-002 round-2 treats attribute removal as a field write.
     fn remove_attribute(&mut self, op: &Operation, entity: EntityId, attr: &AttrId) -> ApplyResult {
         let Some(record) = self.entities.get(&entity) else {
-            return ApplyResult::Quarantined(QuarantineReason::MissingTarget, Vec::new());
+            return quarantined(
+                QuarantineReason::MissingTarget,
+                Some(SubjectRef::Entity(entity)),
+                Vec::new(),
+            );
         };
         let mut candidate = record.clone();
         candidate.attributes.remove(attr);
         if let Some(findings) = self.entity_errors(&candidate) {
-            return ApplyResult::Quarantined(QuarantineReason::FailedValidation, findings);
+            return quarantined(
+                QuarantineReason::FailedValidation,
+                Some(SubjectRef::Entity(entity)),
+                findings,
+            );
         }
         if self.lww(
             ObjectKey::Entity(entity),
@@ -496,14 +646,26 @@ impl GroupState {
         weight: Option<f64>,
     ) -> ApplyResult {
         let Some(record) = self.edges.get(&edge) else {
-            return ApplyResult::Quarantined(QuarantineReason::MissingTarget, Vec::new());
+            return quarantined(
+                QuarantineReason::MissingTarget,
+                Some(SubjectRef::Edge(edge)),
+                Vec::new(),
+            );
         };
         let mut candidate = record.clone();
         if candidate.set_weight(weight).is_err() {
-            return ApplyResult::Quarantined(QuarantineReason::FailedValidation, Vec::new());
+            return quarantined(
+                QuarantineReason::FailedValidation,
+                Some(SubjectRef::Edge(edge)),
+                Vec::new(),
+            );
         }
         if let Some(findings) = self.edge_errors(&candidate) {
-            return ApplyResult::Quarantined(QuarantineReason::FailedValidation, findings);
+            return quarantined(
+                QuarantineReason::FailedValidation,
+                Some(SubjectRef::Edge(edge)),
+                findings,
+            );
         }
         if self.lww(ObjectKey::Edge(edge), FieldKey::Weight, &op.sort_key)
             && let Some(record) = self.edges.get_mut(&edge)
@@ -521,7 +683,11 @@ impl GroupState {
         lifecycle: Lifecycle,
     ) -> ApplyResult {
         if !self.edges.contains_key(&edge) {
-            return ApplyResult::Quarantined(QuarantineReason::MissingTarget, Vec::new());
+            return quarantined(
+                QuarantineReason::MissingTarget,
+                Some(SubjectRef::Edge(edge)),
+                Vec::new(),
+            );
         }
         if self.lww(ObjectKey::Edge(edge), FieldKey::Lifecycle, &op.sort_key)
             && let Some(record) = self.edges.get_mut(&edge)
@@ -538,7 +704,11 @@ impl GroupState {
         lifecycle: Lifecycle,
     ) -> ApplyResult {
         if !self.memberships.contains_key(&membership) {
-            return ApplyResult::Quarantined(QuarantineReason::MissingTarget, Vec::new());
+            return quarantined(
+                QuarantineReason::MissingTarget,
+                Some(SubjectRef::Membership(membership)),
+                Vec::new(),
+            );
         }
         if self.lww(
             ObjectKey::Membership(membership),
@@ -558,7 +728,11 @@ impl GroupState {
         at: Timestamp,
     ) -> ApplyResult {
         let Some(existing) = self.trust_grants.get(&grant) else {
-            return ApplyResult::Quarantined(QuarantineReason::MissingTarget, Vec::new());
+            return quarantined(
+                QuarantineReason::MissingTarget,
+                Some(SubjectRef::TrustGrant(grant)),
+                Vec::new(),
+            );
         };
         if existing.revoked_at.is_some() {
             return ApplyResult::Applied;
@@ -577,26 +751,53 @@ impl GroupState {
             }
             Ok(()) => ApplyResult::Applied,
             Err(ModelError::AlreadyRevoked) => ApplyResult::Applied,
-            Err(ModelError::RevokedBeforeGranted) => {
-                ApplyResult::Quarantined(QuarantineReason::RevokedBeforeGranted, Vec::new())
-            }
-            Err(_) => ApplyResult::Quarantined(QuarantineReason::FailedValidation, Vec::new()),
+            Err(ModelError::RevokedBeforeGranted) => quarantined(
+                QuarantineReason::RevokedBeforeGranted,
+                Some(SubjectRef::TrustGrant(grant)),
+                Vec::new(),
+            ),
+            Err(_) => quarantined(
+                QuarantineReason::FailedValidation,
+                Some(SubjectRef::TrustGrant(grant)),
+                Vec::new(),
+            ),
         }
     }
 
     /// ADR-002 A-B4 allows custody appends on archived targets and misses only unknown targets.
     fn append_custody(&mut self, target: &CustodyTarget, event: CustodyEvent) -> ApplyResult {
         match target {
-            CustodyTarget::Entity(id) => append_to(self.entities.get_mut(id), event),
+            CustodyTarget::Entity(id) => append_to(
+                self.entities.get_mut(id),
+                Some(SubjectRef::Entity(*id)),
+                event,
+            ),
             CustodyTarget::Attribute(id, attr) => {
                 let Some(entity) = self.entities.get_mut(id) else {
-                    return ApplyResult::Quarantined(QuarantineReason::MissingTarget, Vec::new());
+                    return quarantined(
+                        QuarantineReason::MissingTarget,
+                        Some(SubjectRef::Entity(*id)),
+                        Vec::new(),
+                    );
                 };
-                append_to(entity.attributes.get_mut(attr), event)
+                append_to(
+                    entity.attributes.get_mut(attr),
+                    Some(SubjectRef::Entity(*id)),
+                    event,
+                )
             }
-            CustodyTarget::Edge(id) => append_to(self.edges.get_mut(id), event),
-            CustodyTarget::Story(id) => append_to(self.stories.get_mut(id), event),
-            CustodyTarget::Group => append_to(self.group.as_mut(), event),
+            CustodyTarget::Edge(id) => {
+                append_to(self.edges.get_mut(id), Some(SubjectRef::Edge(*id)), event)
+            }
+            CustodyTarget::Story(id) => append_to(
+                self.stories.get_mut(id),
+                Some(SubjectRef::Story(*id)),
+                event,
+            ),
+            CustodyTarget::Group => {
+                let subject = self.group.as_ref().map(|group| SubjectRef::Group(group.id));
+                append_to(self.group.as_mut(), subject, event)
+            }
         }
     }
 
@@ -608,14 +809,22 @@ impl GroupState {
         steps: Option<Vec<StoryStep>>,
     ) -> ApplyResult {
         let Some(existing) = self.stories.get(&story) else {
-            return ApplyResult::Quarantined(QuarantineReason::MissingTarget, Vec::new());
+            return quarantined(
+                QuarantineReason::MissingTarget,
+                Some(SubjectRef::Story(story)),
+                Vec::new(),
+            );
         };
         if let Some(steps) = &steps
             && !steps
                 .iter()
                 .all(|step| self.entities.contains_key(&step.entity))
         {
-            return ApplyResult::Quarantined(QuarantineReason::MissingTarget, Vec::new());
+            return quarantined(
+                QuarantineReason::MissingTarget,
+                Some(SubjectRef::Story(story)),
+                Vec::new(),
+            );
         }
         let mut candidate = existing.clone();
         if let Some(title) = title {
@@ -642,7 +851,11 @@ impl GroupState {
         lifecycle: Lifecycle,
     ) -> ApplyResult {
         if !self.stories.contains_key(&story) {
-            return ApplyResult::Quarantined(QuarantineReason::MissingTarget, Vec::new());
+            return quarantined(
+                QuarantineReason::MissingTarget,
+                Some(SubjectRef::Story(story)),
+                Vec::new(),
+            );
         }
         if self.lww(ObjectKey::Story(story), FieldKey::Lifecycle, &op.sort_key)
             && let Some(record) = self.stories.get_mut(&story)
@@ -659,7 +872,11 @@ impl GroupState {
         visibility: Circle,
     ) -> ApplyResult {
         if !self.entities.contains_key(&id) {
-            return ApplyResult::Quarantined(QuarantineReason::MissingTarget, Vec::new());
+            return quarantined(
+                QuarantineReason::MissingTarget,
+                Some(SubjectRef::Entity(id)),
+                Vec::new(),
+            );
         }
         if self.lww(
             ObjectKey::Entity(id),
@@ -684,7 +901,11 @@ impl GroupState {
             .get(&id)
             .is_some_and(|entity| entity.attributes.contains_key(attr))
         {
-            return ApplyResult::Quarantined(QuarantineReason::MissingTarget, Vec::new());
+            return quarantined(
+                QuarantineReason::MissingTarget,
+                Some(SubjectRef::Entity(id)),
+                Vec::new(),
+            );
         }
         if self.lww(
             ObjectKey::Entity(id),
@@ -707,7 +928,11 @@ impl GroupState {
         visibility: Circle,
     ) -> ApplyResult {
         if !self.edges.contains_key(&id) {
-            return ApplyResult::Quarantined(QuarantineReason::MissingTarget, Vec::new());
+            return quarantined(
+                QuarantineReason::MissingTarget,
+                Some(SubjectRef::Edge(id)),
+                Vec::new(),
+            );
         }
         if self.lww(ObjectKey::Edge(id), FieldKey::Visibility, &op.sort_key)
             && let Some(record) = self.edges.get_mut(&id)
@@ -724,7 +949,11 @@ impl GroupState {
         visibility: Circle,
     ) -> ApplyResult {
         if !self.stories.contains_key(&id) {
-            return ApplyResult::Quarantined(QuarantineReason::MissingTarget, Vec::new());
+            return quarantined(
+                QuarantineReason::MissingTarget,
+                Some(SubjectRef::Story(id)),
+                Vec::new(),
+            );
         }
         if self.lww(ObjectKey::Story(id), FieldKey::Visibility, &op.sort_key)
             && let Some(record) = self.stories.get_mut(&id)
@@ -741,7 +970,11 @@ impl GroupState {
         tier: SensitivityTier,
     ) -> ApplyResult {
         if !self.entities.contains_key(&id) {
-            return ApplyResult::Quarantined(QuarantineReason::MissingTarget, Vec::new());
+            return quarantined(
+                QuarantineReason::MissingTarget,
+                Some(SubjectRef::Entity(id)),
+                Vec::new(),
+            );
         }
         if self.lww(ObjectKey::Entity(id), FieldKey::Tier, &op.sort_key)
             && let Some(record) = self.entities.get_mut(&id)
@@ -759,11 +992,19 @@ impl GroupState {
         tier: SensitivityTier,
     ) -> ApplyResult {
         let Some(entity) = self.entities.get(&id) else {
-            return ApplyResult::Quarantined(QuarantineReason::MissingTarget, Vec::new());
+            return quarantined(
+                QuarantineReason::MissingTarget,
+                Some(SubjectRef::Entity(id)),
+                Vec::new(),
+            );
         };
         let entity_tier = entity.tier;
         if !entity.attributes.contains_key(attr) {
-            return ApplyResult::Quarantined(QuarantineReason::MissingTarget, Vec::new());
+            return quarantined(
+                QuarantineReason::MissingTarget,
+                Some(SubjectRef::Entity(id)),
+                Vec::new(),
+            );
         };
         if self.lww(
             ObjectKey::Entity(id),
@@ -775,10 +1016,18 @@ impl GroupState {
                 .get_mut(&id)
                 .and_then(|entity| entity.attributes.get_mut(attr))
             else {
-                return ApplyResult::Quarantined(QuarantineReason::MissingTarget, Vec::new());
+                return quarantined(
+                    QuarantineReason::MissingTarget,
+                    Some(SubjectRef::Entity(id)),
+                    Vec::new(),
+                );
             };
             if instance.tighten_tier(entity_tier, tier).is_err() {
-                return ApplyResult::Quarantined(QuarantineReason::FailedValidation, Vec::new());
+                return quarantined(
+                    QuarantineReason::FailedValidation,
+                    Some(SubjectRef::Entity(id)),
+                    Vec::new(),
+                );
             }
         }
         ApplyResult::Applied
@@ -786,7 +1035,11 @@ impl GroupState {
 
     fn set_edge_tier(&mut self, op: &Operation, id: EdgeId, tier: SensitivityTier) -> ApplyResult {
         if !self.edges.contains_key(&id) {
-            return ApplyResult::Quarantined(QuarantineReason::MissingTarget, Vec::new());
+            return quarantined(
+                QuarantineReason::MissingTarget,
+                Some(SubjectRef::Edge(id)),
+                Vec::new(),
+            );
         }
         if self.lww(ObjectKey::Edge(id), FieldKey::Tier, &op.sort_key)
             && let Some(record) = self.edges.get_mut(&id)
@@ -803,7 +1056,11 @@ impl GroupState {
         tier: SensitivityTier,
     ) -> ApplyResult {
         if !self.stories.contains_key(&id) {
-            return ApplyResult::Quarantined(QuarantineReason::MissingTarget, Vec::new());
+            return quarantined(
+                QuarantineReason::MissingTarget,
+                Some(SubjectRef::Story(id)),
+                Vec::new(),
+            );
         }
         if self.lww(ObjectKey::Story(id), FieldKey::Tier, &op.sort_key)
             && let Some(record) = self.stories.get_mut(&id)
@@ -878,6 +1135,89 @@ impl GroupState {
     }
 }
 
+fn quarantined(
+    reason: QuarantineReason,
+    subject: Option<SubjectRef>,
+    findings: Vec<cn_schema::Finding>,
+) -> ApplyResult {
+    ApplyResult::Quarantined(reason, subject, findings)
+}
+
+fn quarantine_entry(
+    op: &Operation,
+    subject: Option<SubjectRef>,
+    reason: QuarantineReason,
+    findings: Vec<cn_schema::Finding>,
+) -> QuarantineEntry {
+    QuarantineEntry {
+        op_id: op.op_id,
+        responsible_human: op.responsible_human,
+        subject,
+        reason,
+        findings,
+    }
+}
+
+fn remove_quarantine_entry(report: &mut StoreReport, op_id: OpId) {
+    report.quarantined.retain(|entry| entry.op_id != op_id);
+}
+
+fn subject_for_op(op: &Operation) -> Option<SubjectRef> {
+    match &op.kind {
+        OpKind::GroupCreate { group, .. } => Some(SubjectRef::Group(group.id)),
+        OpKind::EntityCreate { entity } => Some(SubjectRef::Entity(entity.id)),
+        OpKind::EntityLifecycleSet { entity, .. }
+        | OpKind::AttributeSet { entity, .. }
+        | OpKind::AttributeRemove { entity, .. } => Some(SubjectRef::Entity(*entity)),
+        OpKind::VisibilitySet { target, .. } => visibility_subject(target),
+        OpKind::TierSet { target, .. } => tier_subject(target),
+        OpKind::EdgeCreate { edge } => Some(SubjectRef::Edge(edge.id)),
+        OpKind::EdgeWeightSet { edge, .. } | OpKind::EdgeLifecycleSet { edge, .. } => {
+            Some(SubjectRef::Edge(*edge))
+        }
+        OpKind::MembershipAdd { membership } => Some(SubjectRef::Membership(membership.id)),
+        OpKind::MembershipLifecycleSet { membership, .. } => {
+            Some(SubjectRef::Membership(*membership))
+        }
+        OpKind::TrustGrantCreate { grant } => Some(SubjectRef::TrustGrant(grant.id)),
+        OpKind::TrustGrantRevoke { grant, .. } => Some(SubjectRef::TrustGrant(*grant)),
+        OpKind::CustodyAppend { target, .. } => custody_subject(target, op.group_id),
+        OpKind::StoryCreate { story } => Some(SubjectRef::Story(story.id)),
+        OpKind::StoryUpdate { story, .. } | OpKind::StoryLifecycleSet { story, .. } => {
+            Some(SubjectRef::Story(*story))
+        }
+    }
+}
+
+fn visibility_subject(target: &VisibilityTarget) -> Option<SubjectRef> {
+    match target {
+        VisibilityTarget::EntityPresence(id) | VisibilityTarget::Attribute(id, _) => {
+            Some(SubjectRef::Entity(*id))
+        }
+        VisibilityTarget::Edge(id) => Some(SubjectRef::Edge(*id)),
+        VisibilityTarget::Story(id) => Some(SubjectRef::Story(*id)),
+    }
+}
+
+fn tier_subject(target: &TierTarget) -> Option<SubjectRef> {
+    match target {
+        TierTarget::Entity(id) | TierTarget::Attribute(id, _) => Some(SubjectRef::Entity(*id)),
+        TierTarget::Edge(id) => Some(SubjectRef::Edge(*id)),
+        TierTarget::Story(id) => Some(SubjectRef::Story(*id)),
+    }
+}
+
+fn custody_subject(target: &CustodyTarget, group_id: GroupId) -> Option<SubjectRef> {
+    match target {
+        CustodyTarget::Entity(id) | CustodyTarget::Attribute(id, _) => {
+            Some(SubjectRef::Entity(*id))
+        }
+        CustodyTarget::Edge(id) => Some(SubjectRef::Edge(*id)),
+        CustodyTarget::Story(id) => Some(SubjectRef::Story(*id)),
+        CustodyTarget::Group => Some(SubjectRef::Group(group_id)),
+    }
+}
+
 trait HasProvenance {
     fn provenance_mut(&mut self) -> &mut ProvenanceEnvelope;
 }
@@ -912,9 +1252,13 @@ impl HasProvenance for AttributeInstance {
     }
 }
 
-fn append_to<T: HasProvenance>(target: Option<&mut T>, event: CustodyEvent) -> ApplyResult {
+fn append_to<T: HasProvenance>(
+    target: Option<&mut T>,
+    subject: Option<SubjectRef>,
+    event: CustodyEvent,
+) -> ApplyResult {
     let Some(target) = target else {
-        return ApplyResult::Quarantined(QuarantineReason::MissingTarget, Vec::new());
+        return quarantined(QuarantineReason::MissingTarget, subject, Vec::new());
     };
     if !target
         .provenance_mut()

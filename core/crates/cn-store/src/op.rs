@@ -25,6 +25,12 @@ impl HlcClock {
         }
     }
 
+    /// Test hook for constructing a clock at a known prior value.
+    #[doc(hidden)]
+    pub fn from_last_for_test(last: Hlc) -> Self {
+        Self { last }
+    }
+
     /// Returns a strictly increasing HLC under stalled or regressing wall time.
     pub fn tick(&mut self, now_ms: i64) -> Hlc {
         if now_ms > self.last.wall_ms {
@@ -32,8 +38,13 @@ impl HlcClock {
                 wall_ms: now_ms,
                 counter: 0,
             };
+        } else if self.last.counter == u32::MAX {
+            self.last = Hlc {
+                wall_ms: self.last.wall_ms.saturating_add(1),
+                counter: 0,
+            };
         } else {
-            self.last.counter = self.last.counter.saturating_add(1);
+            self.last.counter += 1;
         }
         self.last
     }

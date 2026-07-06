@@ -38,7 +38,10 @@ pub fn submit<A: Authorizer>(
                 let before_quarantine = report.quarantined.len();
                 let op_id = op.op_id;
                 state.apply(op, report);
-                if report.quarantined.len() > before_quarantine {
+                if report.quarantined[before_quarantine..]
+                    .iter()
+                    .any(|entry| entry.op_id == op_id)
+                {
                     outcomes.push(SubmitOutcome::Quarantined(op_id));
                 } else {
                     outcomes.push(SubmitOutcome::Applied(op_id));

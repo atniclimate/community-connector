@@ -9,7 +9,8 @@ pub mod viewer;
 
 pub use authz::PermAuthorizer;
 pub use projection::{
-    ProjectedEdge, ProjectedEntity, ProjectedStory, ProjectedStoryStep, Projection, project,
+    ProjectedEdge, ProjectedEntity, ProjectedStory, ProjectedStoryStep, Projection,
+    export_projection, project,
 };
 pub use reports::redact_report;
 pub use rules::{effective_tier, required_circle, value_visible};

@@ -333,6 +333,53 @@ fn hidden_and_absent_are_identical_not_found() {
 }
 
 #[test]
+fn submit_hidden_and_absent_denials_have_identical_outcome_json() {
+    let hidden_ops = vec![op(
+        group_id(),
+        2,
+        person(1),
+        OpKind::EntityCreate {
+            entity: entity(1, Some(person(1)), Circle::Private),
+        },
+    )];
+    let mut hidden_api = load_api(&hidden_ops);
+    let mut absent_api = load_api(&[]);
+    let hidden_submit = op(
+        group_id(),
+        10,
+        person(2),
+        OpKind::AttributeRemove {
+            entity: entity_id(1),
+            attr: attr_id("display_name"),
+        },
+    );
+    let absent_submit = op(
+        group_id(),
+        10,
+        person(2),
+        OpKind::AttributeRemove {
+            entity: entity_id(99),
+            attr: attr_id("display_name"),
+        },
+    );
+
+    let hidden = ok(&hidden_api.submit_ops(
+        &group_id().to_string(),
+        &viewer_person(2),
+        &serde_json::to_string(&vec![hidden_submit]).expect("ops json"),
+        2_000,
+    ));
+    let absent = ok(&absent_api.submit_ops(
+        &group_id().to_string(),
+        &viewer_person(2),
+        &serde_json::to_string(&vec![absent_submit]).expect("ops json"),
+        2_000,
+    ));
+
+    assert_eq!(hidden["outcomes"][0], absent["outcomes"][0]);
+}
+
+#[test]
 fn streaming_load_two_chunks_matches_one_chunk_and_commit_rules() {
     let ops = vec![
         op(

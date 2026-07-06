@@ -647,6 +647,35 @@ fn tier_ceiling_cells() {
 }
 
 #[test]
+fn export_projection_excludes_owner_visible_t3_override() {
+    let owner = person(1);
+    let mut state = base_state();
+    let mut record = entity(1, Some(owner), Circle::Public, SensitivityTier::T0);
+    let t3_attr = AttrId::new("t3_public").expect("attr id");
+    record.attributes.insert(
+        t3_attr.clone(),
+        attr_with_tier(
+            "Synthetic T3 export gated",
+            Circle::Public,
+            SensitivityTier::T0,
+            SensitivityTier::T3,
+        ),
+    );
+    state.entities.insert(record.id, record);
+
+    let viewer = ViewerContext::Person { person: owner };
+    let display_projection = project(&state, &viewer, 1);
+    let export = export_projection(&state, &viewer, 1);
+
+    assert!(
+        display_projection.entities[0]
+            .attributes
+            .contains_key(&t3_attr)
+    );
+    assert!(!export.entities[0].attributes.contains_key(&t3_attr));
+}
+
+#[test]
 fn fisheries_scenario_matches_spec() {
     let owner = person(1);
     let trusted = person(2);
@@ -858,6 +887,7 @@ fn redact_report_obeys_no_counts_rule() {
         quarantined: vec![QuarantineEntry {
             op_id: op_id(1),
             responsible_human: person(4),
+            subject: Some(SubjectRef::Entity(entity_id(99))),
             reason: QuarantineReason::MissingTarget,
             findings: Vec::new(),
         }],
@@ -865,10 +895,12 @@ fn redact_report_obeys_no_counts_rule() {
             StoreFinding {
                 code: "Visible".to_string(),
                 message: format!("finding for {}", entity_id(1)),
+                subject: Some(SubjectRef::Entity(entity_id(1))),
             },
             StoreFinding {
                 code: "Hidden".to_string(),
                 message: format!("finding for {}", entity_id(99)),
+                subject: Some(SubjectRef::Entity(entity_id(99))),
             },
         ],
         applied: 7,
@@ -901,6 +933,74 @@ fn redact_report_obeys_no_counts_rule() {
     let anonymous = redact_report(&state, &ViewerContext::Anonymous, &report);
     assert!(anonymous.warnings.is_empty());
     assert!(anonymous.quarantined.is_empty());
+}
+
+#[test]
+fn report_redaction_ignores_hidden_message_text_that_contains_visible_kind() {
+    let mut state = base_state();
+    member(&mut state, 2, GroupRole::Member, Lifecycle::Active);
+    state.entities.insert(
+        entity_id(1),
+        entity(1, None, Circle::Group, SensitivityTier::T1),
+    );
+    state.entities.insert(
+        entity_id(2),
+        entity(2, Some(person(1)), Circle::Private, SensitivityTier::T1),
+    );
+    let report = StoreReport {
+        quarantined: Vec::new(),
+        warnings: vec![StoreFinding {
+            code: "Hidden".to_string(),
+            message: format!("hidden finding mentions visible kind {}", kind_id()),
+            subject: Some(SubjectRef::Entity(entity_id(2))),
+        }],
+        applied: 0,
+        deduped: 0,
+    };
+
+    let redacted = redact_report(
+        &state,
+        &ViewerContext::Person { person: person(2) },
+        &report,
+    );
+
+    assert!(redacted.warnings.is_empty());
+}
+
+#[test]
+fn submitter_sees_own_hidden_quarantine_scrubbed_to_not_found() {
+    let mut state = base_state();
+    member(&mut state, 2, GroupRole::Member, Lifecycle::Active);
+    state.entities.insert(
+        entity_id(1),
+        entity(1, Some(person(1)), Circle::Private, SensitivityTier::T1),
+    );
+    let report = StoreReport {
+        quarantined: vec![QuarantineEntry {
+            op_id: op_id(7),
+            responsible_human: person(2),
+            subject: Some(SubjectRef::Entity(entity_id(1))),
+            reason: QuarantineReason::FailedValidation,
+            findings: vec![cn_schema::Finding {
+                code: cn_schema::FindingCode::RequiredAttrMissing,
+                path: format!("/entities/{}", entity_id(1)),
+                message: format!("hidden {}", entity_id(1)),
+            }],
+        }],
+        warnings: Vec::new(),
+        applied: 0,
+        deduped: 0,
+    };
+
+    let redacted = redact_report(
+        &state,
+        &ViewerContext::Person { person: person(2) },
+        &report,
+    );
+
+    assert_eq!(redacted.quarantined.len(), 1);
+    assert_eq!(redacted.quarantined[0].reason, QuarantineReason::NotFound);
+    assert!(redacted.quarantined[0].findings.is_empty());
 }
 
 #[test]

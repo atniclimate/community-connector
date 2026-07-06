@@ -5,7 +5,9 @@ use std::path::{Path, PathBuf};
 use crc32fast::Hasher;
 use serde::{Deserialize, Serialize};
 
-use crate::fold::{GroupState, StoreFinding, StoreReport};
+use cn_model::accepts_schema;
+
+use crate::fold::{FieldClockEntry, GroupState, SnapshotParts, StoreFinding, StoreReport};
 use crate::op::{Operation, SortKey};
 
 const SNAPSHOT_SCHEMA: &str = "0.1.0";
@@ -88,22 +90,28 @@ impl Snapshot {
         std::fs::write(path, bytes).map_err(|source| StoreError::io(path, source))
     }
 
-    /// Loads a snapshot, returning None when parsing or checksum validation fails.
-    pub fn load(path: &Path) -> Result<Option<(GroupState, SnapshotMeta)>, StoreError> {
+    /// Loads a snapshot and reports discard reasons as warnings.
+    pub fn load(
+        path: &Path,
+        report: &mut StoreReport,
+    ) -> Result<Option<(GroupState, SnapshotMeta)>, StoreError> {
         if !path.exists() {
             return Ok(None);
         }
         let bytes = std::fs::read(path).map_err(|source| StoreError::io(path, source))?;
         let Ok(envelope) = serde_json::from_slice::<SnapshotEnvelope>(&bytes) else {
+            snapshot_discarded(report, "snapshot envelope could not be parsed");
             return Ok(None);
         };
         if envelope.schema_version.major != 0 || envelope.schema_version.minor != 1 {
             return Err(StoreError::UnsupportedSchemaVersion);
         }
         if checksum(&envelope.data) != envelope.crc32 {
+            snapshot_discarded(report, "snapshot checksum did not match");
             return Ok(None);
         }
         let Ok(payload) = serde_json::from_slice::<SnapshotPayload>(&envelope.data) else {
+            snapshot_discarded(report, "snapshot payload could not be parsed");
             return Ok(None);
         };
         Ok(Some((payload.state.into_group_state(), payload.meta)))
@@ -113,11 +121,13 @@ impl Snapshot {
     pub fn load_with_log_tip(
         path: &Path,
         log_tip: Option<&SortKey>,
+        report: &mut StoreReport,
     ) -> Result<Option<(GroupState, SnapshotMeta)>, StoreError> {
-        let Some((state, meta)) = Self::load(path)? else {
+        let Some((state, meta)) = Self::load(path, report)? else {
             return Ok(None);
         };
         if watermark_ahead(meta.last_sort_key.as_ref(), log_tip) {
+            snapshot_discarded(report, "snapshot watermark is ahead of log tip");
             return Ok(None);
         }
         Ok(Some((state, meta)))
@@ -194,6 +204,8 @@ struct SnapshotState {
     memberships: Vec<cn_model::Membership>,
     trust_grants: Vec<cn_model::TrustGrant>,
     stories: Vec<cn_model::Story>,
+    field_clocks: Vec<FieldClockEntry>,
+    seen: Vec<cn_model::OpId>,
 }
 
 impl From<&GroupState> for SnapshotState {
@@ -206,33 +218,45 @@ impl From<&GroupState> for SnapshotState {
             memberships: state.memberships.values().cloned().collect(),
             trust_grants: state.trust_grants.values().cloned().collect(),
             stories: state.stories.values().cloned().collect(),
+            field_clocks: state.field_clock_entries(),
+            seen: state.seen_entries(),
         }
     }
 }
 
 impl SnapshotState {
     fn into_group_state(self) -> GroupState {
-        GroupState::from_snapshot_parts(
-            self.group,
-            self.template,
-            self.entities
+        GroupState::from_snapshot_parts(SnapshotParts {
+            group: self.group,
+            template: self.template,
+            entities: self
+                .entities
                 .into_iter()
                 .map(|item| (item.id, item))
                 .collect(),
-            self.edges.into_iter().map(|item| (item.id, item)).collect(),
-            self.memberships
+            edges: self.edges.into_iter().map(|item| (item.id, item)).collect(),
+            memberships: self
+                .memberships
                 .into_iter()
                 .map(|item| (item.id, item))
                 .collect(),
-            self.trust_grants
+            trust_grants: self
+                .trust_grants
                 .into_iter()
                 .map(|item| (item.id, item))
                 .collect(),
-            self.stories
+            stories: self
+                .stories
                 .into_iter()
                 .map(|item| (item.id, item))
                 .collect(),
-        )
+            field_clocks: self
+                .field_clocks
+                .into_iter()
+                .map(|entry| ((entry.object, entry.field), entry.sort_key))
+                .collect(),
+            seen: self.seen.into_iter().collect(),
+        })
     }
 }
 
@@ -259,13 +283,14 @@ fn parse_log_bytes(
             report.warnings.push(StoreFinding {
                 code: "TornLineRecovered".to_string(),
                 message: format!("recovered torn final line in {}", path.display()),
+                subject: None,
             });
             return Ok((ops, report, Some(start as u64)));
         }
-        ops.push(
-            serde_json::from_slice(final_line)
-                .map_err(|_| StoreError::CorruptLog { line: line_no })?,
-        );
+        let op: Operation = serde_json::from_slice(final_line)
+            .map_err(|_| StoreError::CorruptLog { line: line_no })?;
+        reject_unsupported_op(&op)?;
+        ops.push(op);
     }
     Ok((ops, report, None))
 }
@@ -273,11 +298,28 @@ fn parse_log_bytes(
 fn parse_line(line: &[u8], line_no: usize, ops: &mut Vec<Operation>) -> Result<(), StoreError> {
     match serde_json::from_slice(line) {
         Ok(op) => {
+            reject_unsupported_op(&op)?;
             ops.push(op);
             Ok(())
         }
         Err(_) => Err(StoreError::CorruptLog { line: line_no }),
     }
+}
+
+fn reject_unsupported_op(op: &Operation) -> Result<(), StoreError> {
+    if accepts_schema(&op.schema_version) {
+        Ok(())
+    } else {
+        Err(StoreError::UnsupportedSchemaVersion)
+    }
+}
+
+fn snapshot_discarded(report: &mut StoreReport, message: &str) {
+    report.warnings.push(StoreFinding {
+        code: "SnapshotDiscarded".to_string(),
+        message: message.to_string(),
+        subject: None,
+    });
 }
 
 fn checksum(data: &[u8]) -> u32 {

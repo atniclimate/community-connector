@@ -5,25 +5,30 @@
 
 mod dto;
 mod error;
+mod export;
 mod session;
+mod submit;
+mod wire;
 
-use std::collections::{BTreeMap, BTreeSet};
-use std::panic::{AssertUnwindSafe, catch_unwind};
-use std::str::FromStr;
+use std::collections::BTreeMap;
 
 use cn_graph::{GraphError, SearchQuery};
-use cn_model::{AttrId, EntityId, GroupId, SensitivityTier, accepts_schema};
-use cn_perm::{ProjectedEdge, ProjectedEntity, ProjectedStory, Projection, ViewerContext};
-use cn_store::{Operation, StoreReport, SubmitOutcome};
+use cn_model::{AttrId, EntityId, GroupId, SensitivityTier};
+use cn_perm::{ProjectedEntity, Projection, ViewerContext};
+use cn_store::{Operation, StoreReport};
 use dto::{
     CoreInfo, DetailValue, EntityDetail, ExportOptions, ExportSnapshot, LoadReport,
     NeighborhoodRequest, PathRequest, SubmitReport,
 };
-use error::{ApiError, ErrorCode, ErrorEnvelope};
-use serde::Serialize;
-use serde::de::DeserializeOwned;
+use error::{ApiError, ErrorCode};
+use export::export_projection;
 use serde_json::{Value, json};
-use session::{GroupSession, merge_report, projected_entity_ids};
+use session::{GroupSession, merge_report};
+use submit::redact_outcomes;
+use wire::{
+    parse_entity_id, parse_group_id, parse_group_id_for_lookup, parse_json, parse_ops_jsonl,
+    parse_viewer, reject_template_report, reject_unsupported_ops, respond,
+};
 
 const BOUNDARY_VERSION: &str = "0.1.0";
 
@@ -199,6 +204,7 @@ impl Api {
         let viewer = parse_viewer(viewer_ctx_json)?;
         let ops: Vec<Operation> = parse_json(ops_json)?;
         reject_unsupported_ops(&ops)?;
+        let submitted_ops = ops.clone();
         let session = self
             .groups
             .get_mut(&group_id)
@@ -214,10 +220,11 @@ impl Api {
             session.bump_revision();
         }
         let redacted = cn_perm::redact_report(&session.state, &viewer, &call_report);
+        let projection = cn_perm::project(&session.state, &viewer, session.revision);
         merge_report(&mut session.report, call_report);
         Ok(SubmitReport {
             revision: session.revision,
-            outcomes: redact_outcomes(outcomes),
+            outcomes: redact_outcomes(outcomes, &submitted_ops, &projection),
             report: redacted,
         })
     }
@@ -350,111 +357,6 @@ impl Default for Api {
     }
 }
 
-fn respond<T, F>(f: F) -> String
-where
-    T: Serialize,
-    F: FnOnce() -> Result<T, ApiError>,
-{
-    match catch_unwind(AssertUnwindSafe(f)) {
-        Ok(Ok(value)) => serialize_envelope(json!({ "ok": value })),
-        Ok(Err(err)) => serialize_envelope(json!({ "err": ErrorEnvelope::from(err) })),
-        Err(_) => serialize_envelope(json!({
-            "err": ErrorEnvelope::from(ApiError::internal("internal invariant violation"))
-        })),
-    }
-}
-
-fn serialize_envelope(value: Value) -> String {
-    match serde_json::to_string(&value) {
-        Ok(json) => json,
-        Err(err) => {
-            let fallback = format!(
-                r#"{{"err":{{"code":"internal","message":"{}","details":{{}}}}}}"#,
-                json_escape(&err.to_string())
-            );
-            fallback
-        }
-    }
-}
-
-fn parse_json<T: DeserializeOwned>(json: &str) -> Result<T, ApiError> {
-    serde_json::from_str(json).map_err(|err| ApiError::invalid_json(err.to_string()))
-}
-
-fn parse_viewer(json: &str) -> Result<ViewerContext, ApiError> {
-    serde_json::from_str(json).map_err(|err| ApiError::invalid_viewer(err.to_string()))
-}
-
-fn parse_group_id(value: &str) -> Result<GroupId, ApiError> {
-    GroupId::from_str(value).map_err(|err| ApiError::invalid_json(err.to_string()))
-}
-
-fn parse_group_id_for_lookup(value: &str) -> Result<GroupId, ApiError> {
-    GroupId::from_str(value).map_err(|_| ApiError::not_found())
-}
-
-fn parse_entity_id(value: &str) -> Result<EntityId, ApiError> {
-    EntityId::from_str(value).map_err(|_| ApiError::not_found())
-}
-
-fn parse_ops_jsonl(chunk: &str) -> Result<Vec<Operation>, ApiError> {
-    let mut ops = Vec::new();
-    for (index, line) in chunk.lines().enumerate() {
-        let trimmed = line.trim();
-        if trimmed.is_empty() {
-            continue;
-        }
-        let op = serde_json::from_str(trimmed).map_err(|err| {
-            ApiError::with_details(
-                ErrorCode::InvalidJson,
-                err.to_string(),
-                json!({ "line": index.saturating_add(1) }),
-            )
-        })?;
-        ops.push(op);
-    }
-    Ok(ops)
-}
-
-fn reject_template_report(report: &cn_schema::ValidationReport) -> Result<(), ApiError> {
-    if report
-        .errors
-        .iter()
-        .any(|finding| finding.code == cn_schema::FindingCode::UnsupportedSchemaVersion)
-    {
-        return Err(ApiError::with_details(
-            ErrorCode::UnsupportedSchemaVersion,
-            "unsupported template schema version",
-            json!({ "report": report }),
-        ));
-    }
-    if !report.errors.is_empty() {
-        return Err(ApiError::with_details(
-            ErrorCode::InvalidJson,
-            "template validation failed",
-            json!({ "report": report }),
-        ));
-    }
-    Ok(())
-}
-
-fn reject_unsupported_ops(ops: &[Operation]) -> Result<(), ApiError> {
-    if ops
-        .iter()
-        .any(|op| !accepts_schema(&op.schema_version) || !accepts_schema(&op.template_version))
-    {
-        return Err(ApiError::new(
-            ErrorCode::UnsupportedSchemaVersion,
-            "unsupported operation schema version",
-        ));
-    }
-    Ok(())
-}
-
-fn redact_outcomes(outcomes: Vec<SubmitOutcome>) -> Vec<SubmitOutcome> {
-    outcomes
-}
-
 fn projected_entity(
     session: &mut GroupSession,
     viewer: &ViewerContext,
@@ -519,110 +421,4 @@ fn graph_error(err: GraphError) -> ApiError {
     match err {
         GraphError::NotFound => ApiError::not_found(),
     }
-}
-
-fn export_projection(
-    session: &mut GroupSession,
-    viewer: &ViewerContext,
-    options: &ExportOptions,
-) -> Projection {
-    let mut projection = session.projection_for(viewer);
-    remove_t3_entities(session, &mut projection);
-    apply_kind_filter(&mut projection, options.kinds.as_deref());
-    remove_t3_edges(session, &mut projection);
-    retain_referenced_content(&mut projection);
-    projection
-}
-
-fn remove_t3_entities(session: &GroupSession, projection: &mut Projection) {
-    projection.entities = projection
-        .entities
-        .drain(..)
-        .filter_map(|entity| export_entity(session, entity))
-        .collect();
-}
-
-fn export_entity(session: &GroupSession, mut entity: ProjectedEntity) -> Option<ProjectedEntity> {
-    let raw = session.state.entities.get(&entity.id)?;
-    if raw.tier == SensitivityTier::T3 {
-        return None;
-    }
-    entity
-        .attributes
-        .retain(|attr, _| export_attr_allowed(raw, attr));
-    Some(entity)
-}
-
-fn export_attr_allowed(raw: &cn_model::Entity, attr: &AttrId) -> bool {
-    raw.attributes
-        .get(attr)
-        .is_some_and(|instance| instance.effective_tier(raw.tier) != SensitivityTier::T3)
-}
-
-fn apply_kind_filter(projection: &mut Projection, kinds: Option<&[cn_model::KindId]>) {
-    let Some(kinds) = kinds else {
-        return;
-    };
-    let allowed: BTreeSet<_> = kinds.iter().collect();
-    projection
-        .entities
-        .retain(|entity| allowed.contains(&entity.kind));
-}
-
-fn remove_t3_edges(session: &GroupSession, projection: &mut Projection) {
-    projection.edges = projection
-        .edges
-        .drain(..)
-        .filter_map(|edge| export_edge(session, edge))
-        .collect();
-}
-
-fn export_edge(session: &GroupSession, mut edge: ProjectedEdge) -> Option<ProjectedEdge> {
-    let raw = session.state.edges.get(&edge.id)?;
-    if raw.tier == SensitivityTier::T3 {
-        return None;
-    }
-    edge.attributes
-        .retain(|attr, _| export_edge_attr_allowed(raw, attr));
-    Some(edge)
-}
-
-fn export_edge_attr_allowed(raw: &cn_model::Edge, attr: &AttrId) -> bool {
-    raw.attributes
-        .get(attr)
-        .is_some_and(|instance| instance.effective_tier(raw.tier) != SensitivityTier::T3)
-}
-
-fn retain_referenced_content(projection: &mut Projection) {
-    let ids = projected_entity_ids(projection);
-    projection
-        .edges
-        .retain(|edge| ids.contains(&edge.from) && ids.contains(&edge.to));
-    projection.stories = projection
-        .stories
-        .drain(..)
-        .filter_map(|story| retain_story_refs(story, &ids))
-        .collect();
-}
-
-fn retain_story_refs(
-    mut story: ProjectedStory,
-    ids: &BTreeSet<EntityId>,
-) -> Option<ProjectedStory> {
-    story.steps.retain(|step| ids.contains(&step.entity));
-    Some(story)
-}
-
-fn json_escape(value: &str) -> String {
-    value
-        .chars()
-        .flat_map(|c| match c {
-            '"' => "\\\"".chars().collect::<Vec<_>>(),
-            '\\' => "\\\\".chars().collect::<Vec<_>>(),
-            '\n' => "\\n".chars().collect::<Vec<_>>(),
-            '\r' => "\\r".chars().collect::<Vec<_>>(),
-            '\t' => "\\t".chars().collect::<Vec<_>>(),
-            other => vec![other],
-        })
-        .collect()
 }

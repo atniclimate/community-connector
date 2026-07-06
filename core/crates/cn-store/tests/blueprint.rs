@@ -160,6 +160,17 @@ fn named_entity(n: u128, name: &str) -> Entity {
     entity
 }
 
+fn named_entity_with_sort(n: u128, name: &str, sort: i64) -> Operation {
+    op(
+        sort,
+        OpKind::AttributeSet {
+            entity: entity_id(n),
+            attr: AttrId::new("name").expect("attr id"),
+            instance: attr_text(name),
+        },
+    )
+}
+
 fn attr_text(value: &str) -> AttributeInstance {
     AttributeInstance::new(
         AttributeValue::Text(value.to_string()),
@@ -404,6 +415,26 @@ fn authorization_denies_or_applies_without_cn_perm() {
 }
 
 #[test]
+fn submit_reports_missing_target_quarantine() {
+    let (mut state, _) = fold(vec![group_create(0)]);
+    let mut report = StoreReport::default();
+    let missing = named_entity_with_sort(99, "Missing", 2);
+    let outcomes = submit(&mut state, &Permit, vec![missing.clone()], &mut report);
+
+    assert_eq!(outcomes, vec![SubmitOutcome::Quarantined(missing.op_id)]);
+    assert_eq!(report.quarantined.len(), 1);
+    assert_eq!(report.quarantined[0].op_id, missing.op_id);
+    assert_eq!(
+        report.quarantined[0].reason,
+        QuarantineReason::MissingTarget
+    );
+    assert_eq!(
+        report.quarantined[0].subject,
+        Some(SubjectRef::Entity(entity_id(99)))
+    );
+}
+
+#[test]
 fn validation_quarantine_and_wrong_group() {
     let mut bad = entity(1);
     bad.attributes
@@ -553,6 +584,21 @@ fn log_append_reopen_torn_final_and_corrupt_middle() {
 }
 
 #[test]
+fn op_log_rejects_unsupported_op_schema_major() {
+    let path = temp_path("unsupported-schema");
+    let mut unsupported = group_create(1);
+    unsupported.schema_version = Version::new(9, 0, 0);
+    let mut bytes = serde_json::to_vec(&unsupported).expect("serialize op");
+    bytes.extend_from_slice(b"\n");
+    std::fs::write(&path, bytes).expect("write log");
+
+    assert!(matches!(
+        OpLog::open(&path),
+        Err(StoreError::UnsupportedSchemaVersion)
+    ));
+}
+
+#[test]
 fn snapshot_round_trip_and_corruption_discard() {
     let path = temp_path("snapshot");
     let (state, _) = fold(vec![
@@ -560,16 +606,89 @@ fn snapshot_round_trip_and_corruption_discard() {
         op(2, OpKind::EntityCreate { entity: entity(1) }),
     ]);
     Snapshot::save(&path, &state).expect("save");
-    let loaded = Snapshot::load(&path).expect("load").expect("some");
+    let mut load_report = StoreReport::default();
+    let loaded = Snapshot::load(&path, &mut load_report)
+        .expect("load")
+        .expect("some");
     assert_eq!(public_state(&loaded.0), public_state(&state));
+    let mut tip_report = StoreReport::default();
     assert!(
-        Snapshot::load_with_log_tip(&path, Some(&group_create(1).sort_key))
+        Snapshot::load_with_log_tip(&path, Some(&group_create(1).sort_key), &mut tip_report)
             .expect("load with shorter log")
             .is_none()
+    );
+    assert!(
+        tip_report
+            .warnings
+            .iter()
+            .any(|finding| finding.code == "SnapshotDiscarded")
     );
     let mut bytes = std::fs::read(&path).expect("read snapshot");
     let last = bytes.len() - 2;
     bytes[last] ^= 1;
     std::fs::write(&path, bytes).expect("write flipped");
-    assert!(Snapshot::load(&path).expect("load corrupt").is_none());
+    let mut corrupt_report = StoreReport::default();
+    assert!(
+        Snapshot::load(&path, &mut corrupt_report)
+            .expect("load corrupt")
+            .is_none()
+    );
+    assert!(
+        corrupt_report
+            .warnings
+            .iter()
+            .any(|finding| finding.code == "SnapshotDiscarded")
+    );
+}
+
+#[test]
+fn snapshot_round_trips_field_clocks_and_seen() {
+    let path = temp_path("snapshot-clocks");
+    let duplicate = named_entity_with_sort(1, "high", 5);
+    let snapshot_ops = vec![
+        group_create(1),
+        op(2, OpKind::EntityCreate { entity: entity(1) }),
+        duplicate.clone(),
+    ];
+    let (snapshot_state, _) = fold(snapshot_ops.clone());
+    Snapshot::save(&path, &snapshot_state).expect("save");
+    let lower = named_entity_with_sort(1, "low", 4);
+
+    let mut report = StoreReport::default();
+    let (mut loaded, _) = Snapshot::load(&path, &mut report)
+        .expect("load")
+        .expect("some");
+    loaded.apply(lower.clone(), &mut report);
+    loaded.apply(duplicate.clone(), &mut report);
+
+    let mut never_snapshotted = snapshot_ops;
+    never_snapshotted.push(lower);
+    never_snapshotted.push(duplicate);
+    let (expected, _) = fold(never_snapshotted);
+
+    assert_eq!(public_state(&loaded), public_state(&expected));
+    assert_eq!(
+        loaded.entities[&entity_id(1)].attributes[&AttrId::new("name").expect("attr")].value,
+        AttributeValue::Text("high".to_string())
+    );
+    assert!(report.deduped > 0);
+}
+
+#[test]
+fn hlc_clock_rolls_counter_over_by_advancing_wall_time() {
+    let mut clock = HlcClock::from_last_for_test(Hlc {
+        wall_ms: 10,
+        counter: u32::MAX,
+    });
+    let rolled = clock.tick(10);
+    let next = clock.tick(9);
+
+    assert_eq!(
+        rolled,
+        Hlc {
+            wall_ms: 11,
+            counter: 0
+        }
+    );
+    assert!(rolled < next);
 }

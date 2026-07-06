@@ -68,6 +68,17 @@ pub fn project(state: &GroupState, viewer: &ViewerContext, revision: u64) -> Pro
     }
 }
 
+/// Builds an export projection. This applies the normal viewer projection and
+/// the export gate from ADR-001 A-B2 / ADR-002 A-B8: values whose effective
+/// tier is T3 are excluded even when the viewer is the owner.
+pub fn export_projection(state: &GroupState, viewer: &ViewerContext, revision: u64) -> Projection {
+    let mut projection = project(state, viewer, revision);
+    remove_export_t3_entities(state, &mut projection);
+    remove_export_t3_edges(state, &mut projection);
+    retain_referenced_content(&mut projection);
+    projection
+}
+
 /// Projects active entities only (spec section 5 object rules; blueprint
 /// projection rule 1).
 fn project_entities(state: &GroupState, viewer: &ViewerContext) -> Vec<ProjectedEntity> {
@@ -248,5 +259,57 @@ fn projection_group_id(state: &GroupState) -> GroupId {
     match GroupId::from_str("00000000-0000-0000-0000-000000000000") {
         Ok(id) => id,
         Err(_) => GroupId::new(cn_model::Timestamp(0)),
+    }
+}
+
+fn remove_export_t3_entities(state: &GroupState, projection: &mut Projection) {
+    projection.entities = projection
+        .entities
+        .drain(..)
+        .filter_map(|entity| export_entity(state, entity))
+        .collect();
+}
+
+fn export_entity(state: &GroupState, mut entity: ProjectedEntity) -> Option<ProjectedEntity> {
+    let raw = state.entities.get(&entity.id)?;
+    if raw.tier == SensitivityTier::T3 {
+        return None;
+    }
+    entity.attributes.retain(|attr, _| {
+        raw.attributes
+            .get(attr)
+            .is_some_and(|instance| instance.effective_tier(raw.tier) != SensitivityTier::T3)
+    });
+    Some(entity)
+}
+
+fn remove_export_t3_edges(state: &GroupState, projection: &mut Projection) {
+    projection.edges = projection
+        .edges
+        .drain(..)
+        .filter_map(|edge| export_edge(state, edge))
+        .collect();
+}
+
+fn export_edge(state: &GroupState, mut edge: ProjectedEdge) -> Option<ProjectedEdge> {
+    let raw = state.edges.get(&edge.id)?;
+    if raw.tier == SensitivityTier::T3 {
+        return None;
+    }
+    edge.attributes.retain(|attr, _| {
+        raw.attributes
+            .get(attr)
+            .is_some_and(|instance| instance.effective_tier(raw.tier) != SensitivityTier::T3)
+    });
+    Some(edge)
+}
+
+fn retain_referenced_content(projection: &mut Projection) {
+    let ids: BTreeSet<_> = projection.entities.iter().map(|entity| entity.id).collect();
+    projection
+        .edges
+        .retain(|edge| ids.contains(&edge.from) && ids.contains(&edge.to));
+    for story in &mut projection.stories {
+        story.steps.retain(|step| ids.contains(&step.entity));
     }
 }

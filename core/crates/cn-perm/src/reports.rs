@@ -1,5 +1,7 @@
+use std::collections::BTreeSet;
+
 use cn_model::PersonId;
-use cn_store::{GroupState, QuarantineEntry, QuarantineReason, StoreFinding, StoreReport};
+use cn_store::{GroupState, QuarantineEntry, QuarantineReason, StoreReport, SubjectRef};
 
 use crate::projection::project;
 use crate::viewer::{ViewerContext, is_governance};
@@ -24,7 +26,7 @@ pub fn redact_report(
         warnings: report
             .warnings
             .iter()
-            .filter(|finding| subject_index.finding_is_visible(finding))
+            .filter(|finding| subject_index.subject_is_visible(finding.subject))
             .cloned()
             .collect(),
         applied: 0,
@@ -48,61 +50,49 @@ fn redact_quarantine(
     entry: &QuarantineEntry,
     subjects: &SubjectIndex,
 ) -> Option<QuarantineEntry> {
-    if viewer.is_some_and(|person| person == entry.responsible_human) {
-        return Some(redact_own_quarantine(entry));
+    if subjects.subject_is_visible(entry.subject) {
+        return Some(entry.clone());
     }
-    subjects.quarantine_is_visible(entry).then(|| entry.clone())
+    viewer
+        .is_some_and(|person| person == entry.responsible_human)
+        .then(|| redact_own_quarantine(entry))
 }
 
 fn redact_own_quarantine(entry: &QuarantineEntry) -> QuarantineEntry {
     QuarantineEntry {
         op_id: entry.op_id,
         responsible_human: entry.responsible_human,
-        reason: match entry.reason {
-            QuarantineReason::MissingTarget => QuarantineReason::NotFound,
-            reason => reason,
-        },
+        subject: entry.subject,
+        reason: QuarantineReason::NotFound,
         findings: Vec::new(),
     }
 }
 
 struct SubjectIndex {
-    visible_needles: Vec<String>,
+    entities: BTreeSet<cn_model::EntityId>,
+    edges: BTreeSet<cn_model::EdgeId>,
+    stories: BTreeSet<cn_model::StoryId>,
+    group: Option<cn_model::GroupId>,
 }
 
 impl SubjectIndex {
     fn new(state: &GroupState, viewer: &ViewerContext) -> Self {
         let projection = project(state, viewer, 0);
-        let mut visible_needles = Vec::new();
-        for entity in projection.entities {
-            visible_needles.push(entity.id.to_string());
-            visible_needles.push(entity.kind.to_string());
-            visible_needles.extend(entity.attributes.keys().map(ToString::to_string));
+        Self {
+            entities: projection.entities.iter().map(|entity| entity.id).collect(),
+            edges: projection.edges.iter().map(|edge| edge.id).collect(),
+            stories: projection.stories.iter().map(|story| story.id).collect(),
+            group: state.group.as_ref().map(|group| group.id),
         }
-        for edge in projection.edges {
-            visible_needles.push(edge.id.to_string());
-            visible_needles.push(edge.kind.to_string());
-            visible_needles.extend(edge.attributes.keys().map(ToString::to_string));
-        }
-        for story in projection.stories {
-            visible_needles.push(story.id.to_string());
-        }
-        Self { visible_needles }
     }
 
-    fn finding_is_visible(&self, finding: &StoreFinding) -> bool {
-        self.text_is_visible(&finding.code) || self.text_is_visible(&finding.message)
-    }
-
-    fn quarantine_is_visible(&self, entry: &QuarantineEntry) -> bool {
-        entry.findings.iter().any(|finding| {
-            self.text_is_visible(&finding.path) || self.text_is_visible(&finding.message)
-        })
-    }
-
-    fn text_is_visible(&self, text: &str) -> bool {
-        self.visible_needles
-            .iter()
-            .any(|needle| !needle.is_empty() && text.contains(needle))
+    fn subject_is_visible(&self, subject: Option<SubjectRef>) -> bool {
+        match subject {
+            Some(SubjectRef::Entity(id)) => self.entities.contains(&id),
+            Some(SubjectRef::Edge(id)) => self.edges.contains(&id),
+            Some(SubjectRef::Story(id)) => self.stories.contains(&id),
+            Some(SubjectRef::Group(id)) => self.group == Some(id),
+            Some(SubjectRef::Membership(_) | SubjectRef::TrustGrant(_)) | None => false,
+        }
     }
 }
