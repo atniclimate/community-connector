@@ -97,16 +97,19 @@ budget).
    now ADR-004-consistent and is Phase 3's working document).
 3. DONE - state machine + wasm worker landed, I4 spot-checked, committed
    (7 vitest tests; stale-revision rejection; correlation-id protocol).
-4. IN FLIGHT - theming pipeline implementing docs/blueprints/theming.md
-   (codex, result .codex/theming-result.md): OKLCH color math in-repo,
-   deterministic derive order (merge -> variants -> contrast floor -> CVD
-   distance), ThemeReport with I12 adjustments/warnings, theme slice in the
-   store, schemas/theme-tokens.schema.json. On landing: verify (app checks
-   + npm test; pii-scan), judge fixture adjustment outcomes, commit, then:
-5. The base renderer (brief section 9 rewritten checklist, ADR-004 path):
-   per-kind InstancedMesh + merged LineSegments edge layer reading the wasm
-   projection through the store, quality-tier manager early, halos
-   distance-culled/tier-gated, then labels. Blueprint next.
+4. DONE - theming pipeline landed (16 tests) AND fixture palettes improved
+   at source (rotated Okabe-Ito): both templates derive with ZERO
+   adjustments/warnings; the theme test pins that as the regression guard.
+5. IN FLIGHT - base renderer implementing docs/blueprints/base-renderer.md
+   (codex HIGH, result .codex/renderer-result.md): committed synthetic demo
+   ops per fixture (Part 0), kindMeta/hover state additions (Part 1), viz
+   modules (Part 2: instanced nodes, merged shader edges with dual color
+   buffers, distance-culled halos, quality tiers, picking-as-dispatch,
+   reduced-motion camera). On landing: verify + I4 spot-check + commit,
+   then DIRECTOR VISUAL CHECK via playwright headed (screenshot, console),
+   then remaining Phase 3: labels + motion polish, view modes, detail
+   panels, a11y architecture (Session A), wizard/forms (Session B), story
+   viewing, snapshot acceptance run.
 
 Review debt to schedule (routing policy standing job): a codex review diff
 pass over the accumulated core implementation commits before Phase 2 close.
