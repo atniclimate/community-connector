@@ -14,9 +14,10 @@ empty folder to: a complete, adversarially-reviewed Rust/WASM core
 projection ever leaks above a viewer's access), an evidence-based renderer
 decision measured on this machine's GPU, and a working app skeleton that
 loads a synthetic community of 120 people and places and draws it as an
-instanced 3D constellation (first screenshot:
-docs/design/screenshots/base-renderer-2026-07-06.png - node colors need a
-fix, that is queued). ~57 commits, every one verified and PII-scanned.
+instanced 3D constellation, director-accepted after a visual-fix cycle
+(docs/design/screenshots/viz-fixes-2026-07-06.png). ~59 commits, every one
+verified and PII-scanned. For the full decision session, paste
+docs/SESSION_2_LAUNCH.md instead of improvising from this file.
 Roughly half of Phase 3 (frontend) remains, then ingestion (Phase 4),
 personal mode (Phase 5), and hardening to v0.1.0 - an estimated 10-13
 focused sessions, mapped in docs/PROJECT_PLAN.md.

@@ -117,8 +117,19 @@ budget).
    run it when the human is next present). CLAUDE.md reading order and
    session-end protocol updated accordingly.
 
-Next build session is S3-A per PROJECT_PLAN: fix the four visual findings,
-then labels, then motion - with a benchmark re-run against the p95 goal.
+7. DONE - S3-A visual fixes landed and DIRECTOR-ACCEPTED (screenshot:
+   docs/design/screenshots/viz-fixes-2026-07-06.png). Root cause of the
+   black nodes: instanceColor not reaching the stock material fragment
+   path; now an explicit self-lit shader. All four findings resolved.
+8. SESSION 2 LAUNCH PROMPT written: **docs/SESSION_2_LAUNCH.md** - paste
+   into a fresh session to run the decision interview (8 parts, options +
+   recommendations + defaults) and produce Execution Plan v2. It lands any
+   in-flight work first and retires itself to docs/archive/ when done.
+
+Next: EITHER the human pastes docs/SESSION_2_LAUNCH.md (decision session -
+preferred before more build work), OR autonomous continuation proceeds
+with S3-A's remaining scope per PROJECT_PLAN: labels (troika), motion/
+focus-mode polish, benchmark re-run against the p95 goal.
 
 Review debt to schedule (routing policy standing job): a codex review diff
 pass over the accumulated core implementation commits before Phase 2 close.
