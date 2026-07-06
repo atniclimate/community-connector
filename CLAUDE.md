@@ -109,6 +109,20 @@ diff, Codex or human. Do not restate it elsewhere; link to it.
 - Anything involving the old repo's (`C:\dev\CPF-RCN_demo`) git history or its PII
   remediation.
 
+### Real-data gate process - ATNI convention pilot (D-030, D-034)
+
+- Individual consent instrument: the intake form. Only form respondents enter the
+  graph; QR-code joins at the convention are consented joins. The convention
+  attendee list is outreach-only data and is never ingested or rendered.
+- Collective checkpoint: a recorded ATNI Climate committee approval of the network
+  activity before any real ingestion runs.
+- All pilot entries and outputs enter at TSDF T1. The tier-assignment authority is
+  ATNI Climate. Per-field tier UX is post-pilot work.
+- Community-facing text (intake form, consent email, tier wording) requires human
+  review before use.
+- Real pilot data lives outside this repository (or in gitignored staging) and is
+  never committed; the PII prime directive is unchanged by this process.
+
 ## Yours to decide autonomously (log nontrivial ones in DECISIONS.md)
 
 Crate and library choices within the pinned stack; internal APIs and module

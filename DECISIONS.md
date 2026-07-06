@@ -203,3 +203,196 @@ D-014; an initial wrong-tier launch at mini/low was caught and killed
 within a minute). Director grep-verified the revision. The brief's
 two-round budget is now spent; it is Phase 3's working document, revised
 further only by ADR-anchored evidence.
+
+## D-019 (2026-07-06) - Session 2 decision interview conducted through Part 5
+
+The human ran the docs/SESSION_2_LAUNCH.md interview live (Parts 1-5
+answered; entries D-020..D-038 below). The human ended the interview at
+Part 5; Parts 6-8 fall to their published defaults: Q6.1 CSV-first
+ingestor with column mapping, Q6.2 always-queue duplicates, Q7.1 full
+autonomy with the ARCHITECTURE-redesign parking rule, Q7.2 current spend
+acceptable (human: "there is plenty of context and usage"), Q7.3 the
+8:00 AM safety cron and usage-failover directives stand, Q7.4 PolyForm
+Noncommercial stands. Per protocol, pure defaults get no separate entries.
+
+## D-020 (2026-07-06) - First deployment: ATNI committee pilot (Q1.1)
+
+The first real community is an ATNI committee pilot (the Climate
+Resilience Committee per D-022), not a CPF-RCN returning demo. Confirms
+committee-first Phase 4 ordering; CPF-RCN becomes a later migration
+target (D-031).
+
+## D-021 (2026-07-06) - Hero workflows: explore + need-to-solution routing (Q1.2)
+
+Both together: exploring the network (viz-first) AND need-to-solution
+routing ("who here can help with X"). Routing UI is now explicit v0.1
+scope in S3-B. Personal profiles were not selected (see D-029).
+
+## D-022 (2026-07-06) - The convention pilot arc and win definition (Q1.3)
+
+Human's scenario, condensed: before the ATNI Annual Convention, a consent
+email goes to the Climate Resilience Committee plus documented past
+convention attendees (other committees also invited to opt in).
+Participants complete an intake form (name, Tribe, org(s), specialties,
+resource availability, contact/social links, plus the fields designed in
+D-023). The convention attendee list is used for outreach. The full
+participant + committee graph is shown at the general assembly;
+participants explore support pathways during the committee meeting;
+feedback is captured to improve the system. WIN (near-verbatim): "they
+see it work, they see themselves within it, they gain an understanding
+of their connections, and then are able to visualize how this platform
+enables them to share resources, information, and accelerate outreach."
+Consequences: v0.1.0 has a real external date (the convention); the
+intake form is the project's critical-path artifact; the pilot is
+facilitator-run end to end.
+
+## D-023 (2026-07-06) - Intake form design direction (director deliverable, Q1.3)
+
+Principles adopted for the form + ATNI template (one artifact, two
+views): (1) offers and needs draw from ONE controlled capability
+taxonomy so need_met_by pathways compute directly; (2) edge-generating
+questions (named collaborators, projects, committees, convenings)
+outrank attribute questions; (3) response rate is protected via a
+required ~5-minute core + optional depth section + facilitator-assisted
+completion; (4) capacity level per offer and a contactability consent
+(yes / through facilitator / no) are routing-critical fields; (5)
+per-field visibility consent on the form maps to cn-perm circles at the
+source; (6) never ask enumeration of traditional knowledge holdings -
+only willingness to be contacted, at the most restricted tier. Full
+field list delivered in-session; becomes the FORM docs deliverable.
+All community-facing text requires human review before use.
+
+## D-024 (2026-07-06) - Snapshot-first distribution (Q2.1)
+
+The offline single-file snapshot is the primary v0.1 vehicle; the live
+app remains the dev/build environment. S3-C snapshot acceptance and
+Phase 6 targets follow.
+
+## D-025 (2026-07-06) - Runs on the facilitator laptop (Q2.2)
+
+Assembly and committee-meeting exploration run on the facilitator's
+laptop (projector). Perf target stays the reference Iris Xe; no
+mobile/touch scope in v0.1.
+
+## D-026 (2026-07-06) - Backup: risk accepted (Q2.3)
+
+Human answer: "Accept the risk for now." No remote, no bundles; the
+remotes gate stays CLOSED. Single-machine total-loss remains risk #1 in
+the register and is re-raised at every decision session. Do not act
+autonomously on this.
+
+## D-027 (2026-07-06) - Identity design deferred entirely (Q3.1)
+
+No identity mechanism is designed now (no claim codes, no passkeys).
+Session D and the identity ADR leave the v0.1.0 plan and return with
+v0.2 personal-mode planning.
+
+## D-028 (2026-07-06) - Facilitator (and developer) role now; creator governance later (Q3.2)
+
+Human answer (verbatim): "For the demo and through the ongoing
+development, there will need to be a facilitator (and developer) role
+for entry, modifications, but will transition eventually into group
+creator with permissions requirements." Scope: a standing facilitator
+role with entry/modification authority is added to cn-perm's role model
+for the pilot and development era, designed to hand off to
+group-creator-held governance with permission requirements later.
+Permission-adjacent work = grind HIGH + adversarial review.
+
+## D-029 (2026-07-06) - Personal mode is v0.2, after the pilot (Q3.3)
+
+Phase 5 stops gating v0.1.0. v0.1.0 ships facilitator-managed data with
+the viewer-switcher demonstrating permission filtering. Personal mode is
+built time-boxed after a real committee has used facilitator mode.
+
+## D-030 (2026-07-06) - Graph membership: form respondents only, QR joins (Q4.1a)
+
+Human answer: "We will utilize form respondents only, but QR codes to
+the form and in convention packets will allow attendees to join."
+Rulings: the intake form is the individual consent instrument; the
+attendee list is outreach-only and is never rendered; QR-code joins
+during the convention are consented joins, which creates a REQUIREMENT
+for fast idempotent re-ingest + snapshot rebuild so same-day joiners
+appear by the committee meeting (S4-A).
+
+## D-031 (2026-07-06) - CPF-RCN migration recipe written in Phase 4 (Q4.2)
+
+Session E stays: docs-only recipe (export, scrub, tier assignment, FPIC
+checkpoints). Execution remains human-gated; the session never reads
+red data.
+
+## D-032 (2026-07-06) - TSDF codes are the primary tier language in the UI (Q4.3)
+
+Against the plain-language recommendation - deliberate human choice, do
+not "fix" later. T0-T3 codes are the visible UI language; plain-language
+equivalents appear secondarily (tooltips/expansions). Aligns the UI with
+the TSDF standard (C:\dev\TieredSovereignDataFramework).
+
+## D-033 (2026-07-06) - Provenance visibility: one-line for members, full chain for governance (Q4.4)
+
+Members see "added by X from Y (date)"; governance sees the full
+IEEE-2890-style custody chain. Detail-panel design input for S3-B.
+
+## D-034 (2026-07-06) - Demo tiering: everything T1; ATNI Climate is the tier authority (Q4.1b/c)
+
+Human answer (verbatim): "For this working demo, all entries and outputs
+are considered Tier 1 (ATNI Climate assigns Tiers), but after feedback
+and continued development, tier enforcement will be better developed."
+Rulings: all pilot entries and outputs enter at T1; the tier-assignment
+authority is ATNI Climate (the Climate Resilience Committee); per-field
+tier-assignment UX and richer governance tooling are post-pilot work.
+The collective FPIC checkpoint default stands: a recorded committee
+approval of the activity before any real ingestion runs.
+
+## D-035 (2026-07-06) - Accessibility deferred to post-pilot refocus (Q5.1)
+
+Human: accessibility "is not a concern just yet, but after the feedback
+we will refocus on this aspect." Session A leaves the v0.1.0 critical
+path. RETAINED (cheap now, expensive to retrofit): the font-scale token,
+reduced-motion variants, basic keyboard navigation. DEFERRED: the
+parallel-DOM primary equivalent interface and the WCAG 2.2 AA audit.
+This entry records the R9 acceptance-criterion deferral required by the
+phase-gate rule (CLAUDE.md phase plan).
+
+## D-036 (2026-07-06) - Facilitator wizard; template authoring stays JSON (Q5.2)
+
+Group creation is a facilitator-led wizard from existing templates;
+authoring NEW community types remains a JSON-file task until two real
+communities have shipped. Session B scope set.
+
+## D-037 (2026-07-06) - In-app story authoring is v0.1 scope (Q5.3)
+
+Beyond the viewing-only recommendation - deliberate. The facilitator
+composes stories (from intake-form story material) inside the app before
+the convention. S3-C grows: authoring UI (create/edit/order steps
+referencing entities) plus viewing.
+
+## D-038 (2026-07-06) - Aesthetic check deferred to a dedicated design session (Q5.4)
+
+Human: "We'll spend more time on the visual display later, and bring in
+some focused agents and claude design." Hearthlight stands provisionally;
+a human-present DESIGN sitting (focused design agents + cultural palette
+review) is scheduled into the plan before convention polish.
+
+## D-039 (2026-07-06) - Execution Plan v2 adopted (provisional)
+
+PROJECT_PLAN.md section 3 rewritten from the interview: v0.1.0 =
+convention-pilot ready (facilitator-run, snapshot-first). Phase 5,
+Session D (identity), Session A (accessibility), and Session F's
+governance-tooling remainder move past v0.1.0 to v0.2. S3-B gains the
+routing UI; S3-C gains story authoring; a FORM docs deliverable (intake
+form + ATNI template + consent email) joins the critical path; S4-A
+gains fast re-ingest. PROVISIONAL: a plan-v3 sitting follows the
+graph-networks research report (D-040); expect refinement, not reversal.
+
+## D-040 (2026-07-06) - Post-interview directive: graph-networks deep research
+
+Human directive: conduct deep research on graph databases beyond social
+network analysis - 3D visualization, spatial reasoning, affinities,
+resource pools, geographic mapping, what a graph of many Peoples could
+illuminate, and real-world (non-social-media) innovations of the past
+decade - then report comprehensively (findings, code and technical
+structures, real-world usability). Report lands at
+docs/research/graph-networks-report-2026-07-06.md. The next human
+sitting shapes plan v3 with this knowledge, including possible
+integrations: cap-assessor, TCR-policy-scanner, GeoBase,
+engagement-database, and the TSDF ecosystem under C:\dev.
