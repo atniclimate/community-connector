@@ -49,6 +49,7 @@ noUncheckedIndexedAccess and exactOptionalPropertyTypes.
 | vite | ^7.3.6 |
 | typescript | ^6.0.3 |
 | vite-plugin-singlefile | ^2.3.3 |
+| vitest | 4.1.10 - resolved 4.1.10 |
 | 3d-force-graph | ^1.80.0 - resolved 1.80.0 |
 | three | ^0.185.1 - resolved 0.185.1 |
 | three-forcegraph | ^1.43.4 - resolved 1.43.4 |
