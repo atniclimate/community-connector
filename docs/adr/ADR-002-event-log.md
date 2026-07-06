@@ -1,7 +1,6 @@
 # ADR-002: Event-Sourced Operation Log and Network Readiness
 
-- Status: draft - amended after adversarial round 1 (REDESIGN verdict on the
-  spec's completeness, direction affirmed); awaiting round 2
+- Status: accepted (amended after adversarial rounds 1 and 2; round budget spent)
 - Date: 2026-07-06
 - Phase: 1
 - Drivers: R5 (network-ready, not networked), R10/I6 (provenance), I3 (no
@@ -180,6 +179,13 @@ quarantine set in canonical order, repeating until a pass admits nothing new
 converge identically across peers. Quarantined ops persist in the log and in
 the validation report (I12) until admitted.
 
+Round-2 clarification: admission timing can never affect LWW outcomes. Every
+field write carries its op's sort_key, and a write lands only if its sort_key
+exceeds the sort_key currently recorded for that field - so an op admitted
+late from quarantine with a lower sort_key cannot overwrite a higher-sort
+write that already landed. Canonical order governs values; passes only govern
+admission.
+
 ### A-B5. Export gate: per-OpKind disclosure and dependency closure
 
 Every OpKind declares a disclosure classification covering ALL fields it can
@@ -196,8 +202,11 @@ implementation spec, but the gate contract is normative now.
 cn-store exposes exactly one write path: `submit(ops)` which calls cn-perm
 authorization per op BEFORE append. Unauthorized ops are rejected with typed
 errors surfaced in the validation report (I2, I3). `VisibilitySet` requires
-the value's owner; `TierSet` requires the group's governance role and may
-only tighten when submitted by a non-governance owner (ADR-001 A-B3/D7).
+the value's owner. `TierSet` is authorized iff EITHER the submitter holds the
+group's governance role (may assign any tier within community policy) OR the
+submitter owns the value AND the new tier is strictly more restrictive than
+the current effective tier (owner tighten-only, ADR-001 A-B3/D7). Any other
+TierSet is rejected with a typed error.
 
 ### A-B7. Durability semantics, typed
 
@@ -205,8 +214,10 @@ One fsync per submitted BATCH, not per op (bulk ingest streams). Every line
 ends with a newline; on open, a torn final line (missing newline or invalid
 JSON) is truncated and reported as a typed WARN (I3, I12). The snapshot
 watermark must be <= the durable log tip; a snapshot ahead of the log is
-discarded with a typed WARN and state refolds from the log. Log lines are
-never rewritten.
+discarded with a typed WARN and state refolds from the log. Round-2 addition:
+snapshot.json carries a content checksum, and a torn, unparseable, or
+checksum-failing snapshot - regardless of watermark - is likewise discarded
+with a typed WARN and a full refold (I3, I12). Log lines are never rewritten.
 
 ### A-B8. SyncTransport is an explicitly provisional v0 seam
 
