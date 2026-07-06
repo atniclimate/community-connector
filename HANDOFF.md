@@ -55,11 +55,14 @@ wasm32-unknown-unknown -p <crate>, pii-scan - then atomic commit, then
 2. cn-store lands -> verify/commit -> launch run-cn-perm.ps1 (high effort -
    it owns the Phase 2 acceptance property test)
 3. cn-perm lands -> verify/commit -> launch run-cn-graph.ps1
-4. cn-graph lands -> verify/commit -> THEN director work: cn-api + cn-wasm
-   blueprint (ADR-003 D1 surface incl. streaming load + entity_detail +
-   redacted reports via cn_perm::redact_report), implement, wasm smoke page
-   in app/ loading the pkg, Phase 2 memory + projection-payload measurement
-   gates (ADR-001/ADR-003 amendments).
+4. cn-graph lands -> verify/commit -> launch run-cn-api.ps1 (blueprint
+   docs/blueprints/cn-api.md is DONE and committed; the task implements
+   cn-api + cn-wasm bindings + smoke page + measurement gate in one go;
+   verification includes wasm-pack build and npm smoke:node from app/).
+5. cn-api lands -> verify/commit -> run the ignored measurement_gate test,
+   record its numbers in HANDOFF -> codex review diff pass over all core
+   implementation commits (the standing job) -> judge findings -> Phase 2
+   close or fix list.
 
 Review debt to schedule (routing policy standing job): a codex review diff
 pass over the accumulated core implementation commits before Phase 2 close.
