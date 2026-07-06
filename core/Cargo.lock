@@ -48,6 +48,17 @@ version = "0.1.0"
 [[package]]
 name = "cn-api"
 version = "0.1.0"
+dependencies = [
+ "cn-graph",
+ "cn-model",
+ "cn-perm",
+ "cn-schema",
+ "cn-store",
+ "semver",
+ "serde",
+ "serde_json",
+ "thiserror",
+]
 
 [[package]]
 name = "cn-graph"

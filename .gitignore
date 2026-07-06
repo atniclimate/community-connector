@@ -3,6 +3,8 @@ target/
 dist/
 node_modules/
 pkg/
+pkg-node/
+dist-smoke/
 .vite/
 *.tsbuildinfo
 

@@ -7,6 +7,8 @@
     "dev": "vite",
     "typecheck": "tsc --noEmit",
     "build": "vite build",
+    "build:smoke": "vite build --mode smoke --base ./",
+    "smoke:node": "node scripts/smoke-node.mjs",
     "validate:templates": "node scripts/validate-templates.mjs",
     "build:snapshot": "vite build --mode snapshot && node ../scripts/check-size.mjs dist/index.html"
   },
