@@ -65,6 +65,7 @@ pub struct StoreReport {
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct QuarantineEntry {
     pub op_id: OpId,
+    pub responsible_human: PersonId,
     pub reason: QuarantineReason,
     pub findings: Vec<cn_schema::Finding>,
 }
@@ -72,6 +73,7 @@ pub struct QuarantineEntry {
 /// Quarantine reason.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 pub enum QuarantineReason {
+    NotFound,
     MissingTarget,
     DuplicateCreate,
     TemplateVersionUnknown,
@@ -153,6 +155,7 @@ impl GroupState {
             ApplyResult::Quarantined(reason, findings) => {
                 report.quarantined.push(QuarantineEntry {
                     op_id: op.op_id,
+                    responsible_human: op.responsible_human,
                     reason,
                     findings,
                 });
@@ -178,6 +181,7 @@ impl GroupState {
                     ApplyResult::Quarantined(reason, findings) => {
                         report.quarantined.push(QuarantineEntry {
                             op_id: op.op_id,
+                            responsible_human: op.responsible_human,
                             reason,
                             findings,
                         });
@@ -195,6 +199,7 @@ impl GroupState {
         for op in std::mem::take(&mut self.quarantine) {
             report.quarantined.push(QuarantineEntry {
                 op_id: op.op_id,
+                responsible_human: op.responsible_human,
                 reason: QuarantineReason::MissingTarget,
                 findings: Vec::new(),
             });

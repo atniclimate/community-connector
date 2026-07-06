@@ -1,0 +1,252 @@
+use std::collections::{BTreeMap, BTreeSet};
+use std::str::FromStr;
+
+use cn_model::{
+    AttrId, AttributeInstance, AttributeValue, Circle, Edge, EdgeId, Entity, EntityId, GroupId,
+    KindId, Lifecycle, SensitivityTier, Story, StoryId,
+};
+use cn_store::GroupState;
+use serde::Serialize;
+
+use crate::rules::value_visible;
+use crate::viewer::{ViewerContext, admissible_circle, viewer_fingerprint};
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct Projection {
+    pub group_id: GroupId,
+    pub viewer_fingerprint: String,
+    pub revision: u64,
+    pub entities: Vec<ProjectedEntity>,
+    pub edges: Vec<ProjectedEdge>,
+    pub stories: Vec<ProjectedStory>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct ProjectedEntity {
+    pub id: EntityId,
+    pub kind: KindId,
+    pub owner_is_viewer: bool,
+    pub attributes: BTreeMap<AttrId, AttributeValue>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct ProjectedEdge {
+    pub id: EdgeId,
+    pub kind: KindId,
+    pub from: EntityId,
+    pub to: EntityId,
+    pub directed: bool,
+    pub weight: Option<f64>,
+    pub attributes: BTreeMap<AttrId, AttributeValue>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct ProjectedStory {
+    pub id: StoryId,
+    pub title: String,
+    pub steps: Vec<ProjectedStoryStep>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct ProjectedStoryStep {
+    pub entity: EntityId,
+    pub narration: String,
+}
+
+/// Builds the viewer projection (spec sections 5 and 6; ADR-001 A-B1;
+/// ADR-003 D1 and round-2 entity detail amendment).
+pub fn project(state: &GroupState, viewer: &ViewerContext, revision: u64) -> Projection {
+    let entities = project_entities(state, viewer);
+    let entity_ids = entities.iter().map(|entity| entity.id).collect();
+    Projection {
+        group_id: projection_group_id(state),
+        viewer_fingerprint: viewer_fingerprint(state, viewer),
+        revision,
+        edges: project_edges(state, viewer, &entity_ids),
+        stories: project_stories(state, viewer, &entity_ids),
+        entities,
+    }
+}
+
+/// Projects active entities only (spec section 5 object rules; blueprint
+/// projection rule 1).
+fn project_entities(state: &GroupState, viewer: &ViewerContext) -> Vec<ProjectedEntity> {
+    state
+        .entities
+        .values()
+        .filter(|entity| entity.lifecycle == Lifecycle::Active)
+        .filter(|entity| entity_visible(state, viewer, entity))
+        .map(|entity| project_entity(state, viewer, entity))
+        .collect()
+}
+
+/// Projects entity presence when the presence rule passes (spec section 5;
+/// blueprint projection rule 2).
+pub fn entity_visible(state: &GroupState, viewer: &ViewerContext, entity: &Entity) -> bool {
+    visible_for_owner(
+        state,
+        viewer,
+        entity.owner.as_ref(),
+        entity.presence_visibility,
+        entity.tier,
+    )
+}
+
+fn project_entity(state: &GroupState, viewer: &ViewerContext, entity: &Entity) -> ProjectedEntity {
+    ProjectedEntity {
+        id: entity.id,
+        kind: entity.kind.clone(),
+        owner_is_viewer: owner_is_viewer(viewer, &entity.owner),
+        attributes: visible_entity_attributes(state, viewer, entity),
+    }
+}
+
+/// Includes only attributes whose own visibility and effective tier pass
+/// (spec section 5; ADR-001 A-B3; blueprint projection rule 3).
+pub fn visible_entity_attributes(
+    state: &GroupState,
+    viewer: &ViewerContext,
+    entity: &Entity,
+) -> BTreeMap<AttrId, AttributeValue> {
+    entity
+        .attributes
+        .iter()
+        .filter(|(_, instance)| {
+            attr_visible(state, viewer, entity.owner.as_ref(), entity.tier, instance)
+        })
+        .map(|(attr, instance)| (attr.clone(), instance.value.clone()))
+        .collect()
+}
+
+/// Projects edges only when both endpoints are projected and the edge's own
+/// rule passes (spec section 5; ADR-001 D6; blueprint projection rules 4 and
+/// 6).
+fn project_edges(
+    state: &GroupState,
+    viewer: &ViewerContext,
+    entity_ids: &BTreeSet<EntityId>,
+) -> Vec<ProjectedEdge> {
+    state
+        .edges
+        .values()
+        .filter(|edge| edge.lifecycle == Lifecycle::Active)
+        .filter(|edge| entity_ids.contains(&edge.from) && entity_ids.contains(&edge.to))
+        .filter(|edge| edge_visible(state, viewer, edge))
+        .map(|edge| project_edge(state, viewer, edge))
+        .collect()
+}
+
+/// Evaluates the edge's own circle and tier (spec section 5; ADR-001 D6).
+pub fn edge_visible(state: &GroupState, viewer: &ViewerContext, edge: &Edge) -> bool {
+    visible_for_owner(state, viewer, None, edge.visibility, edge.tier)
+}
+
+fn project_edge(state: &GroupState, viewer: &ViewerContext, edge: &Edge) -> ProjectedEdge {
+    ProjectedEdge {
+        id: edge.id,
+        kind: edge.kind.clone(),
+        from: edge.from,
+        to: edge.to,
+        directed: edge.directed,
+        weight: edge.weight,
+        attributes: visible_edge_attributes(state, viewer, edge),
+    }
+}
+
+/// Filters edge attributes like entity attributes with edge tier as container
+/// (spec section 5; ADR-001 D6; blueprint projection rule 4).
+pub fn visible_edge_attributes(
+    state: &GroupState,
+    viewer: &ViewerContext,
+    edge: &Edge,
+) -> BTreeMap<AttrId, AttributeValue> {
+    edge.attributes
+        .iter()
+        .filter(|(_, instance)| attr_visible(state, viewer, None, edge.tier, instance))
+        .map(|(attr, instance)| (attr.clone(), instance.value.clone()))
+        .collect()
+}
+
+/// Projects stories through their own rule and silently elides invisible steps
+/// (spec section 5; ADR-001 A-B4; blueprint projection rules 5 and 6).
+fn project_stories(
+    state: &GroupState,
+    viewer: &ViewerContext,
+    entity_ids: &BTreeSet<EntityId>,
+) -> Vec<ProjectedStory> {
+    state
+        .stories
+        .values()
+        .filter(|story| story.lifecycle == Lifecycle::Active)
+        .filter(|story| story_visible(state, viewer, story))
+        .map(|story| project_story(story, entity_ids))
+        .collect()
+}
+
+/// Evaluates a story's whole-story circle and tier (spec section 5; ADR-001
+/// A-B4).
+pub fn story_visible(state: &GroupState, viewer: &ViewerContext, story: &Story) -> bool {
+    visible_for_owner(state, viewer, None, story.visibility, story.tier)
+}
+
+fn project_story(story: &Story, entity_ids: &BTreeSet<EntityId>) -> ProjectedStory {
+    let steps = story
+        .steps
+        .iter()
+        .filter(|step| entity_ids.contains(&step.entity))
+        .map(|step| ProjectedStoryStep {
+            entity: step.entity,
+            narration: step.narration.clone(),
+        })
+        .collect();
+    ProjectedStory {
+        id: story.id,
+        title: story.title.clone(),
+        steps,
+    }
+}
+
+/// Projection omits provenance envelopes and tiers by construction (blueprint
+/// projection rule 7; ADR-003 round-2 entity detail amendment).
+pub fn attr_visible(
+    state: &GroupState,
+    viewer: &ViewerContext,
+    owner: Option<&cn_model::PersonId>,
+    container_tier: SensitivityTier,
+    instance: &AttributeInstance,
+) -> bool {
+    visible_for_owner(
+        state,
+        viewer,
+        owner,
+        instance.visibility,
+        instance.effective_tier(container_tier),
+    )
+}
+
+pub fn visible_for_owner(
+    state: &GroupState,
+    viewer: &ViewerContext,
+    owner: Option<&cn_model::PersonId>,
+    visibility: Circle,
+    tier: SensitivityTier,
+) -> bool {
+    value_visible(admissible_circle(state, viewer, owner), visibility, tier)
+}
+
+fn owner_is_viewer(viewer: &ViewerContext, owner: &Option<cn_model::PersonId>) -> bool {
+    match (viewer, owner) {
+        (ViewerContext::Person { person }, Some(owner)) => person == owner,
+        _ => false,
+    }
+}
+
+fn projection_group_id(state: &GroupState) -> GroupId {
+    if let Some(group) = &state.group {
+        return group.id;
+    }
+    match GroupId::from_str("00000000-0000-0000-0000-000000000000") {
+        Ok(id) => id,
+        Err(_) => GroupId::new(cn_model::Timestamp(0)),
+    }
+}

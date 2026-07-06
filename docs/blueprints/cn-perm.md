@@ -59,7 +59,12 @@ pub fn required_circle(value_visibility: Circle, eff_tier: SensitivityTier) -> C
 // = min(value_visibility, eff_tier.ceiling())   (min = more restrictive)
 
 pub fn value_visible(admissible: Circle, value_visibility: Circle, eff_tier: SensitivityTier) -> bool;
-// = admissible >= required_circle(...)
+// = admissible <= required_circle(...)
+// ERRATA (director, 2026-07-06): originally written `>=`, which contradicted
+// the min() rule under the audience-size Ord (deeper access = SMALLER value:
+// an owner reaching Private(0) sees a Private-required value; anonymous at
+// Public(4) does not). Implementation and tests use `<=`; the tier-cell and
+// property tests pin the semantics.
 ```
 
 ## Module: projection
