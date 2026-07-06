@@ -45,6 +45,18 @@ describe("state reducer", () => {
     expect(next.session.revision).toBe(4);
   });
 
+  it("accepts the first revision-zero projection", () => {
+    const initial = createInitialState();
+    const accepted = reduce(initial, {
+      kind: "projectionReceived",
+      projection: projection(0),
+      revision: 0,
+    });
+
+    expect(accepted).not.toBe(initial);
+    expect(accepted.data.projection?.revision).toBe(0);
+  });
+
   it("keeps mode transitions consistent", () => {
     const focused = reduce(createInitialState(), {
       kind: "entityFocused",
@@ -60,18 +72,21 @@ describe("state reducer", () => {
     expect(focused.view).toEqual({
       mode: "focus",
       focusedEntityId: "entity-focus",
+      hoveredEntityId: null,
       storyId: null,
       storyStep: 0,
     });
     expect(story.view).toEqual({
       mode: "story",
       focusedEntityId: null,
+      hoveredEntityId: null,
       storyId: "story-alpha",
       storyStep: 2,
     });
     expect(exited.view).toEqual({
       mode: "overview",
       focusedEntityId: null,
+      hoveredEntityId: null,
       storyId: null,
       storyStep: 0,
     });
@@ -88,10 +103,25 @@ describe("state reducer", () => {
       tokens: { "bg.center": { hex: "#0d1017", source: "default" as const } },
     };
     const report = { schema_version: "0.1.0" as const, adjustments: [], warnings: [] };
-    const themed = reduce(initial, { kind: "themeDerived", theme, report });
+    const kindMeta = {
+      person: { shape: "sphere" as const, label: "Person", colorRole: "kind-1" },
+    };
+    const themed = reduce(initial, { kind: "themeDerived", theme, report, kindMeta });
 
     expect(themed.session.revision).toBe(3);
     expect(themed.theme).toEqual({ resolved: theme, report });
+    expect(themed.data.kindMeta).toEqual(kindMeta);
+  });
+
+  it("stores hovered entity and quality tier through explicit actions", () => {
+    const hovered = reduce(createInitialState(), {
+      kind: "entityHovered",
+      entityId: "entity-hover",
+    });
+    const tiered = reduce(hovered, { kind: "qualityTierChanged", tier: "C" });
+
+    expect(hovered.view.hoveredEntityId).toBe("entity-hover");
+    expect(tiered.ui.qualityTier).toBe("C");
   });
 });
 

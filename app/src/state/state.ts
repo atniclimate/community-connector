@@ -49,6 +49,14 @@ export type EntityDetailDto = JsonObject & {
 
 export type LoadState = "idle" | "loading" | "ready" | "error";
 export type ViewMode = "overview" | "focus" | "story";
+export type QualityTierName = "A" | "B" | "C" | "D";
+export type ShapeName = "sphere" | "cube" | "octahedron" | "tetrahedron" | "torus" | "cone";
+
+export type KindMeta = {
+  readonly shape: ShapeName;
+  readonly label: string;
+  readonly colorRole: string;
+};
 
 export interface AppState {
   readonly session: {
@@ -61,6 +69,7 @@ export interface AppState {
   readonly view: {
     readonly mode: ViewMode;
     readonly focusedEntityId: string | null;
+    readonly hoveredEntityId: string | null;
     readonly storyId: string | null;
     readonly storyStep: number;
   };
@@ -69,10 +78,12 @@ export interface AppState {
     readonly sidebarOpen: boolean;
     readonly detailEntityId: string | null;
     readonly reducedMotion: boolean;
+    readonly qualityTier: QualityTierName;
   };
   readonly data: {
     readonly projection: ProjectionDto | null;
     readonly detail: EntityDetailDto | null;
+    readonly kindMeta: Readonly<Record<string, KindMeta>>;
   };
   readonly theme: {
     readonly resolved: Theme | null;
@@ -92,6 +103,7 @@ export function createInitialState(reducedMotion = false): AppState {
     view: {
       mode: "overview",
       focusedEntityId: null,
+      hoveredEntityId: null,
       storyId: null,
       storyStep: 0,
     },
@@ -100,10 +112,12 @@ export function createInitialState(reducedMotion = false): AppState {
       sidebarOpen: true,
       detailEntityId: null,
       reducedMotion,
+      qualityTier: "B",
     },
     data: {
       projection: null,
       detail: null,
+      kindMeta: {},
     },
     theme: {
       resolved: null,

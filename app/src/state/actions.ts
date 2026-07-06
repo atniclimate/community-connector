@@ -1,7 +1,9 @@
 import type {
   EntityDetailDto,
   ErrorEnvelopeDto,
+  KindMeta,
   ProjectionDto,
+  QualityTierName,
   ViewerContextDto,
 } from "./state";
 import type { Theme, ThemeReport } from "../theme/tokens";
@@ -30,10 +32,15 @@ export type Action =
       readonly kind: "themeDerived";
       readonly theme: Theme;
       readonly report: ThemeReport;
+      readonly kindMeta: Readonly<Record<string, KindMeta>>;
     }
   | {
       readonly kind: "entityFocused";
       readonly entityId: string;
+    }
+  | {
+      readonly kind: "entityHovered";
+      readonly entityId: string | null;
     }
   | {
       readonly kind: "entityFocusCleared";
@@ -68,6 +75,10 @@ export type Action =
   | {
       readonly kind: "reducedMotionChanged";
       readonly reducedMotion: boolean;
+    }
+  | {
+      readonly kind: "qualityTierChanged";
+      readonly tier: QualityTierName;
     }
   | {
       readonly kind: "errorSurfaced";

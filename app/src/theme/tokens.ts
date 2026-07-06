@@ -36,6 +36,8 @@ export type DerivedTheme = {
 
 export type GroupTemplateKindDto = {
   readonly id: string;
+  readonly label?: string;
+  readonly shape?: string;
   readonly color_role: string;
 };
 

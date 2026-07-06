@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { createRequire } from "node:module";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -22,33 +22,16 @@ const require = createRequire(import.meta.url);
 const { CnApi } = require(pkgEntry);
 
 const groupId = "00000000-0000-0000-0000-000000000010";
-const viewer = JSON.stringify({ kind: "anonymous" });
-const template = JSON.stringify({
-  schema_version: "0.1.0",
-  template_id: "research",
-  name: "Research Network",
-  description: "Synthetic research network",
-  kinds: [
-    {
-      id: "person",
-      label: "Person",
-      shape: "sphere",
-      color_role: "kind-1",
-      attributes: [{ id: "display_name", type: "text", required: true }],
-    },
-  ],
-  edge_kinds: [
-    {
-      id: "knows",
-      label: "Knows",
-      from: ["person"],
-      to: ["person"],
-      directed: false,
-      weighted: "forbidden",
-    },
-  ],
-  theme: { mode: "light", roles: { "kind-1": "#224466" } },
+const viewer = JSON.stringify({
+  kind: "person",
+  person: "00000000-0000-0000-0000-0000000003e9",
 });
+const template = readFileSync(
+  path.join(repo, "fixtures/templates/research-network.template.json"),
+  "utf8",
+);
+const ops = readFileSync(path.join(repo, "fixtures/groups/research-network.ops.jsonl"), "utf8");
+const minProjectedEntities = 100;
 
 function ok(name, json) {
   const envelope = JSON.parse(json);
@@ -62,5 +45,10 @@ function ok(name, json) {
 const api = new CnApi();
 ok("core_info", api.core_info());
 ok("load_group_begin", api.load_group_begin(groupId, viewer, template));
+ok("load_ops_chunk", api.load_ops_chunk(groupId, ops));
 ok("load_group_commit", api.load_group_commit(groupId, Date.now()));
-ok("projection", api.projection(groupId, viewer));
+const projection = ok("projection", api.projection(groupId, viewer));
+if (!Array.isArray(projection.entities) || projection.entities.length <= minProjectedEntities) {
+  throw new Error(`projection entity count too low: ${projection.entities?.length ?? "missing"}`);
+}
+console.log(`PASS projection_entity_count ${projection.entities.length}`);

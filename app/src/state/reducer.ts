@@ -9,6 +9,7 @@ function resetView(): AppState["view"] {
   return {
     mode: "overview",
     focusedEntityId: null,
+    hoveredEntityId: null,
     storyId: null,
     storyStep: 0,
   };
@@ -18,6 +19,7 @@ function focusView(entityId: string): AppState["view"] {
   return {
     mode: "focus",
     focusedEntityId: entityId,
+    hoveredEntityId: null,
     storyId: null,
     storyStep: 0,
   };
@@ -27,6 +29,7 @@ function storyView(storyId: string, step: number): AppState["view"] {
   return {
     mode: "story",
     focusedEntityId: null,
+    hoveredEntityId: null,
     storyId,
     storyStep: Math.max(0, step),
   };
@@ -47,7 +50,7 @@ export function reduce(state: AppState, action: Action): AppState {
         },
         view: resetView(),
         ui: { ...state.ui, detailEntityId: null },
-        data: { projection: null, detail: null },
+        data: { projection: null, detail: null, kindMeta: {} },
         theme: { resolved: null, report: null },
       };
     case "groupLoadSucceeded":
@@ -66,7 +69,7 @@ export function reduce(state: AppState, action: Action): AppState {
         },
       };
     case "projectionReceived":
-      if (action.revision <= state.session.revision) {
+      if (action.revision <= state.session.revision && state.data.projection !== null) {
         return state;
       }
       return {
@@ -79,6 +82,12 @@ export function reduce(state: AppState, action: Action): AppState {
         ...state,
         // Theme derivation is revision-independent in v0: template changes arrive as a new group load.
         theme: { resolved: action.theme, report: action.report },
+        data: { ...state.data, kindMeta: action.kindMeta },
+      };
+    case "entityHovered":
+      return {
+        ...state,
+        view: { ...state.view, hoveredEntityId: action.entityId },
       };
     case "entityFocused":
       return {
@@ -123,6 +132,11 @@ export function reduce(state: AppState, action: Action): AppState {
       return {
         ...state,
         ui: { ...state.ui, reducedMotion: action.reducedMotion },
+      };
+    case "qualityTierChanged":
+      return {
+        ...state,
+        ui: { ...state.ui, qualityTier: action.tier },
       };
     case "errorSurfaced":
       return {
