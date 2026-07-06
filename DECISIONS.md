@@ -165,3 +165,18 @@ had to be true in the scaffold, not just the prose - cn-api crate added,
 cn-wasm made cdylib+rlib depending on cn-api, workspace re-verified green.
 Round budget spent; ADR-003 accepted. With this, all three Phase 1 ADRs are
 accepted and every acceptance criterion of Phase 1 is met.
+
+## D-016 (2026-07-06) - Phase 2 closing review: 5 blockers accepted, 1 rejected
+
+Codex review (gpt-5.5 high, whole core) returned FIXES-REQUIRED: 6 blocking,
+4 advisory. Director rulings: B1-B5 CONFIRMED and fixed (export gate moved
+into cn-perm per I2; submit now reports quarantine truthfully; hidden vs
+absent made indistinguishable in submit outcomes; substring redaction
+replaced with structural subject-based filtering; snapshots now round-trip
+field clocks and seen-set - a real convergence bug). All four advisories
+accepted (log version rejection, snapshot discard warnings channel, HLC
+counter rollover, cn-api module split). B6 (cn-sync unimplemented) REJECTED
+for Phase 2: the phase plan assigns the SyncTransport trait and local
+adapter to Phase 5; ADR-002 A-B8 defines the contract it must meet then.
+Fixes applied via codex grind from .codex/task-core-fixes.md; director
+re-verified and committed.
