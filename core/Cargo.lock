@@ -41,3 +41,6 @@ version = "0.1.0"
 [[package]]
 name = "cn-wasm"
 version = "0.1.0"
+dependencies = [
+ "cn-api",
+]
