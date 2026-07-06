@@ -289,6 +289,18 @@ fn serde_round_trip_aggregates() {
         at,
         provenance,
     ));
+    round_trip(&Story::new(
+        StoryId::new(at),
+        group_id,
+        "Synthetic Story",
+        vec![StoryStep {
+            entity: EntityId::new(at),
+            narration: "Synthetic step".to_string(),
+        }],
+        Circle::Group,
+        envelope(),
+        SensitivityTier::T1,
+    ));
 }
 
 #[test]

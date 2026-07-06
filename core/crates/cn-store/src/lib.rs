@@ -1,4 +1,13 @@
-//! cn-store: file-backed store and append-only operation log.
-//!
-//! Placeholder scaffolded in Phase 0; implemented in Phase 2 per the Phase 1
-//! specs and ADRs.
+//! Event-sourced store and append-only operation log.
+
+pub mod authz;
+pub mod fold;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod log;
+pub mod op;
+
+pub use authz::*;
+pub use fold::*;
+#[cfg(not(target_arch = "wasm32"))]
+pub use log::*;
+pub use op::*;

@@ -66,6 +66,9 @@ wasm32-unknown-unknown -p <crate>, pii-scan - then atomic commit, then
 
 Review debt to schedule (routing policy standing job): a codex review diff
 pass over the accumulated core implementation commits before Phase 2 close.
+Known I12 debt for that pass: cn-store `Snapshot::load` returns Ok(None) on
+discard without a report channel - cn-api's load path must surface the
+discard reason as a warning finding (cn-store result note, 2026-07-06).
 
 ## Open human gates
 
