@@ -3,7 +3,8 @@
 > Durable plan. Read after CLAUDE.md. Live state stays in HANDOFF.md; this
 > document changes only when the plan itself changes (log a DECISIONS entry
 > when it does). Companion: docs/NEXT_SESSION.md (resume brief + the human
-> interview). Last revised: 2026-07-06, end of session 1.
+> interview). Last revised: 2026-07-06, session 2 (decision session;
+> Execution Plan v2 per D-039).
 
 ## 1. Where the project stands
 
@@ -14,9 +15,14 @@ permission property test, measured 255ms fold / 133ms projection at
 
 Phase 3 is roughly HALF done: ADR-004 renderer decision measured on the
 reference GPU; design brief final; state machine (I4); theming pipeline
-with CVD-clean fixture palettes; base renderer landed and visually
-verified (first screenshot: docs/design/screenshots/). Remaining Phase 3
-work and Phases 4-6 are planned below.
+with CVD-clean fixture palettes; base renderer landed, visually fixed and
+director-accepted (docs/design/screenshots/viz-fixes-2026-07-06.png).
+
+The 2026-07-06 decision session (D-019..D-040) defined the pilot: an
+ATNI Climate convention arc, facilitator-run, snapshot-first, with
+need-to-solution routing as a hero workflow. Personal mode, identity,
+deep accessibility, and governance tooling moved to v0.2. Section 3
+below is Execution Plan v2.
 
 ## 2. The operating model (what makes this project fast)
 
@@ -64,15 +70,28 @@ the chain). Never point --output-last-message at a task's own artifact.
 4. ACCEPTANCE: drive the real app (playwright), measure against criteria
    (R9 audit, perf benchmark, snapshot budget).
 
-## 3. Plan by phase (explicit sessions)
+## 3. Execution Plan v2 (decision session 2026-07-06; D-039)
 
-### Phase 3 remainder - Frontend (3-4 build sessions + 2 deep sessions)
+> v0.1.0 = "convention-pilot ready": a facilitator-run, snapshot-first
+> build that can ingest intake-form CSVs, render the participant +
+> committee graph, route needs to solutions, and present authored
+> stories at the ATNI Annual Convention. Personal mode, identity, deep
+> accessibility, and governance tooling move to v0.2 (post-pilot).
+> PROVISIONAL: a plan-v3 sitting follows the graph-networks research
+> report (D-040); expect refinement, not reversal.
 
-**S3-A "Constellation visible"** (next build session)
-- Fix the visual-check findings: node materials not receiving kind colors
-  (bodies render near-black), edge/node visual hierarchy inverted, halo
-  culling too aggressive, background gradient presence. (grind medium,
-  Fable re-screenshots to accept.)
+### The pilot arc (fixed points this plan serves; D-022, D-030)
+
+1. Consent email -> intake form (QR codes in convention packets)
+2. Ingest form-export CSV (T1 default, provenance stamped, dedup queue)
+3. General assembly: full graph reveal (snapshot, facilitator laptop)
+4. Committee meeting: need-to-solution pathway exploration; same-day QR
+   joiners appear via fast re-ingest + snapshot rebuild
+5. Feedback capture -> v0.2 scoping
+
+### Phase 3 remainder - Frontend
+
+**S3-A2 "Constellation legible"** (next build session)
 - Labels: troika SDF, zoom-adaptive policy, density culling, cap tokens.
   (grind HIGH - fiddly.)
 - Motion: focus-mode dim/highlight via the dual color buffers, camera
@@ -81,90 +100,107 @@ the chain). Never point --output-last-message at a task's own artifact.
 - Acceptance: screenshot review by Fable; spike benchmark re-run with
   labels+halos live (record vs the p95 <= 50ms tail goal).
 
-**S3-B "Explore"**
-- View modes from template data; detail panel (entity_detail path,
-  own-record indicators); search UI over cn-graph search; legend with the
-  "adjusted for readability" indicator. (blueprints Fable; grind medium.)
+**S3-B "Explore + Route"**
+- View modes from template data; search UI over cn-graph search; legend
+  with the "adjusted for readability" indicator.
+- Detail panel: entity_detail path, own-record indicators, TSDF tier
+  codes primary with plain-language secondary (D-032), one-line
+  provenance for members with full custody chain for governance (D-033).
+- NEED-TO-SOLUTION ROUTING UI (hero workflow, D-021): "who here can help
+  with X" over cn-graph constrained paths; pathway rendering in the 3D
+  scene + a readable path summary. Fable designs the routing UX first;
+  grind medium-high implements.
 
-**Session A (deep) "Accessibility as the primary interface"**
-- The parallel DOM list/table is the PRIMARY equivalent interface (brief
-  ruling; WCAG 2.1.1/4.1.3). Design pass first: information architecture,
-  focus model, canvas<->DOM sync through the store, 375px layouts.
-- Interview input needed (see NEXT_SESSION Q6) - real AT users, elder
-  accessibility, language.
-- Split: codex review researches WAI-ARIA APG patterns (memo, capped);
-  Fable designs; two grind tasks (DOM interface; keyboard/announcements).
-
-**Session B (deep) "Groups without engineers"**
-- Group setup wizard + template-driven entry forms (R1/R2/R3 UI): field
-  widgets per attribute type, validation UX from cn-schema findings,
-  drafts. Interview input needed (Q7): what group creation feels like for
-  a non-technical committee admin; paper-flow the wizard first.
-
-**S3-C "Stories + close"**
-- Story viewing UI (validated data, silent elision already in core).
+**S3-C "Stories"**
+- In-app story AUTHORING + viewing (D-037): facilitator composes stories
+  (create/edit/order steps referencing entities); validated at load;
+  silent elision already in core.
 - Snapshot acceptance: embed a projection + theme; both fixture groups
-  load and render; size budget green.
-- R9 audit (acceptance session) + Phase 3 closing codex review sweep +
-  rulings + fixes. Phase 3 CLOSED.
+  load and render; size budget green (D-024 makes this primary-vehicle
+  acceptance, not a side check).
 
-### Phase 4 - Ingestor (2 build sessions + 2 deep sessions)
+**Session B "Groups without engineers"**
+- Facilitator group-setup wizard from JSON templates (D-036) +
+  template-driven entry forms (R1/R2/R3 UI): field widgets per attribute
+  type, validation UX from cn-schema findings, drafts.
+- Facilitator/developer role added to cn-perm (D-028): entry/modification
+  authority now, designed to hand off to group-creator governance later.
+  Permission-adjacent = grind HIGH + adversarial review.
 
-**Session C (deep) "Who is the same person?"** - dedup/entity-resolution
-design -> ADR-005: match heuristics, merge-vs-link ops, undo, review
-queues. Interview input (Q8): default to manual merge review? Then grind
-implements against fixtures with planted near-duplicates.
+**DESIGN sitting (human-present; scheduled by the human; D-038)**
+- Focused design agents + claude design pass on Hearthlight; cultural
+  palette/shape review; the parked brief critique money goes here.
+  Before convention polish.
 
-**S4-A** - cn-ingest importers (CSV/JSON/YAML -> ops with provenance +
-tier), cn CLI subcommands (ingest, validate, export, snapshot), fixture
-round-trip lossless. Mostly grind from blueprints; the CLI reuses cn-api.
+**Phase 3 close**
+- Codex review sweep + rulings + fixes. R9 accessibility criteria
+  DEFERRED per D-035 (font-scale token, reduced-motion, basic keyboard
+  retained; parallel-DOM primary interface + AA audit move to v0.2
+  Session A). Phase 3 CLOSED.
 
-**Session E (deep, docs-only) "CPF-RCN migration recipe"** - the recipe
-the human executes: what to export from the old repo, scrub steps, tier
-assignment per field, FPIC checkpoints. The session NEVER reads red data.
-Interview input (Q4-Q5) required before this session is scheduled.
+### Phase 4 - Ingestor + pilot ops
+
+**FORM (docs, human-reviewed) "Intake form + ATNI template"**
+- Co-design the intake form and the ATNI climate-resilience group
+  template - one artifact, two views (D-023): shared offer/need taxonomy,
+  edge-generating questions, capacity + contactability, per-field
+  visibility consent, core + depth structure.
+- Consent email draft; QR/link mechanics; feedback-capture plan.
+- Human reviews ALL community-facing text. Runs EARLY - it gates the
+  consent email and needs no code.
+
+**Session C (light) "Dedup" -> ADR-005**
+- Always-queue review (Q6.2 default), exact-key handling, merge-vs-link
+  ops, undo; idempotent re-ingest semantics (D-030). Fable ADR + one
+  review round; grind implements against fixtures with planted
+  near-duplicates.
+
+**S4-A "Ingestor + CLI"**
+- cn-ingest importers (CSV first: intake-form export + generic roster;
+  then JSON/YAML) -> ops with provenance + T1 default tier (D-034);
+  review queue; fixture round-trip lossless.
+- cn CLI subcommands: ingest, validate, export, snapshot.
+- FAST RE-INGEST -> snapshot rebuild path (same-day QR joiners, D-030):
+  idempotent re-run, minutes not hours, one command for the facilitator.
+
+**Session E (docs-only) "CPF-RCN migration recipe" (D-031)**
+- Export/scrub/tier/FPIC steps the human executes; the session never
+  reads red data. Execution human-gated.
 
 **S4-B** - Phase 4 closing review + fixes. Phase 4 CLOSED.
 
-### Phase 5 - Personal mode (2-3 sessions + 2 deep sessions)
+### Phase 6 - Hardening -> v0.1.0 (Phase 5 vacates v0.1.0 per D-029)
 
-**Session D (deep) "Identity"** - the ADR-003 declared dependency:
-core-owned sessions, local credentials, how trust grants bind to
-identities that could later federate. STARTS from interview answers (Q3);
-ends with an ADR draft + any residual gate questions. Nothing in personal
-mode ships before this ADR is accepted.
-
-**S5-A** - profile ownership + per-attribute sharing UI + trust grant
-management + grant audit log + viewer-context switcher ("view as").
-Blueprints Fable (permission-adjacent = grind HIGH; heavy adversarial
-review after).
-
-**S5-B** - cn-sync trait finalized + LocalLoopback + the protocol
-integration guide for a future network team (Fable-heavy writing; codex
-drafts from ADR-002 A-B8). Session F folds in here or stands alone:
-
-**Session F (deep) "Sovereignty made visible"** - export/governance UX:
-which viewer contexts are legitimate export targets, tier language in the
-UI, governance action flows (TierSet), CARE principles as product
-behavior. Interview input (Q5) is the authority here.
-
-### Phase 6 - Hardening -> v0.1.0 (1-2 sessions)
-
-- Full-stack perf pass at 2-5k (benchmark re-run; validate/revise the
-  tail goal; ADR-004 table updated).
+- Perf pass at pilot-realistic scale; benchmark re-run; ADR-004 table
+  updated.
 - Error-state UX sweep; empty states; loading states.
-- Docs: group-admin guide + individual guide (codex drafts, Fable voice
-  pass, HUMAN reviews community-facing language before they count).
+- Facilitator guide (codex drafts, Fable voice pass, HUMAN reviews
+  community-facing language). Individual guide moves to v0.2 with
+  personal mode.
+- CONVENTION REHEARSAL: full pilot arc dry run on the facilitator laptop
+  with fixtures - ingest, reveal, route, story, re-ingest.
 - Full codex review sweep over everything since Phase 2 close -> rulings
-  -> fixes -> tag v0.1.0 locally (remotes remain gated).
+  -> fixes -> tag v0.1.0 locally (remotes remain gated per D-026).
 
-Estimated remaining: 10-13 focused sessions.
+Estimated remaining to v0.1.0: 9-12 focused sessions.
+
+### v0.2 (post-pilot; shaped by feedback + the research sitting)
+
+Personal mode (Phase 5: S5-A profile ownership/sharing, S5-B cn-sync +
+protocol guide), Session D identity ADR (D-027), Session A accessibility
+as primary interface (D-035), Session F sovereignty/governance tooling +
+tier enforcement development (D-034), story authoring polish, and
+integration spikes with the sibling tools (cap-assessor,
+TCR-policy-scanner, GeoBase, engagement-database; D-040).
 
 ## 4. Risk register (standing)
 
 | Risk | Mitigation |
 |---|---|
-| Single-machine repo: disk failure loses everything | GATE QUESTION Q1 (private remote) - highest-priority interview item |
+| Single-machine repo: disk failure loses everything | Risk ACCEPTED by the human (D-026); remotes gate closed. Re-raise at every decision session |
+| Convention date not pinned in-repo | Confirm date + registration-window reality with the human (NEXT_SESSION) |
+| Form response rate = graph quality | Short required core, facilitator-assisted completion, QR joins at the convention (D-023, D-030) |
+| Same-day re-ingest turnaround at the convention | Explicit S4-A requirement + Phase 6 rehearsal |
 | Codex sandbox bypass (D-008) | Blueprint-constrained tasks + director verification; revisit if Codex behavior ever surprises |
 | Projection JSON 2.9MB per recompute at 5k scale | ADR-003 D2 typed-array escape hatch; re-measure in-browser before Phase 6 |
 | p95 tail (70ms) vs 50ms goal unvalidated | S3-A benchmark re-run; halo mitigation is the named lever |
