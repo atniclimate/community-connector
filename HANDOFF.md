@@ -34,21 +34,35 @@ builds and loads in a smoke page. Measurement gates from ADR rounds: wasm
 heap at 5k entities x 10 attrs + 10k edges under 64MB; projection payload
 budget measured.
 
-### Exact next three actions
+### Phase 2 chain state (updated mid-phase)
 
-1. Setup: `rustup target add wasm32-unknown-unknown` (NOT yet installed),
-   then verify `wasm-pack build core/crates/cn-wasm --target web` works on
-   the empty crate (validates ADR-003 A-B5 end to end).
-2. Director writes the cn-model type skeleton (types from ADR-001 D2-D9 with
-   Amendments) and the cn-api facade signatures (ADR-003 D1 + Amendments);
-   then per routing policy, codex grind implements serde + validation
-   plumbing from those signatures and authors tests from the specs
-   (permission property test spec is in docs/specs/permission-model.md
-   section 8).
-3. Implement order: cn-model -> cn-schema (validate the two fixtures in
-   Rust, mirroring the ajv harness) -> cn-store fold (ADR-002 D4/D5 with
-   per-field sort_key LWW) -> cn-perm projection -> cn-graph over
-   projections -> cn-api -> cn-wasm bindings + smoke page.
+DONE: wasm32 target installed; wasm-pack smoke build of cn-wasm PASSES
+(cdylib+rlib + target-gated wasm-bindgen committed). Director blueprints
+authored and committed for ALL five core crates:
+docs/blueprints/{cn-model,cn-schema,cn-store,cn-perm,cn-graph}.md.
+cn-model IMPLEMENTED and committed (15 tests; fmt/clippy/test/wasm green).
+
+IN FLIGHT: cn-schema implementation on codex (task .codex/task-cn-schema.md,
+result lands at .codex/cn-schema-result.md).
+
+MECHANICAL CHAIN for whoever continues (each step: wait for result file,
+re-run verification loop from core/ - fmt --check, clippy --workspace
+--all-targets -D warnings, test --workspace, cargo build --target
+wasm32-unknown-unknown -p <crate>, pii-scan - then atomic commit, then
+`Start-Process pwsh -ArgumentList @('-NoProfile','-File','.codex\run-<next>.ps1') -WindowStyle Hidden`):
+
+1. cn-schema lands -> verify/commit -> launch run-cn-store.ps1
+2. cn-store lands -> verify/commit -> launch run-cn-perm.ps1 (high effort -
+   it owns the Phase 2 acceptance property test)
+3. cn-perm lands -> verify/commit -> launch run-cn-graph.ps1
+4. cn-graph lands -> verify/commit -> THEN director work: cn-api + cn-wasm
+   blueprint (ADR-003 D1 surface incl. streaming load + entity_detail +
+   redacted reports via cn_perm::redact_report), implement, wasm smoke page
+   in app/ loading the pkg, Phase 2 memory + projection-payload measurement
+   gates (ADR-001/ADR-003 amendments).
+
+Review debt to schedule (routing policy standing job): a codex review diff
+pass over the accumulated core implementation commits before Phase 2 close.
 
 ## Open human gates
 
