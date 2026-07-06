@@ -48,6 +48,13 @@ version = "0.1.0"
 [[package]]
 name = "cn-schema"
 version = "0.1.0"
+dependencies = [
+ "cn-model",
+ "semver",
+ "serde",
+ "serde_json",
+ "thiserror",
+]
 
 [[package]]
 name = "cn-store"
