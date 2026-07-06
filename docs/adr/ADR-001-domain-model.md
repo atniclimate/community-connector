@@ -1,6 +1,6 @@
 # ADR-001: Domain Model
 
-- Status: draft - awaiting adversarial round 1
+- Status: accepted (amended after adversarial round 1; see Amendments)
 - Date: 2026-07-06
 - Phase: 1
 - Drivers: R1 (multi-group), R2 (template-defined kinds/attributes), R4
@@ -164,7 +164,74 @@ explicit migrations validated by cn-schema (I7).
 
 ## Open questions (resolve before Phase 1 exit)
 
-- Story model detail: ordered path of entity/edge refs with narration blocks,
-  validated at load (R7) - shape lands in the group-template or its own schema?
 - Geo values: point + named-region reference now; full geometry later?
 - MediaRef resolution/storage is deliberately opaque until Phase 4 (ingest).
+
+## Amendments (adversarial round 1, 2026-07-06)
+
+Codex review session 019f36fa-a523-7ee3-8e3a-fdb3d9afced4 (verdict
+ACCEPT-WITH-AMENDMENTS; full critique
+archived in DECISIONS.md D-010 context). Amendments accepted by the director:
+
+### A-B1. Query closure over projections
+
+ALL graph operations - shortest/constrained paths, degree counts, neighborhood
+expansion, need-to-solution routing, search, story rendering - execute over the
+viewer's materialized projection, never the raw graph. cn-graph's public API
+takes a `Projection` (produced only by cn-perm) as input; there is no cn-graph
+entry point accepting the raw store. A path that would traverse an invisible
+entity does not exist in the projection, so no result, count, or "route exists"
+signal can leak it.
+
+### A-B2. Tier ceilings are circles - one lattice
+
+Each tier maps to a ceiling ON THE CIRCLE LATTICE per viewer context:
+T0 -> Public, T1 -> Network, T2 -> Group, T3 -> Private (owner/custodian only;
+custodian access defined in Phase 5, never export, never sync). Effective
+visibility of any value = min(value's circle, tier ceiling). Both operands are
+circles, so min is total and every (tier, circle, context) cell is defined:
+e.g. a T3 attribute marked Public resolves to Private.
+
+### A-B3. Attribute-level tier override (tighten-only)
+
+`AttributeInstance` gains `tier: Option<SensitivityTier>`. Effective tier of a
+value = max-restrictiveness(entity tier, override); overrides can only tighten,
+never loosen (most restrictive wins). This expresses the fisheries case: a T1
+fishing site with group-visible display name and T3 site_knowledge.
+
+### A-B4. Story visibility
+
+A story carries its own visibility circle and tier, gating the WHOLE story per
+viewer via the same rules as entities. Within a visible story, steps whose
+entities/edges are not in the viewer's projection are elided silently - no
+markers, counts, or ordering gaps that signal hidden content. Authoring-time
+validation (R7) runs against the author's own projection, not the raw graph.
+
+### A-B5. Canonical attribute type ids
+
+Wire ids in templates: `text`, `number`, `enum`, `tags`, `date`, `geo`,
+`link`, `media`. `media` corresponds to `AttributeValue::MediaRef`. The
+fixture templates are conformant as written.
+
+### A-B6. Template migration with live data
+
+A template version that removes or narrows a kind/attribute still referenced by
+live data MUST ship an explicit migration directive (`map_to`, `archive`, or
+`delete_with_consent`); absent that, migration fails loudly (I3, I7). Retired
+kind ids are tombstoned in the group registry forever and never reused.
+
+### Advisories folded in
+
+- Weights: each edge kind declares `weighted: required | optional | forbidden`
+  (template default forbidden); violations are validation errors (I12).
+- Handed to ADR-002 as hard requirements: operations are idempotent by
+  operation id (UUIDv7), deterministic under duplicate and out-of-order
+  delivery; custody events carry stable ids and an ordering rule.
+- Memory: Phase 2 exit gate includes a measured heap figure for 5k entities x
+  10 attributes + 10k edges; target core data under 64MB in wasm; envelope
+  interning is the pre-approved mitigation.
+- `vocabulary`, `shape`, `color_role`, `theme` in templates are presentation
+  metadata: structurally validated by cn-schema, semantically ignored by
+  cn-model.
+- Email links are stored as `mailto:` URLs; `format: email` is a validation
+  hint on `link`.
