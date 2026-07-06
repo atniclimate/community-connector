@@ -52,6 +52,12 @@ version = "0.1.0"
 [[package]]
 name = "cn-graph"
 version = "0.1.0"
+dependencies = [
+ "cn-model",
+ "cn-perm",
+ "serde",
+ "thiserror",
+]
 
 [[package]]
 name = "cn-ingest"

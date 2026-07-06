@@ -5,3 +5,7 @@ edition.workspace = true
 publish = false
 
 [dependencies]
+cn-model = { path = "../cn-model" }
+cn-perm = { path = "../cn-perm" }
+serde = { version = "1", features = ["derive"] }
+thiserror = "2"
