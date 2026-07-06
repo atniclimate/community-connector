@@ -1,6 +1,7 @@
 # ADR-002: Event-Sourced Operation Log and Network Readiness
 
-- Status: draft - awaiting adversarial round 1
+- Status: draft - amended after adversarial round 1 (REDESIGN verdict on the
+  spec's completeness, direction affirmed); awaiting round 2
 - Date: 2026-07-06
 - Phase: 1
 - Drivers: R5 (network-ready, not networked), R10/I6 (provenance), I3 (no
@@ -136,7 +137,104 @@ exposes: submit_operation, get_projection(viewer), get_validation_report.
 
 ## Open questions (Phase 2 may refine without a new ADR)
 
-- HLC implementation detail (single-node now: wall clock + monotonic counter
-  suffices; the type is opaque to callers).
+- HLC implementation detail (single-node now; the type is opaque to callers).
 - Snapshot cadence policy (every N ops vs on-close) - performance question,
   not architectural.
+
+## Amendments (adversarial round 1, 2026-07-06)
+
+Codex review verdict REDESIGN - direction affirmed, semantics incomplete.
+Director rulings, amended in:
+
+### A-B1. Lifecycle is a field; liveness is derived
+
+Archive is not a special op class: every object carries a `lifecycle` field
+(`active | archived`) mutated by `EntityArchive`/`EntityUnarchive` (added) /
+`EdgeArchive`/`StoryArchive`, converging under the same LWW-per-(object,
+field) rule as everything else. Ops on archived objects still fold (the record
+keeps updating); LIVENESS is derived purely from the lifecycle field at
+projection time. No dominance special-case, so convergence is preserved.
+
+### A-B2. Cross-object validity is evaluated at read time
+
+The fold is purely structural; cross-object SEMANTIC validity (a TrustGrant
+whose grantor lost membership, an edge whose endpoint is archived) is
+evaluated by cn-perm at projection time against current state. Such records
+are INERT, not deleted - they reactivate if the referenced state returns.
+No authorization decision is ever baked into fold order.
+
+### A-B3. Ops validate against their declared template version
+
+Every op carries the `template_version` it was authored against. The fold
+validates an op against THAT version, then maps its effect forward through
+the migration chain's directives (ADR-001 A-B6). A concurrent
+`AttributeSet(old_name)` sorting after a rename migration remains valid per
+its declared version and lands renamed. Ops declaring an unknown or future
+template version are quarantined with a typed report entry.
+
+### A-B4. Quarantine folds to fixpoint
+
+The fold definition is: apply ops in canonical order, then re-examine the
+quarantine set in canonical order, repeating until a pass admits nothing new
+(fixpoint). Deterministic in the op multiset, so late-arriving dependencies
+converge identically across peers. Quarantined ops persist in the log and in
+the validation report (I12) until admitted.
+
+### A-B5. Export gate: per-OpKind disclosure and dependency closure
+
+Every OpKind declares a disclosure classification covering ALL fields it can
+reveal (existence, kind, endpoints, owner, roles, story membership, actor and
+responsible_human metadata - advisory 4 folded in). An op exports to a
+destination context only if every object it references admits that context
+under ADR-001 rules. Exported batches must be dependency-closed AFTER
+filtering (creates precede references); suppressed ops leave no placeholders,
+gaps, or counts. The concrete per-OpKind table lands with cn-sync's
+implementation spec, but the gate contract is normative now.
+
+### A-B6. Write-path authorization is cn-perm's
+
+cn-store exposes exactly one write path: `submit(ops)` which calls cn-perm
+authorization per op BEFORE append. Unauthorized ops are rejected with typed
+errors surfaced in the validation report (I2, I3). `VisibilitySet` requires
+the value's owner; `TierSet` requires the group's governance role and may
+only tighten when submitted by a non-governance owner (ADR-001 A-B3/D7).
+
+### A-B7. Durability semantics, typed
+
+One fsync per submitted BATCH, not per op (bulk ingest streams). Every line
+ends with a newline; on open, a torn final line (missing newline or invalid
+JSON) is truncated and reported as a typed WARN (I3, I12). The snapshot
+watermark must be <= the durable log tip; a snapshot ahead of the log is
+discarded with a typed WARN and state refolds from the log. Log lines are
+never rewritten.
+
+### A-B8. SyncTransport is an explicitly provisional v0 seam
+
+The trait becomes a request/response exchange over versioned opaque frames
+plus a capability descriptor:
+
+```
+trait SyncTransport {
+    fn capabilities(&self) -> PeerCapabilities;   // versioned, extensible
+    fn exchange(&mut self, frame: SyncFrame) -> Result<SyncFrame, SyncError>;
+}
+```
+
+`SyncFrame` is a schema-versioned envelope (I7); the local loopback adapter
+implements one frame kind (op-batch offer/accept by watermark). The
+architectural guarantee R5 relies on is the SEAM (nothing outside cn-sync may
+reference a transport or frame internals) plus op-format stability - NOT the
+trait's arity, which the future protocol ADR (human-gated) is expected to
+revise cheaply within the one crate. Per-tier partial sync is a declared
+capability requirement for that ADR, wired to A-B5's gate.
+
+### Advisories folded in
+
+- The fold ALWAYS applies canonical order, including locally; append order is
+  arrival detail, never fold order.
+- Op shape splits `recorded_at: Timestamp` (display/audit) from
+  `sort_key: (hlc, actor_id, op_id)` (canonical order).
+- `CustodyAppend` on an archived target is valid (audit continues); on an
+  unknown target it quarantines like any dependency miss.
+- Version policy: readers reject unknown MAJOR versions loudly and accept
+  unknown MINOR fields with ignore-and-preserve semantics (round-trip safe).
