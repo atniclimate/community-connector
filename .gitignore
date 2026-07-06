@@ -11,6 +11,9 @@ dist-smoke/
 # Codex scratch space
 .codex/
 
+# Playwright CLI artifacts (spike measurement runs)
+.playwright-cli/
+
 # Env files and secrets
 .env
 .env.*
