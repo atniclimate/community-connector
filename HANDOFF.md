@@ -3,75 +3,81 @@
 > This file outranks session memory. Reading order for a new session: CLAUDE.md,
 > then this file, then current-phase ADRs.
 
-Last updated: 2026-07-06 ~03:50 Pacific, end of session 1 (bootstrap + Phase 1
-start). The 3:10am usage reset happened mid-session; the director resumed
-directly and the planned next-day cron was deleted as stale (DECISIONS D-007).
+Last updated: 2026-07-06 ~05:00 Pacific, end of session 1 (a single overnight
+session spanning bootstrap through Phase 1 completion, including a usage-limit
+failover and resume - see DECISIONS D-007).
 
 ## Phase status
 
-**Phase 0 - Bootstrap: COMPLETE.** All criteria pass: skeleton scaffolded
-(codex grind session 019f36f7-5398/relaunched 019f36f7-6e1a, director
-re-verified: cargo fmt/clippy/test, tsc, vite build, snapshot size ok,
-pii-scan); contract docs authored; PII tripwire proven (blocked a planted
-violation, exit 1); toolchain recorded (docs/ENVIRONMENT.md); Codex pinned
-(grind=gpt-5.4-mini, review=gpt-5.5) and round-tripped.
+**Phase 0 - Bootstrap: COMPLETE.**
+**Phase 1 - Domain model and ADRs: COMPLETE.** All acceptance criteria met:
 
-**Phase 1 - Domain model and ADRs: IN PROGRESS.**
-
-| Item | Status |
+| Criterion | Status |
 |---|---|
-| ADR-001 domain model | ACCEPTED with round-1 amendments (D-010); no round 2 needed |
-| Two contrasting synthetic templates | DRAFTED: fixtures/templates/*.template.json (research network + fictional fisheries committee) |
-| ADR-002 event log / network readiness | NOT STARTED - inherits two hard requirements from ADR-001 round 1: op idempotency by UUIDv7 op id; custody events need stable ids + ordering rule |
-| ADR-003 wasm boundary shape | NOT STARTED |
-| Permission model spec (circles, grants, viewer contexts, tier ceilings) | PARTIAL - core rules now in ADR-001 (A-B1, A-B2, A-B3); needs its own written spec before cn-perm |
-| schemas/group-template.schema.json | NOT STARTED - fixtures are drafts to validate against it |
-| Design brief adversarial critique | STILL PENDING - docs/design/DESIGN_BRIEF.md is uncritiqued; run per routing policy via codex review, output to a DIFFERENT path than the artifact |
+| ADR-001 domain model | ACCEPTED (1 adversarial round, amended; D-010) |
+| ADR-002 event log / network readiness | ACCEPTED (2 rounds, amended; D-013) |
+| ADR-003 wasm boundary | ACCEPTED (2 rounds, amended; D-015) - cn-api facade crate added, cn-wasm is cdylib+rlib |
+| Written specs | ADR-001 (entity/attribute model), docs/specs/permission-model.md, schemas/group-template.schema.json, ADR-002 (op log/sync) |
+| Two contrasting synthetic templates | fixtures/templates/*.template.json, both PASS `npm run validate:templates` (app/) |
 
-## Commits this session (oldest first)
+Also complete: docs/design/DESIGN_BRIEF.md revised per adversarial critique
+(D-012, D-014); its critique round 2 is PARKED until the Phase 3 rendering
+spike exists. PolyForm Noncommercial 1.0.0 license added (D-011).
 
-- 1c1ae52 chore: add PII tripwire, git hooks, and size budget check
-- 47902f7 docs: author contract docs, codex guide, environment record; archive launch brief
-- 7b6ef8d docs: add design brief from research workflow; session-end handoff
-- (scaffold) chore: scaffold cargo workspace, TS app shell, and placeholder dirs
-- (phase1) docs(phase1): draft ADR-001 domain model and two contrasting group templates
-- (final two) ADR-001 amendments + routing policy adoption - see git log
+## Next phase: Phase 2 - Rust core
 
-## Open human gates (one-line answers suffice)
+Acceptance (CLAUDE.md / launch prompt section 5): cn-model, cn-schema,
+cn-perm, cn-graph, cn-store implemented behind the cn-api facade with the
+wasm boundary; cargo test green including the permission property test (no
+projection ever leaks above the viewer's access); clippy clean; wasm bundle
+builds and loads in a smoke page. Measurement gates from ADR rounds: wasm
+heap at 5k entities x 10 attrs + 10k edges under 64MB; projection payload
+budget measured.
 
-1. Git identity: commits use `Patrick Freeland <accounts@indigenousaccess.org>` - confirm or correct.
-2. Naming: product "Community Navigator", folder `community-connector` - keep both, or rename one?
-3. License: none chosen - fine to stay unlicensed for now?
-4. Codex sandbox: its Windows elevated sandbox cannot spawn from this context (D-008), so bootstrap Codex runs used `--sandbox danger-full-access` inside the trusted repo - OK to continue, or do you want the elevated sandbox fixed (needs an elevated shell)?
+### Exact next three actions
+
+1. Setup: `rustup target add wasm32-unknown-unknown` (NOT yet installed),
+   then verify `wasm-pack build core/crates/cn-wasm --target web` works on
+   the empty crate (validates ADR-003 A-B5 end to end).
+2. Director writes the cn-model type skeleton (types from ADR-001 D2-D9 with
+   Amendments) and the cn-api facade signatures (ADR-003 D1 + Amendments);
+   then per routing policy, codex grind implements serde + validation
+   plumbing from those signatures and authors tests from the specs
+   (permission property test spec is in docs/specs/permission-model.md
+   section 8).
+3. Implement order: cn-model -> cn-schema (validate the two fixtures in
+   Rust, mirroring the ajv harness) -> cn-store fold (ADR-002 D4/D5 with
+   per-field sort_key LWW) -> cn-perm projection -> cn-graph over
+   projections -> cn-api -> cn-wasm bindings + smoke page.
+
+## Open human gates
+
+1. License variant: PolyForm NONCOMMERCIAL 1.0.0 was selected from the
+   "polyform" answer - confirm, or name Internal Use / Small Business instead.
+2. (Standing) no remotes, no real data, no spend without explicit instruction.
 
 ## Degraded modes / standing directives
 
-- Codex runs use `--sandbox danger-full-access` (D-008) until the sandbox is
-  fixed; mitigations: strict task files, no-git rule, director re-verification.
-- Usage failover rule active (CLAUDE.md): at ~98% Claude usage, offload to
-  Codex, park judgment work, resume after reset.
-- Routing policy for token conservation: docs/CODEX_GUIDE.md section 7 -
-  Codex absorbs research/drafting/mechanical work; Claude director decides,
-  reviews compressed outputs, and commits.
-- Never point --output-last-message at a task's own artifact path (clobbers).
-
-## Next three actions
-
-1. Run the design-brief critique: codex review over docs/design/DESIGN_BRIEF.md
-   (task pattern: .codex/task-adr001-round1.md is the template; attack Iris Xe
-   feasibility, 5MB bundle, theming contract, a11y, warmth); director judges,
-   revises brief, commits.
-2. Draft ADR-002 (event-sourced op log + SyncTransport; rejected alternatives
-   CRDTs-now and snapshot-only; fold in the two inherited requirements), run
-   its adversarial round (budget: two).
-3. Write the permission model spec + schemas/group-template.schema.json
-   (validate both fixture templates against it; per routing policy, schema
-   drafting can go to codex grind from the ADR-001 spec, director reviews).
+- Codex runs use `--sandbox danger-full-access` (D-008; human said "figure it
+  out" - D-011 keeps the bypass with mitigations).
+- Routing policy is MANDATORY (CLAUDE.md, docs/CODEX_GUIDE.md section 7):
+  Codex absorbs bulk work; effort-match grind tasks (D-014: multi-ruling doc
+  revisions need gpt-5.5/medium, not gpt-5.4-mini/low).
+- Atomic commits without asking (CLAUDE.md cadence).
+- Re-arm a one-shot 8:00 AM local resume cron each session while the
+  usage-failover directive stands (this session's is armed: job fb983a1b;
+  session-only, dies with the terminal).
+- Never point codex --output-last-message at a task's own artifact path.
 
 ## Warnings that must not be lost
 
-- DESIGN_BRIEF.md remains uncritiqued until next-action 1 completes.
-- fixtures/templates/*.json are pre-schema drafts; they carry `"type": "media"`
-  and `format: email` per ADR-001 A-B5 - keep schema consistent with that.
-- The predecessor's PII exclusion list (CLAUDE.md) applies to every future
-  Codex prompt; nothing is cleared.
+- The design brief's second critique round is intentionally parked until the
+  Phase 3 rendering spike produces evidence (D-012); do not treat the brief's
+  rendering numbers as validated - they are labeled allocations.
+- wasm32 target not installed yet (Phase 2 action 1).
+- .codex/ is gitignored scratch; the token analysis that matters is preserved
+  at docs/analysis/token-analysis-2026-07-06.md, and ADR critiques at
+  docs/adr/ADR-001-round1-critique.md (rounds 2/3 critiques for ADR-002/003
+  live only in .codex/ - archive them if ever needed before cleanup).
+- Predecessor PII exclusion list (CLAUDE.md) applies to every Codex prompt;
+  nothing is cleared.

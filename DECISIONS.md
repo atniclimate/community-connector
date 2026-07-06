@@ -130,3 +130,38 @@ equivalent interface). Revision applied by codex grind per
 .codex/task-brief-revision.md; a Phase 3 rendering spike is now checklist
 item 1. Critique round 2 DEFERRED to Phase 3 start, when spike results exist
 to critique against - the two-round budget is not spent, it is parked.
+
+## D-013 (2026-07-06) - ADR-002 accepted after two adversarial rounds
+
+Round 1 (REDESIGN): 8 blockers, all amended (see ADR-002 Amendments). Round 2
+(ACCEPT-WITH-AMENDMENTS): confirmed 6/8 resolved; director fixed the final
+three findings directly - per-field sort_key comparison (quarantine admission
+order can never violate LWW canonical order), typed snapshot checksum
+recovery, and an explicit TierSet authorization predicate (governance
+any-within-policy OR owner strict-tighten) that removes the contradiction
+with the permission spec. Round budget spent; ADR-002 is accepted.
+
+## D-014 (2026-07-06) - Routing lesson: effort-match grind tasks
+
+The design-brief revision on grind (gpt-5.4-mini, low effort) applied 8
+substantive rulings in only 24 inserted lines, leaving verified gaps
+("unmangled" phrasing survived, WCAG citations missing). Rule adopted: grind
+at low effort is for truly mechanical transforms; multi-ruling document
+revisions get a stronger model or higher effort (pass 2 ran gpt-5.5 at
+medium via -m override). Director spot-check greps after every in-place
+revision are now standard (they caught this).
+
+## D-015 (2026-07-06) - ADR-003 accepted after two adversarial rounds
+
+Round 1 (REDESIGN): 5 blockers - unfiltered validation reports, unbounded
+export options, forgeable viewer contexts, leaking error payloads, and a
+factually wrong one-crate cdylib/rlib claim. Amended: viewer-scoped reports,
+narrow-only exports, honest v0 trust scope with a declared Phase 5
+session-identity dependency, hidden-equals-absent error semantics, and a
+cn-api facade crate. Round 2 (ACCEPT-WITH-AMENDMENTS): caught that category
+COUNTS still leak (revoked - no counts ever for non-governance viewers),
+entity_detail needed the detail-equals-projection rule, and the crate claims
+had to be true in the scaffold, not just the prose - cn-api crate added,
+cn-wasm made cdylib+rlib depending on cn-api, workspace re-verified green.
+Round budget spent; ADR-003 accepted. With this, all three Phase 1 ADRs are
+accepted and every acceptance criterion of Phase 1 is met.
