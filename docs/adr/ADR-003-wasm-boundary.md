@@ -1,6 +1,7 @@
 # ADR-003: WASM Boundary Shape
 
-- Status: draft - awaiting adversarial round 1
+- Status: draft - amended after adversarial round 1 (REDESIGN verdict);
+  awaiting round 2 (final)
 - Date: 2026-07-06
 - Phase: 1
 - Drivers: architecture stances (Rust core is the single source of truth; the
@@ -115,5 +116,71 @@ structurally impossible for anything the facade covers.
 
 - Exact PathRequest/Neighborhood/Search request shapes (land with cn-graph's
   implementation, schema-versioned from day one).
-- LoadReport/SubmitReport field detail beyond quarantine and validation
-  summaries.
+
+## Amendments (adversarial round 1, 2026-07-06)
+
+### A-B1. Reports are viewer-scoped
+
+`validation_report(group_id, viewer_ctx_json)` - no report call exists
+without a viewer. Report entries referencing objects outside the viewer's
+projection are redacted to opaque category counts; full-detail reports
+require the group's governance context; the anonymous context receives
+schema-level findings only, no counts. LoadReport and SubmitReport follow
+the same redaction rule.
+
+### A-B2. Export options can only narrow
+
+`export_snapshot` content is exactly the named viewer's projection passed
+through the ADR-002 A-B5 export gate; `options_json` selects strict SUBSETS
+(entity kinds, story selection, attribute categories) and can never add
+disclosure classes. Independent of viewer, the export gate excludes
+T3-effective values - including the owner's own - because T3 never leaves
+the local store (ADR-001 A-B2, ADR-002 A-B8).
+
+### A-B3. Honest trust scope for viewer naming
+
+v0 is local-first and single-user: the app process is trusted to name the
+viewer context, and the boundary is a CORRECTNESS boundary, not an
+authentication boundary - stated as an explicit limitation, not implied.
+Phase 5 (personal mode, R4) MUST add core-owned session identity: viewer
+contexts above `group` bind to a session established through core-managed
+credentials, specified in a Phase 5 ADR. That ADR is a declared dependency
+of shipping personal mode; until then `self`/`admin` contexts exist for
+development and viewer-switcher testing only.
+
+### A-B4. Hidden is indistinguishable from absent
+
+One error code, `NotFound`, covers both missing and not-visible for every
+call; error `details` never carry ids, kinds, or attribute names the viewer
+cannot see; search evaluates only over projected values. This rule is
+normative for every current and future boundary call.
+
+### A-B5. cn-api facade crate (corrects D6)
+
+The facade is its own native-safe crate `core/crates/cn-api` (rlib, zero
+wasm dependencies): the single public API over the cn-* crates. `cn-wasm`
+(crate-type cdylib) wraps cn-api with wasm-bindgen behind
+target-gated dependencies; the CLI links cn-api directly. This fixes the
+round-1 finding that one crate cannot be both cdylib-for-wasm-pack and
+rlib-for-native without gating, and keeps `cargo clippy --workspace
+--all-targets` clean on native targets.
+
+### Advisories folded in
+
+- `viewer_fingerprint` = canonical hash over (context kind, subject person
+  id, resolved trust-grant revision, role set, template version); any
+  component change invalidates the cached projection.
+- Monotonic revision enforcement is a stated obligation of the app state
+  machine (I4): stale worker responses (lower revision than current) are
+  discarded, never rendered.
+- Load API is streaming-shaped from v0: `load_group_begin(group_id,
+  template_json)`, `load_ops_chunk(group_id, ops_jsonl_chunk)`,
+  `load_group_commit(group_id) -> LoadReport`, so large logs stream and
+  validation warnings can surface progressively; v0 may implement it
+  all-at-once internally without changing the API (I7-safe).
+- Projection payload is split: `projection()` returns the DISPLAY projection
+  (ids, kinds, labels, display-designated attributes, edges, weights,
+  revision); full attribute detail comes per entity via
+  `entity_detail(group_id, viewer_ctx_json, entity_id)`. The Phase 2
+  measurement gate (ADR-001) gains a projection-payload budget measured at
+  5k nodes / 10k edges.
