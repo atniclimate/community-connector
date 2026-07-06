@@ -4,4 +4,11 @@ version.workspace = true
 edition.workspace = true
 publish = false
 
+# cdylib for wasm-pack; rlib so native cargo check/clippy/test cover the crate
+# (ADR-003 A-B5 / round-2 amendment). wasm-only deps get target-gated as they
+# land in Phase 2.
+[lib]
+crate-type = ["cdylib", "rlib"]
+
 [dependencies]
+cn-api = { path = "../cn-api" }

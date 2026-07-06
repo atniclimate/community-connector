@@ -1,7 +1,6 @@
 # ADR-003: WASM Boundary Shape
 
-- Status: draft - amended after adversarial round 1 (REDESIGN verdict);
-  awaiting round 2 (final)
+- Status: accepted (amended after adversarial rounds 1 and 2; round budget spent)
 - Date: 2026-07-06
 - Phase: 1
 - Drivers: architecture stances (Rust core is the single source of truth; the
@@ -184,3 +183,24 @@ rlib-for-native without gating, and keeps `cargo clippy --workspace
   `entity_detail(group_id, viewer_ctx_json, entity_id)`. The Phase 2
   measurement gate (ADR-001) gains a projection-payload budget measured at
   5k nodes / 10k edges.
+
+## Amendments (adversarial round 2, 2026-07-06 - final)
+
+Verdict ACCEPT-WITH-AMENDMENTS; three findings, all fixed:
+
+- **Reports never leak by count.** A viewer's report contains only (a)
+  findings about objects within their own projection and (b) outcomes of
+  their OWN submitted or loaded ops, where unresolvable references are
+  reported at NotFound opacity (missing indistinguishable from hidden,
+  A-B4). No opaque categories, no counts of findings about others' hidden
+  data - the round-1 "category counts" idea is REVOKED as itself leaky.
+  The governance context receives full detail.
+- **Streaming load carries the viewer.** `load_group_begin(group_id,
+  viewer_ctx_json, template_json)`; progressive warnings and the final
+  LoadReport follow the no-counts rule above.
+- **entity_detail equals projection.** `entity_detail` returns exactly the
+  viewer's projected attribute set for that entity; the display/detail
+  split is a payload optimization and can never be a disclosure difference.
+- **Crate structure made true, not just claimed.** cn-wasm ships
+  `crate-type = ["cdylib", "rlib"]` and depends on cn-api from the scaffold
+  onward; wasm-only dependencies are target-gated as they land in Phase 2.
