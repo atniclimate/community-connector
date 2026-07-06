@@ -8,6 +8,7 @@ members = [
     "crates/cn-store",
     "crates/cn-sync",
     "crates/cn-ingest",
+    "crates/cn-api",
     "crates/cn-wasm",
     "cli",
 ]
