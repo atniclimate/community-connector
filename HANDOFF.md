@@ -87,13 +87,13 @@ budget).
 
 ### Exact next three actions
 
-1. THE RENDERING SPIKE (design brief section 9 item 1): prototype custom
-   instanced Three layer vs three-forcegraph vs stock 3d-force-graph at
-   5k nodes / 10k edges from a generated synthetic projection; acceptance
-   30 FPS at DPR 1.5 thermally steady on this machine; ONE edge system.
-   Deps land in app/ (three, 3d-force-graph pinned versions into
-   docs/ENVIRONMENT.md). Decision recorded as ADR-004 (renderer choice).
-2. Design brief critique round 2 (codex review) WITH spike numbers in hand;
+1. DONE - RENDERING SPIKE run and decided (ADR-004): custom instanced layer
+   33.5 avg FPS / 5 draw calls on the real Iris Xe (headed Chrome 149) vs
+   stock 26.1 / three-forcegraph 22.0 at ~10k draw calls - only instanced
+   passes the 30 FPS bar. Measurement executed via playwright-cli headed
+   Chrome (claude-in-chrome extension was not connected). Spike harness
+   kept at app/spike as the regression benchmark.
+2. Design brief critique round 2 (codex review) WITH the ADR-004 numbers;
    revise brief; then app state machine skeleton (I4) + wasm worker
    integration (ADR-003 D5: worker owns the CnApi instance; monotonic
    revision enforcement).
