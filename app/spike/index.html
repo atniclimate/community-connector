@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Rendering Spike</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: #070a10;
+        color: #f4f7fb;
+      }
+
+      body {
+        margin: 0;
+        min-width: 320px;
+      }
+
+      main {
+        display: grid;
+        grid-template-rows: auto minmax(420px, 1fr);
+        min-height: 100vh;
+      }
+
+      .toolbar {
+        display: grid;
+        grid-template-columns: minmax(160px, 220px) auto 1fr;
+        gap: 12px;
+        align-items: center;
+        padding: 12px;
+        border-bottom: 1px solid #273244;
+        background: #101722;
+      }
+
+      select,
+      button {
+        min-height: 36px;
+        border: 1px solid #40506a;
+        border-radius: 6px;
+        background: #182235;
+        color: #f4f7fb;
+        font: inherit;
+      }
+
+      button {
+        padding: 0 14px;
+        cursor: pointer;
+      }
+
+      button:hover,
+      select:hover {
+        border-color: #7ca6e8;
+      }
+
+      .status {
+        color: #b9c7d8;
+        font-size: 0.9rem;
+      }
+
+      .stage {
+        position: relative;
+        min-height: 420px;
+      }
+
+      #canvas-container {
+        position: absolute;
+        inset: 0;
+      }
+
+      .results {
+        position: absolute;
+        right: 12px;
+        bottom: 12px;
+        max-width: min(760px, calc(100% - 24px));
+        overflow-x: auto;
+        border: 1px solid #273244;
+        border-radius: 6px;
+        background: rgba(10, 15, 23, 0.9);
+      }
+
+      table {
+        border-collapse: collapse;
+        font-size: 0.86rem;
+        white-space: nowrap;
+      }
+
+      th,
+      td {
+        padding: 8px 10px;
+        border-bottom: 1px solid #273244;
+        text-align: right;
+      }
+
+      th:first-child,
+      td:first-child {
+        text-align: left;
+      }
+
+      tr:last-child td {
+        border-bottom: 0;
+      }
+
+      @media (max-width: 640px) {
+        .toolbar {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <section class="toolbar" aria-label="Spike controls">
+        <select id="candidate" aria-label="Renderer candidate">
+          <option value="stock">stock 3d-force-graph</option>
+          <option value="forcegraph">three-forcegraph</option>
+          <option value="instanced">custom instanced Three</option>
+        </select>
+        <button id="run-all" type="button" aria-label="Run all renderer candidates">Run all</button>
+        <div id="status" class="status" role="status">Ready</div>
+      </section>
+      <section class="stage" aria-label="Rendering canvas and results">
+        <div id="canvas-container"></div>
+        <div class="results" aria-label="Spike results">
+          <table>
+            <thead>
+              <tr>
+                <th>Candidate</th>
+                <th>Frames</th>
+                <th>Avg FPS</th>
+                <th>p95 ms</th>
+                <th>Worst ms</th>
+                <th>Draw calls</th>
+              </tr>
+            </thead>
+            <tbody id="results-body"></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+    <script type="module" src="/spike/main.ts"></script>
+  </body>
+</html>

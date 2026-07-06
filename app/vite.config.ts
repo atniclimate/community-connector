@@ -6,6 +6,6 @@ export default defineConfig(({ mode }) => ({
   build: {
     target: "es2022",
     outDir: mode === "smoke" ? "dist-smoke" : "dist",
-    rollupOptions: mode === "smoke" ? { input: "smoke/index.html" } : {},
+    rollupOptions: mode === "smoke" ? { input: "smoke/index.html" } : { input: "index.html" },
   },
 }));
