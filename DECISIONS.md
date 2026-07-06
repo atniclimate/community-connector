@@ -49,3 +49,14 @@ Per human directive, a 5-researcher + synthesis + adversarial-critique workflow
 (run id wf_afb4e38d-a45) produced `docs/design/DESIGN_BRIEF.md` to drive Phase 3
 visual/motion direction. The brief is advisory input to Phase 3, not a contract
 doc; conflicts with invariants resolve in favor of AGENTS.md.
+
+## D-007 (2026-07-06) - Early usage failover: bootstrap tail delegated to Codex
+
+The Claude session usage limit was hit mid-bootstrap (the design workflow's
+critique agent died on it; reset 3:10am America/Los_Angeles). Per the human's
+directives: (a) cargo workspace + app shell scaffold delegated to detached
+codex grind run (.codex/task-scaffold.md); (b) workflow token-conservation
+analysis delegated to codex review (.codex/task-token-analysis.md); (c) session
+resume scheduled via in-session cron at 3:12am local - two minutes after reset
+so the new limit window is definitely active. Director-judgment work (ADR-001,
+fixtures content, brief revision) parked in HANDOFF.md, not delegated.
