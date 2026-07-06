@@ -40,13 +40,13 @@ deprecated - never fall back to them. Re-verify ids after any codex CLI update.
 
 ## Frontend toolchain
 
-Recorded at scaffold time (see app/package.json for exact pins): Vite 7.x
-(vite-plugin-singlefile compatibility - do not upgrade to v8 without checking the
-plugin), TypeScript strict mode. Update this table when the app is scaffolded:
+Recorded at scaffold time. Vite stays 7.x (vite-plugin-singlefile compatibility -
+do not upgrade to v8 without checking the plugin). TypeScript strict mode with
+noUncheckedIndexedAccess and exactOptionalPropertyTypes.
 
 | Package | Version |
 |---|---|
-| vite | see app/package.json |
-| typescript | see app/package.json |
-| 3d-force-graph | see app/package.json |
-| three | see app/package.json |
+| vite | ^7.3.6 |
+| typescript | ^6.0.3 |
+| vite-plugin-singlefile | ^2.3.3 |
+| 3d-force-graph / three | not yet added (Phase 3) |

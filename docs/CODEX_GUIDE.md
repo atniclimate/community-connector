@@ -139,7 +139,32 @@ If Claude usage limit reaches ~98%: offload active mechanical work to `grind`,
 verification to `review`, park director-judgment work in HANDOFF.md, resume as
 director when the limit resets. Mark commits made in this mode `[codex-offload]`.
 
-## 7. Degraded mode
+## 7. Standing routing policy (token conservation)
+
+Adopted 2026-07-06 from the Codex analysis of the design-research workflow
+(docs/analysis/token-analysis-2026-07-06.md; DECISIONS.md D-009). Claude and
+Codex draw on separate budgets: spend Claude on deciding what matters, Codex on
+collecting, transforming, and drafting. Compress every cross-stage handoff
+before it re-enters Claude.
+
+| Task type | Route | Token rule |
+|---|---|---|
+| Human gates, contract interpretation, phase sequencing, final architecture calls | Claude director | Never delegate |
+| Real or possibly real PII, credentials, predecessor excluded data | Nobody | Stop the line |
+| Broad web research over public sources | Codex review | Cap output to 1200-1800 words |
+| Local codebase audits over green repo files | Codex review | Give allowlist and exact questions |
+| Mechanical implementation from a written blueprint | Codex grind | Workspace-write, run checks, no redesign |
+| Test authoring, fixtures with synthetic data, lint burn-down | Codex grind | Batch related work |
+| Synthesis first drafts from bounded notes | Codex grind | Use compressed inputs, not raw journals |
+| Diff review, adversarial ADR or design critique | Codex review | Blocking findings first |
+| Claude workflow agents | Rare | Only when Claude-specific parallel judgment is worth it, with hard output caps |
+| Commit readiness and final acceptance | Claude director | Read Codex outputs, decide, commit |
+
+Known pitfall: if a Codex task writes an artifact file, point
+`--output-last-message` at a DIFFERENT path - the last-message write clobbers
+same-path artifacts (it cost us a recovery-from-log this session).
+
+## 8. Degraded mode
 
 If Codex CLI is missing, unauthenticated, or persistently failing: proceed with
 self-review, mark affected commits `[unreviewed-by-codex]`, log the degradation and
