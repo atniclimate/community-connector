@@ -4,6 +4,7 @@ import type {
   ProjectionDto,
   ViewerContextDto,
 } from "./state";
+import type { Theme, ThemeReport } from "../theme/tokens";
 
 export type Action =
   | {
@@ -24,6 +25,11 @@ export type Action =
       readonly kind: "projectionReceived";
       readonly projection: ProjectionDto;
       readonly revision: number;
+    }
+  | {
+      readonly kind: "themeDerived";
+      readonly theme: Theme;
+      readonly report: ThemeReport;
     }
   | {
       readonly kind: "entityFocused";

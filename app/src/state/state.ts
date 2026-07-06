@@ -1,3 +1,5 @@
+import type { Theme, ThemeReport } from "../theme/tokens";
+
 export type JsonPrimitive = string | number | boolean | null;
 export type JsonValue = JsonPrimitive | JsonObject | readonly JsonValue[];
 
@@ -72,6 +74,10 @@ export interface AppState {
     readonly projection: ProjectionDto | null;
     readonly detail: EntityDetailDto | null;
   };
+  readonly theme: {
+    readonly resolved: Theme | null;
+    readonly report: ThemeReport | null;
+  };
 }
 
 export function createInitialState(reducedMotion = false): AppState {
@@ -98,6 +104,10 @@ export function createInitialState(reducedMotion = false): AppState {
     data: {
       projection: null,
       detail: null,
+    },
+    theme: {
+      resolved: null,
+      report: null,
     },
   };
 }

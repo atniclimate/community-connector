@@ -1,6 +1,8 @@
 import type { Store } from "./store";
 import type { JsonObject, ViewerContextDto } from "./state";
 import type { WasmClient } from "../wasm/client";
+import { deriveTheme } from "../theme/derive";
+import type { GroupTemplateDto } from "../theme/tokens";
 
 function revisionFromProjection(projection: JsonObject): number {
   const revision = projection.revision;
@@ -19,6 +21,8 @@ export async function loadGroup(
   store.dispatch({ kind: "groupLoadRequested", groupId, viewer });
   try {
     await client.loadGroup(groupId, viewer, templateJson, opsJsonl);
+    const derived = deriveTheme(JSON.parse(templateJson) as GroupTemplateDto);
+    store.dispatch({ kind: "themeDerived", theme: derived.theme, report: derived.report });
     store.dispatch({ kind: "groupLoadSucceeded", groupId });
     await refreshProjection(store, client);
   } catch (error) {

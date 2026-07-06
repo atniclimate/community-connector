@@ -48,6 +48,7 @@ export function reduce(state: AppState, action: Action): AppState {
         view: resetView(),
         ui: { ...state.ui, detailEntityId: null },
         data: { projection: null, detail: null },
+        theme: { resolved: null, report: null },
       };
     case "groupLoadSucceeded":
       return {
@@ -72,6 +73,12 @@ export function reduce(state: AppState, action: Action): AppState {
         ...state,
         session: { ...state.session, revision: action.revision, loadState: "ready" },
         data: { ...state.data, projection: action.projection, detail: null },
+      };
+    case "themeDerived":
+      return {
+        ...state,
+        // Theme derivation is revision-independent in v0: template changes arrive as a new group load.
+        theme: { resolved: action.theme, report: action.report },
       };
     case "entityFocused":
       return {

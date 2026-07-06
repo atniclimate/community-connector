@@ -76,6 +76,23 @@ describe("state reducer", () => {
       storyStep: 0,
     });
   });
+
+  it("stores derived theme results without revision staleness rules", () => {
+    const initial = reduce(createInitialState(), {
+      kind: "projectionReceived",
+      projection: projection(3),
+      revision: 3,
+    });
+    const theme = {
+      schema_version: "0.1.0" as const,
+      tokens: { "bg.center": { hex: "#0d1017", source: "default" as const } },
+    };
+    const report = { schema_version: "0.1.0" as const, adjustments: [], warnings: [] };
+    const themed = reduce(initial, { kind: "themeDerived", theme, report });
+
+    expect(themed.session.revision).toBe(3);
+    expect(themed.theme).toEqual({ resolved: theme, report });
+  });
 });
 
 describe("store", () => {
