@@ -36,10 +36,18 @@ base renderer landed + visual fixes DIRECTOR-ACCEPTED
 3. Real-data gate process added to CLAUDE.md gates section (D-030/D-034).
 4. NEXT_SESSION.md refreshed (brief + remaining questions Q-A..Q-F).
 5. docs/SESSION_2_LAUNCH.md retired to docs/archive/.
-6. Graph-networks deep research commissioned (D-040); report lands at
-   **docs/research/graph-networks-report-2026-07-06.md**. Check it is
-   present and committed; if missing, the research did not complete -
-   re-run per D-040's scope.
+6. Graph-networks deep research COMPLETE (D-040): report at
+   **docs/research/graph-networks-report-2026-07-06.md** (~870 lines,
+   committed). The workflow's auto-synthesis died on a usage limit; the
+   director synthesized the report from the full 25-source agent journal
+   plus two supplemental research passes (resource-matching /
+   closed-loop evidence; epidemiology-energy-GQL). Section 6 is the
+   plan-v3 input: six design commitments, sibling-tool integration
+   hypotheses (cap-assessor/TCR-policy-scanner/GeoBase/engagement-database
+   feed one shared taxonomy + TSDF envelope + graph), and three cautions
+   (lay graph-literacy is a measured barrier; closed-loop routing is
+   funding-gated not software-gated; external graph engines carry
+   viability risk - Kuzu archived mid-2025).
 
 ## Exact next three actions
 
