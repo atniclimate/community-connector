@@ -66,13 +66,36 @@ assembly comprehension layer to critical path and corrects two build
 specs (structural routing consent gate; deterministic-UUIDv5 idempotent
 ingest). It is PROVISIONAL input to plan v3; changes no accepted ADR.
 
-## Exact next three actions
+## Session 2c addendum (FORM deliverable drafted, same day)
 
-1. **Human sitting (preferred next):** read the research report AND
-   docs/design/integration-plan-2026-07-06.md alongside Execution Plan v2;
-   shape plan v3; answer NEXT_SESSION Q-A (convention date), Q-B (form
-   platform), and the new gates G1 (vocabulary authority) + G2 (Open
-   Eligibility licensing); schedule the DESIGN sitting (D-038).
+Proceeding autonomously after the integration plan, the FORM deliverable
+(integration plan R1; Execution Plan v2's earliest critical-path item) is
+drafted at **docs/design/pilot-form-and-template-2026-07-06.md**: the
+participant intake form (required 5-min core + optional edge-generating
+depth + per-field visibility + contactability consent), the ATNI template
+STRUCTURE (skeleton, vocabulary arrays empty and parked per G1, offer/need
+as tags on Person per spec 6.2), the consent-email draft, and the feedback
+plan. It respects both new gates (G1 terms parked; no Open Eligibility
+terms embedded, G2) and is marked DRAFT FOR HUMAN REVIEW - community-facing
+text is not to be used until reviewed (D-023). No real data touched.
+
+## Exact next actions
+
+1. **Human review / plan-v3 sitting (preferred next):** read the research
+   report + docs/design/integration-plan-2026-07-06.md + the FORM
+   deliverable alongside Execution Plan v2; shape plan v3; answer
+   NEXT_SESSION Q-A (convention date), Q-B (form platform), gates G1
+   (vocabulary authority - unblocks the FORM's parked terms) + G2 (Open
+   Eligibility licensing); review the intake form + consent email text;
+   schedule the DESIGN sitting (D-038).
+2. **Ready-to-build (autonomous, when the plan is confirmed or on "go"),
+   in dependency order per the integration plan specs:** R5 facilitator
+   role (spec 6.3 - grind HIGH + adversarial round); R2 cn-ingest
+   AtniIntakeBatchV0_1 importer (spec 6.1 - director blueprint first, the
+   idempotency semantics are subtle); R3 routing capability + structural
+   consent gate (spec 6.2); R4 explore surface + flat reveal projection;
+   R6 comprehension layer. Note: these implement a PROVISIONAL plan - if
+   the human wants plan v3 shaped first, they park until then.
 2. **Autonomous build (if no human):** S3-A2 "Constellation legible" -
    labels (troika, grind HIGH), motion/focus polish (grind medium),
    benchmark re-run vs p95 goal. Then S3-B "Explore + Route".
