@@ -396,3 +396,51 @@ docs/research/graph-networks-report-2026-07-06.md. The next human
 sitting shapes plan v3 with this knowledge, including possible
 integrations: cap-assessor, TCR-policy-scanner, GeoBase,
 engagement-database, and the TSDF ecosystem under C:\dev.
+
+## D-041 (2026-07-06) - Integration plan via adversarial multi-model panel
+
+Human directive: run an adversarial agent discussion (including Codex) over the
+research report + codebase, make integration recommendations, and have an Opus
+4.8 max-effort reviewer articulate the plan + technical specs. Executed as:
+codebase surface map (Fable code-explorer) -> two opposed proposers MIN
+(pilot-first) / MAX (spine integrator) -> two critics: Codex gpt-5.5 high
+(session 019f3a59-91c9-7830-97f3-823a0c21069c) on engineering + a Fable skeptic
+on sovereignty/delivery/decision-fidelity -> director synthesis -> Opus 4.8 at
+MAX effort review. Deliverable: docs/design/integration-plan-2026-07-06.md.
+Panel artifacts in .codex/ (gitignored): panel-codebase-map.md,
+panel-proposal-{min,max}.md, panel-codex-critique.md.
+
+Verdict: MIN is the base (hits the convention date, hugs D-019..D-040, maps to
+the D-022 win); MAX's general-DTO ambition is deferred, its "don't foreclose the
+spine" warning kept as a design note. Six blocking findings surfaced and are
+resolved in the plan. Three are decision-relevant enough to flag here:
+
+1. KEYSTONE - sovereignty and licensing are ONE fix. Both proposers seeded the
+   capability vocabulary from Open Eligibility (a US settler taxonomy, CC BY-SA).
+   Rejected: (a) it grants a vocabulary authority the human never delegated
+   (D-034 reserves the analogous tier authority to ATNI Climate), and (b)
+   CC BY-SA vs PolyForm Noncommercial is a license conflict. Both dissolve by
+   adopting the HSDS taxonomy-agnostic STRUCTURE while ATNI Climate authors its
+   own TERMS first (facilitator co-construction, Net-Map method, under FPIC).
+   This REDIRECTS D-023's taxonomy direction. New human gate G1 (vocabulary
+   authority) + G2 (any later Open Eligibility mapping isolated as separately-
+   licensed third-party data).
+2. Routing is NOT "UI-only" (Codex): PathRequest needs concrete endpoints and
+   search returns attribute hits, not "who can help." The plan adds a term+asker
+   -> candidate-paths contract, and - corrected by Opus - the contactability-
+   consent gate (D-023 principle 4) is STRUCTURAL in cn-graph/cn-api candidate
+   resolution, not a UI rule (I2 / ADR-001 A-B1 forbid app-layer permission
+   logic). No "need-met/closed" state is ever built (caution #2).
+3. The assembly comprehension layer (flat/list reveal projection, "how to read
+   this" primer, facilitator reveal script, seeded+tested Stories) is promoted
+   to a named CRITICAL-PATH deliverable with a rehearsal acceptance check - the
+   graph-literacy caution is measured in a community like ATNI's, and the D-022
+   win depends on the reveal landing.
+
+Opus 4.8 (max) caught three must-fix errors in the first synthesis - an
+unimplementable idempotency mechanism (no home for a source-id map in group
+state; corrected to deterministic UUIDv5 identity for entities, edges, AND
+custody), a nonexistent file reference (cn-perm/session.rs -> cn-perm/viewer.rs
++ cn-api/session.rs), and the misplaced consent gate - all fixed before commit.
+The plan is PROVISIONAL input to plan v3 (the D-040 sitting); it changes no
+accepted ADR and reserves G1/G2 to the human.

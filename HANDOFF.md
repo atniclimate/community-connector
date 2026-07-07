@@ -49,11 +49,30 @@ base renderer landed + visual fixes DIRECTOR-ACCEPTED
    funding-gated not software-gated; external graph engines carry
    viability risk - Kuzu archived mid-2025).
 
+## Session 2b addendum (integration panel, same day)
+
+Per human directive (D-041): an adversarial multi-model panel produced
+**docs/design/integration-plan-2026-07-06.md** - the decision-ready plan
+for applying the research to the pilot. Panel = codebase map (Fable) +
+two opposed proposers (MIN pilot-first / MAX spine) + two critics (Codex
+gpt-5.5 high, session 019f3a59; Fable sovereignty skeptic) + Opus 4.8
+max-effort review (which caught 3 must-fix errors, all corrected).
+Verdict: MIN is the base; MAX's spine deferred to a design note.
+TWO NEW HUMAN GATES opened (plan Section 9, added to Open Gates below):
+G1 vocabulary authority (ATNI Climate authors capability terms, not a
+seeded US taxonomy - redirects D-023), G2 Open Eligibility licensing
+(CC BY-SA vs PolyForm - isolate any mapping). The plan promotes the
+assembly comprehension layer to critical path and corrects two build
+specs (structural routing consent gate; deterministic-UUIDv5 idempotent
+ingest). It is PROVISIONAL input to plan v3; changes no accepted ADR.
+
 ## Exact next three actions
 
-1. **Human sitting (preferred next):** read the research report alongside
-   Execution Plan v2; shape plan v3; answer NEXT_SESSION Q-A (convention
-   date) and Q-B (form platform); schedule the DESIGN sitting (D-038).
+1. **Human sitting (preferred next):** read the research report AND
+   docs/design/integration-plan-2026-07-06.md alongside Execution Plan v2;
+   shape plan v3; answer NEXT_SESSION Q-A (convention date), Q-B (form
+   platform), and the new gates G1 (vocabulary authority) + G2 (Open
+   Eligibility licensing); schedule the DESIGN sitting (D-038).
 2. **Autonomous build (if no human):** S3-A2 "Constellation legible" -
    labels (troika, grind HIGH), motion/focus polish (grind medium),
    benchmark re-run vs p95 goal. Then S3-B "Explore + Route".
@@ -70,6 +89,13 @@ base renderer landed + visual fixes DIRECTOR-ACCEPTED
    explicit instruction.
 3. Community-facing text (form, consent email) requires human review
    before any use (D-023).
+4. **G1 - Vocabulary authority (new, D-041).** Confirm ATNI Climate
+   authors the capability categories in its own words (like tier
+   authority, D-034), facilitator-elicited under FPIC. Default: FORM
+   drafts an empty HSDS-shaped structure; no settler vocabulary committed.
+5. **G2 - Open Eligibility licensing (new, D-041).** Any later mapping to
+   Open Eligibility (CC BY-SA) must be isolated as separately-licensed
+   third-party data, out of the PolyForm code. Default: no mapping in v0.1.
 
 ## Degraded modes / standing directives
 
