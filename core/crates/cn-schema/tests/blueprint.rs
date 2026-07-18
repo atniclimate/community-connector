@@ -102,6 +102,39 @@ fn structural_failures_are_parse_errors() {
 }
 
 #[test]
+fn template_reader_rejects_unknown_schema_major_loudly() {
+    // I7: an unknown major is a typed finding (I3), which cn-api maps to a
+    // typed UnsupportedSchemaVersion error before any template is used.
+    let mut major_bumped: Value = serde_json::from_str(RESEARCH).expect("fixture json");
+    major_bumped["schema_version"] = json!("9.0.0");
+    assert_eq!(
+        report_codes(&parse_value(major_bumped)),
+        vec![FindingCode::UnsupportedSchemaVersion]
+    );
+
+    // While the major is 0, the minor is the compatibility line
+    // (cn_model::accepts_schema), so a bumped minor is rejected too.
+    let mut minor_bumped: Value = serde_json::from_str(RESEARCH).expect("fixture json");
+    minor_bumped["schema_version"] = json!("0.2.0");
+    assert_eq!(
+        report_codes(&parse_value(minor_bumped)),
+        vec![FindingCode::UnsupportedSchemaVersion]
+    );
+}
+
+#[test]
+fn template_reader_accepts_current_schema_version() {
+    let (template, report) = parse_template(RESEARCH).expect("fixture parses");
+    assert_eq!(template.schema_version, cn_model::model_schema_version());
+    assert!(
+        report
+            .errors
+            .iter()
+            .all(|finding| finding.code != FindingCode::UnsupportedSchemaVersion)
+    );
+}
+
+#[test]
 fn semantic_template_failures_are_reported() {
     let mut missing_enum_values: Value = serde_json::from_str(RESEARCH).expect("fixture json");
     missing_enum_values["kinds"][0]["attributes"][4]

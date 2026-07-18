@@ -599,6 +599,58 @@ fn op_log_rejects_unsupported_op_schema_major() {
 }
 
 #[test]
+fn op_log_accepts_current_schema_version_on_both_line_paths() {
+    // I7 acceptance side: current-major ops replay through both the
+    // newline-terminated path and the unterminated-final-line path.
+    let path = temp_path("current-schema");
+    let terminated = group_create(1);
+    let unterminated = op(2, OpKind::EntityCreate { entity: entity(1) });
+    assert_eq!(terminated.schema_version, cn_model::model_schema_version());
+    let mut bytes = serde_json::to_vec(&terminated).expect("serialize op");
+    bytes.extend_from_slice(b"\n");
+    bytes.extend_from_slice(&serde_json::to_vec(&unterminated).expect("serialize op"));
+    std::fs::write(&path, bytes).expect("write log");
+
+    let (_log, replayed, report) = OpLog::open(&path).expect("open");
+    assert_eq!(replayed, vec![terminated, unterminated]);
+    assert!(report.warnings.is_empty());
+}
+
+#[test]
+fn op_log_rejects_unsupported_schema_major_on_unterminated_final_line() {
+    // I7 rejection side for the torn-final-line recovery path: a parseable
+    // final line with a bumped major is a typed error, not a silent recovery.
+    let path = temp_path("unsupported-schema-final");
+    let mut bytes = serde_json::to_vec(&group_create(1)).expect("serialize op");
+    bytes.extend_from_slice(b"\n");
+    let mut unsupported = op(2, OpKind::EntityCreate { entity: entity(1) });
+    unsupported.schema_version = Version::new(9, 0, 0);
+    bytes.extend_from_slice(&serde_json::to_vec(&unsupported).expect("serialize op"));
+    std::fs::write(&path, bytes).expect("write log");
+
+    assert!(matches!(
+        OpLog::open(&path),
+        Err(StoreError::UnsupportedSchemaVersion)
+    ));
+}
+
+#[test]
+fn snapshot_rejects_unsupported_schema_major() {
+    // I7: an unknown snapshot envelope major is a typed error (I3), unlike
+    // corruption, which is a warning-reported discard.
+    let path = temp_path("snapshot-unsupported");
+    std::fs::write(&path, br#"{"schema_version":"9.0.0","crc32":0,"data":[]}"#)
+        .expect("write snapshot");
+
+    let mut report = StoreReport::default();
+    assert!(matches!(
+        Snapshot::load(&path, &mut report),
+        Err(StoreError::UnsupportedSchemaVersion)
+    ));
+    assert!(report.warnings.is_empty());
+}
+
+#[test]
 fn snapshot_round_trip_and_corruption_discard() {
     let path = temp_path("snapshot");
     let (state, _) = fold(vec![
