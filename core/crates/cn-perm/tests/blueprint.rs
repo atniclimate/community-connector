@@ -124,6 +124,40 @@ fn entity(n: u128, owner: Option<PersonId>, visibility: Circle, tier: Sensitivit
     entity
 }
 
+#[test]
+fn entity_detail_metadata_limits_custody_to_governance() {
+    let mut state = base_state();
+    member(&mut state, 1, GroupRole::Governance, Lifecycle::Active);
+    member(&mut state, 2, GroupRole::Member, Lifecycle::Active);
+    let mut record = entity(1, Some(person(2)), Circle::Public, SensitivityTier::T2);
+    record.provenance.append_custody(CustodyEvent {
+        id: id(900),
+        action: CustodyAction::Corrected,
+        at: ts(2),
+        actor: ActorRef::Human(person(1)),
+        note: Some("synthetic correction".to_string()),
+    });
+
+    let member_detail = entity_detail_metadata(
+        &state,
+        &ViewerContext::Person { person: person(2) },
+        &record,
+    );
+    assert_eq!(member_detail.tier, SensitivityTier::T2);
+    assert!(member_detail.provenance.line.contains("Added by person"));
+    assert_eq!(member_detail.provenance.custody, None);
+
+    let governance_detail = entity_detail_metadata(
+        &state,
+        &ViewerContext::Person { person: person(1) },
+        &record,
+    );
+    assert_eq!(
+        governance_detail.provenance.custody.as_deref(),
+        Some(record.provenance.custody()),
+    );
+}
+
 fn attr(value: &str, visibility: Circle) -> AttributeInstance {
     AttributeInstance::new(
         AttributeValue::Text(value.to_string()),

@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use cn_graph::PathConstraints;
 use cn_model::{AttrId, AttributeValue, Circle, EntityId, KindId, SensitivityTier};
-use cn_perm::Projection;
+use cn_perm::{DetailProvenance, Projection};
 use cn_store::{StoreReport, SubmitOutcome};
 use serde::{Deserialize, Serialize};
 
@@ -31,6 +31,8 @@ pub(crate) struct EntityDetail {
     pub(crate) id: EntityId,
     pub(crate) kind: KindId,
     pub(crate) owner_is_viewer: bool,
+    pub(crate) tier: SensitivityTier,
+    pub(crate) provenance: DetailProvenance,
     pub(crate) attributes: BTreeMap<AttrId, DetailValue>,
 }
 

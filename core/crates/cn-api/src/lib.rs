@@ -257,7 +257,7 @@ impl Api {
             .get_mut(&group_id)
             .ok_or_else(ApiError::not_found)?;
         let projected = projected_entity(session, &viewer, entity_id)?;
-        detail_from_projection(session, projected)
+        detail_from_projection(session, &viewer, projected)
     }
 
     fn query_paths_impl(
@@ -372,6 +372,7 @@ fn projected_entity(
 
 fn detail_from_projection(
     session: &GroupSession,
+    viewer: &ViewerContext,
     projected: ProjectedEntity,
 ) -> Result<EntityDetail, ApiError> {
     let mut attributes = BTreeMap::new();
@@ -380,6 +381,7 @@ fn detail_from_projection(
         .entities
         .get(&projected.id)
         .ok_or_else(|| ApiError::internal("projected entity missing from state"))?;
+    let metadata = cn_perm::entity_detail_metadata(&session.state, viewer, raw);
     for (attr, value) in projected.attributes {
         let settings = own_settings(projected.owner_is_viewer, raw, &attr)?;
         attributes.insert(
@@ -395,6 +397,8 @@ fn detail_from_projection(
         id: projected.id,
         kind: projected.kind,
         owner_is_viewer: projected.owner_is_viewer,
+        tier: metadata.tier,
+        provenance: metadata.provenance,
         attributes,
     })
 }

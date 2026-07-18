@@ -488,6 +488,9 @@ fn entity_detail_settings_only_for_owner_viewer() {
     ));
     assert!(own["attributes"]["display_name"]["visibility"].is_string());
     assert!(own["attributes"]["display_name"]["tier"].is_string());
+    assert_eq!(own["tier"], "T0");
+    assert!(own["provenance"]["line"].is_string());
+    assert!(own["provenance"].get("custody").is_none());
     let other = ok(&api.entity_detail(
         &group_id().to_string(),
         &viewer_person(2),

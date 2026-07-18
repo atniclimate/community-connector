@@ -2,8 +2,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::str::FromStr;
 
 use cn_model::{
-    AttrId, AttributeInstance, AttributeValue, Circle, Edge, EdgeId, Entity, EntityId, GroupId,
-    KindId, Lifecycle, SensitivityTier, Story, StoryId,
+    ActorRef, AttrId, AttributeInstance, AttributeValue, Circle, CustodyEvent, Edge, EdgeId,
+    Entity, EntityId, GroupId, KindId, Lifecycle, Origin, SensitivityTier, Story, StoryId,
 };
 use cn_store::GroupState;
 use serde::Serialize;
@@ -51,6 +51,65 @@ pub struct ProjectedStory {
 pub struct ProjectedStoryStep {
     pub entity: EntityId,
     pub narration: String,
+}
+
+/// Permission-shaped metadata for an entity detail response (D-032/D-033).
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct EntityDetailMetadata {
+    pub tier: SensitivityTier,
+    pub provenance: DetailProvenance,
+}
+
+/// The one-line provenance summary visible to every projected viewer, with
+/// the full custody chain present only for governance viewers.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct DetailProvenance {
+    pub line: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub custody: Option<Vec<CustodyEvent>>,
+}
+
+/// Supplies entity-detail tier and provenance at the permission boundary.
+pub fn entity_detail_metadata(
+    state: &GroupState,
+    viewer: &ViewerContext,
+    entity: &Entity,
+) -> EntityDetailMetadata {
+    let provenance = &entity.provenance;
+    let custody = match viewer {
+        ViewerContext::Person { person } if crate::viewer::is_governance(state, *person) => {
+            Some(provenance.custody().to_vec())
+        }
+        _ => None,
+    };
+    EntityDetailMetadata {
+        tier: entity.tier,
+        provenance: DetailProvenance {
+            line: format!(
+                "Added by {} from {} (timestamp {})",
+                actor_summary(provenance.recorded_by()),
+                origin_summary(provenance.origin()),
+                provenance.recorded_at().0,
+            ),
+            custody,
+        },
+    }
+}
+
+fn actor_summary(actor: &ActorRef) -> String {
+    match actor {
+        ActorRef::Human(person) => format!("person {person}"),
+        ActorRef::Agent { agent_id } => format!("agent {agent_id}"),
+    }
+}
+
+fn origin_summary(origin: &Origin) -> String {
+    match origin {
+        Origin::SelfReported => "self-reported".to_string(),
+        Origin::Ingested { source } => source.to_string(),
+        Origin::Derived { inputs } => format!("{} operation inputs", inputs.len()),
+        Origin::Authored => "authored input".to_string(),
+    }
 }
 
 /// Builds the viewer projection (spec sections 5 and 6; ADR-001 A-B1;
