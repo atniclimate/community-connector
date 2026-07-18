@@ -5,3 +5,6 @@ edition.workspace = true
 publish = false
 
 [dependencies]
+cn-api = { path = "../crates/cn-api" }
+cn-schema = { path = "../crates/cn-schema" }
+serde_json = "1"
