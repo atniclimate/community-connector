@@ -710,3 +710,49 @@ above-scope sentinel appears in the serialized HTML; then flip
 CN_EMBED_SNAPSHOT on by default. Everything else in Wave 2 (explore surface,
 detail provenance/tier core extension, CLI router) is complete and committed.
 This changes no accepted ADR and crosses no human gate.
+
+## D-049 (2026-07-18) - R2 adversarial round completed LATE with BLOCK; fixes queued
+
+Reconciliation during /trueup: the mandatory permission-adjacent adversarial
+round on the R2 EntityDetail change (D-044; committed 5e9c176 as
+[unreviewed-by-codex] because the round appeared to have exited early) actually
+COMPLETED and wrote its verdict late, at C:\dev\_reviews\community-connector\
+2026-07-18_r2-entitydetail-adversarial.md. Verdict: BLOCK. The record is
+corrected here: the round did run; the R2 commit stands but carries known,
+reviewer-confirmed defects to fix as the next session's first unit. The tree
+is green and safe to sit on (the defects are a display mislabel and a
+pre-existing boundary issue, not a data leak).
+
+Findings and disposition:
+- **CONFIRMED SAFE (custody gate).** The reviewer's own trace agrees: the only
+  constructor of full custody depth is the `is_governance` arm; anonymous,
+  member, facilitator-only, self, and trust-only viewers receive only the
+  one-line summary (D-033 holds). project() and the five-class no-leak property
+  are unchanged - no regression.
+- **BLOCK-1 (tier under-report, D-032 correctness).** `entity_detail_metadata`
+  returns raw `entity.tier`; a viewer's projected attributes can carry a higher
+  effective tier (fixture: T0 entity + T2 attribute override visible to a
+  member, cn-perm/tests/blueprint.rs:655-712), so the detail can show
+  "tier":"T0" beside viewer-visible T2 data. FIX (cn-perm, I2-clean): report the
+  effective tier as the max of entity.tier and the effective tier of exactly the
+  PROJECTED (viewer-visible) attribute set - never over raw attributes (which
+  would reveal hidden higher-tier attributes).
+- **BLOCK-2 (I2, pre-existing).** `own_settings` in cn-api/src/lib.rs:385-421
+  decides tier/visibility disclosure by owner_is_viewer and computes effective
+  tier in the API layer. It predates R2 but is on the detail path. FIX: relocate
+  the disclosure/effective-tier decision into cn-perm; cn-api carries decided
+  values only.
+- **HIGH-3 (test gap).** The custody/tier tests cover only member+governance.
+  FIX: extend to anonymous, facilitator-only, self, trusted/non-member,
+  inactive-governance, and dual-role, plus an end-to-end cn-api entity_detail
+  test with a non-empty custody chain (governance sees the exact chain; every
+  non-governance class omits it).
+- **LOW-4 (one-line shape).** actor_summary/origin_summary
+  (cn-perm/src/projection.rs:99-112) do not normalize control whitespace, so a
+  newline in an agent id or ingested source breaks the D-033 one-line shape. FIX:
+  normalize whitespace in the summary.
+
+These are gate-blind (pure cn-perm/cn-api). They are the next session's first
+unit and must get a fresh adversarial round after the fix. Operational note:
+Codex `exec` output files can land LATE (after the process appears done) - verify
+by re-checking the output path before concluding a round failed ([[codex-exec-early-exit]]).
