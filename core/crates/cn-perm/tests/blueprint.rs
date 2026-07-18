@@ -324,8 +324,16 @@ fn lifecycle_strategy() -> impl Strategy<Value = Lifecycle> {
     prop_oneof![Just(Lifecycle::Active), Just(Lifecycle::Archived)]
 }
 
+/// Five viewer classes reachable by the no-leak property (P3.4): anonymous
+/// (no viewer), member, facilitator, self (viewer owns generated entities),
+/// and governance. Dual-role holders arise because the membership vector can
+/// assign several roles to one person.
 fn role_strategy() -> impl Strategy<Value = GroupRole> {
-    prop_oneof![Just(GroupRole::Member), Just(GroupRole::Governance)]
+    prop_oneof![
+        Just(GroupRole::Member),
+        Just(GroupRole::Governance),
+        Just(GroupRole::Facilitator),
+    ]
 }
 
 fn scenario_strategy() -> impl Strategy<Value = Scenario> {
@@ -554,6 +562,50 @@ proptest! {
         for story in &projection.stories {
             for step in &story.steps {
                 prop_assert!(projected_entities.contains(&step.entity));
+            }
+        }
+
+        // Read property extension (P3.4 + 2026-07-17 adversarial round):
+        // governance-only report depth never appears for any non-governance
+        // viewer class (anonymous, member, facilitator, self, dual-role).
+        // A non-governance viewer gets zeroed counts, no invisible-subject
+        // warnings, and at most their own finding-stripped quarantine stubs.
+        let sample_report = StoreReport {
+            quarantined: vec![QuarantineEntry {
+                op_id: op_id(999),
+                responsible_human: person(1),
+                subject: None,
+                reason: QuarantineReason::MissingTarget,
+                findings: vec![cn_schema::Finding {
+                    code: cn_schema::FindingCode::UnsupportedSchemaVersion,
+                    message: "synthetic governance-only depth".to_string(),
+                    path: "/synthetic".to_string(),
+                }],
+            }],
+            warnings: vec![StoreFinding {
+                code: "Synthetic".to_string(),
+                message: "synthetic invisible-subject warning".to_string(),
+                subject: None,
+            }],
+            applied: 3,
+            deduped: 2,
+        };
+        let redacted = redact_report(&state, &viewer, &sample_report);
+        let viewer_person = match &viewer {
+            ViewerContext::Person { person } => Some(*person),
+            ViewerContext::Anonymous => None,
+        };
+        let viewer_is_governance =
+            viewer_person.is_some_and(|person| cn_perm::viewer::is_governance(&state, person));
+        if viewer_is_governance {
+            prop_assert_eq!(&redacted, &sample_report);
+        } else {
+            prop_assert_eq!(redacted.applied, 0);
+            prop_assert_eq!(redacted.deduped, 0);
+            prop_assert!(redacted.warnings.is_empty());
+            for entry in &redacted.quarantined {
+                prop_assert!(entry.findings.is_empty());
+                prop_assert_eq!(Some(entry.responsible_human), viewer_person);
             }
         }
     }
@@ -1388,6 +1440,152 @@ fn custody(who: PersonId) -> CustodyEvent {
 fn assert_code(result: Result<(), AuthzDenial>, code: &str) {
     let denial = result.expect_err("operation denied");
     assert_eq!(denial.code, code);
+}
+
+#[test]
+fn fingerprint_distinguishes_member_facilitator_and_dual_role() {
+    let viewer = ViewerContext::Person { person: person(2) };
+
+    let mut as_member = base_state();
+    member(&mut as_member, 2, GroupRole::Member, Lifecycle::Active);
+    let member_fp = viewer_fingerprint(&as_member, &viewer);
+
+    let mut as_facilitator = base_state();
+    member(
+        &mut as_facilitator,
+        2,
+        GroupRole::Facilitator,
+        Lifecycle::Active,
+    );
+    let facilitator_fp = viewer_fingerprint(&as_facilitator, &viewer);
+
+    let mut as_dual = base_state();
+    member(&mut as_dual, 2, GroupRole::Facilitator, Lifecycle::Active);
+    let mut second = Membership::new(
+        membership_id(90),
+        group_id(),
+        person(2),
+        GroupRole::Member,
+        envelope_for(person(2)),
+    );
+    second.lifecycle = Lifecycle::Active;
+    as_dual.memberships.insert(second.id, second);
+    let dual_fp = viewer_fingerprint(&as_dual, &viewer);
+
+    assert_ne!(member_fp, facilitator_fp);
+    assert_ne!(member_fp, dual_fp);
+    assert_ne!(facilitator_fp, dual_fp);
+}
+
+#[test]
+fn cache_key_survives_fingerprint_collision() {
+    // CRC32 cross-role collision pair engineered by the 2026-07-17
+    // adversarial round (Codex session 019f7389-9e32-78a2-94ee-7a1b2827f3d3):
+    // in one group state, this member and this facilitator collide at the
+    // hashed 32-bit viewer_fingerprint for ANY shared template-version
+    // suffix. Caches must therefore key on viewer_cache_key (the canonical
+    // context), which is collision-free by construction.
+    let member_person: PersonId =
+        PersonId::from_str("8a6a5a71-4e38-f6e4-e021-29edf7ed1c20").expect("person id");
+    let facilitator_person: PersonId =
+        PersonId::from_str("56db767d-724e-8fb1-923c-a06813fa87d8").expect("person id");
+    let mut state = base_state();
+    let member_membership = Membership::new(
+        membership_id(91),
+        group_id(),
+        member_person,
+        GroupRole::Member,
+        envelope_for(member_person),
+    );
+    state
+        .memberships
+        .insert(member_membership.id, member_membership);
+    let facilitator_membership = Membership::new(
+        membership_id(92),
+        group_id(),
+        facilitator_person,
+        GroupRole::Facilitator,
+        envelope_for(facilitator_person),
+    );
+    state
+        .memberships
+        .insert(facilitator_membership.id, facilitator_membership);
+
+    let member_viewer = ViewerContext::Person {
+        person: member_person,
+    };
+    let facilitator_viewer = ViewerContext::Person {
+        person: facilitator_person,
+    };
+    assert_eq!(
+        viewer_fingerprint(&state, &member_viewer),
+        viewer_fingerprint(&state, &facilitator_viewer),
+        "collision pair no longer collides - the fingerprint input format \
+         moved; engineer a new pair before trusting this test"
+    );
+    assert_ne!(
+        viewer_cache_key(&state, &member_viewer),
+        viewer_cache_key(&state, &facilitator_viewer),
+        "cache keys must never collide across distinct authorization contexts"
+    );
+}
+
+#[test]
+fn facilitator_reads_at_member_level_and_report_is_not_governance() {
+    let mut state = base_state();
+    member(&mut state, 2, GroupRole::Member, Lifecycle::Active);
+    member(&mut state, 5, GroupRole::Facilitator, Lifecycle::Active);
+    state.entities.insert(
+        entity_id(1),
+        entity(1, None, Circle::Group, SensitivityTier::T1),
+    );
+    state.entities.insert(
+        entity_id(2),
+        entity(2, Some(person(1)), Circle::Private, SensitivityTier::T1),
+    );
+
+    let member_projection = project(&state, &ViewerContext::Person { person: person(2) }, 1);
+    let facilitator_projection = project(&state, &ViewerContext::Person { person: person(5) }, 1);
+    assert_eq!(
+        member_projection
+            .entities
+            .iter()
+            .map(|entity| entity.id)
+            .collect::<Vec<_>>(),
+        facilitator_projection
+            .entities
+            .iter()
+            .map(|entity| entity.id)
+            .collect::<Vec<_>>(),
+    );
+    assert_eq!(facilitator_projection.entities.len(), 1);
+
+    let report = StoreReport {
+        quarantined: vec![QuarantineEntry {
+            op_id: op_id(1),
+            responsible_human: person(4),
+            subject: Some(SubjectRef::Entity(entity_id(2))),
+            reason: QuarantineReason::MissingTarget,
+            findings: Vec::new(),
+        }],
+        warnings: vec![StoreFinding {
+            code: "Hidden".to_string(),
+            message: format!("finding for {}", entity_id(2)),
+            subject: Some(SubjectRef::Entity(entity_id(2))),
+        }],
+        applied: 7,
+        deduped: 3,
+    };
+    let facilitator_view = redact_report(
+        &state,
+        &ViewerContext::Person { person: person(5) },
+        &report,
+    );
+    assert_ne!(facilitator_view, report);
+    assert!(facilitator_view.quarantined.is_empty());
+    assert!(facilitator_view.warnings.is_empty());
+    assert_eq!(facilitator_view.applied, 0);
+    assert_eq!(facilitator_view.deduped, 0);
 }
 
 #[test]

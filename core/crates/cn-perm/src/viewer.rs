@@ -40,10 +40,25 @@ pub fn is_governance(state: &GroupState, person: PersonId) -> bool {
     active_roles_for(state, &person).any(|role| role == GroupRole::Governance)
 }
 
+/// Returns true when the viewer has an active facilitator or governance
+/// membership in the group (facilitator blueprint section 2; D-028). Grants
+/// write authority only; it is never consulted on a read path.
+pub fn is_facilitator_or_governance(state: &GroupState, person: PersonId) -> bool {
+    active_roles_for(state, &person)
+        .any(|role| matches!(role, GroupRole::Facilitator | GroupRole::Governance))
+}
+
 /// Returns true when the viewer has any active membership in the group
 /// (spec section 2; ADR-001 D5).
 pub fn is_active_member(state: &GroupState, person: PersonId) -> bool {
     active_roles_for(state, &person).next().is_some()
+}
+
+/// Returns true when the viewer's active roles include the Member role
+/// specifically (facilitator blueprint section 4: the member custody rule
+/// dominates for dual-role holders).
+pub(crate) fn has_member_role(state: &GroupState, person: PersonId) -> bool {
+    active_roles_for(state, &person).any(|role| role == GroupRole::Member)
 }
 
 /// Returns the projection cache fingerprint (ADR-003 D3 and round-1
@@ -53,6 +68,18 @@ pub fn viewer_fingerprint(state: &GroupState, viewer: &ViewerContext) -> String 
     let mut hasher = Hasher::new();
     hasher.update(canonical.as_bytes());
     format!("{:08x}", hasher.finalize())
+}
+
+/// Returns the collision-free in-memory cache key: the canonical fingerprint
+/// input itself rather than its 32-bit hash. Distinct viewer authorization
+/// contexts can collide at the hashed `viewer_fingerprint` (it is a CRC32;
+/// the 2026-07-17 adversarial round produced a concrete member/facilitator
+/// collision pair), so per-viewer caches must never key on the hash alone.
+/// This string contains person and grant ids: it is for in-memory keying
+/// only and must never be serialized or exported. Exports keep carrying the
+/// hashed `viewer_fingerprint`.
+pub fn viewer_cache_key(state: &GroupState, viewer: &ViewerContext) -> String {
+    fingerprint_input(state, viewer)
 }
 
 fn fingerprint_input(state: &GroupState, viewer: &ViewerContext) -> String {
@@ -90,6 +117,7 @@ fn active_role_names(state: &GroupState, person: &PersonId) -> Vec<String> {
         .map(|role| match role {
             GroupRole::Member => "member".to_string(),
             GroupRole::Governance => "governance".to_string(),
+            GroupRole::Facilitator => "facilitator".to_string(),
         })
         .collect();
     roles.sort();

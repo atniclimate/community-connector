@@ -5,7 +5,7 @@ use cn_model::{
     ActorRef, Group, GroupId, OpId, Origin, PersonId, ProvenanceEnvelope, SensitivityTier,
     TemplateId, Timestamp,
 };
-use cn_perm::{Projection, ViewerContext, project, viewer_fingerprint};
+use cn_perm::{Projection, ViewerContext, project, viewer_cache_key};
 use cn_schema::GroupTemplate;
 use cn_store::{GroupState, Hlc, Operation, SortKey, StoreReport};
 
@@ -90,20 +90,25 @@ impl GroupSession {
         })
     }
 
+    // Both caches key on `viewer_cache_key` (the canonical authorization
+    // context), NOT the hashed `viewer_fingerprint`: the 32-bit fingerprint
+    // admits collisions across viewers, and a collision here would serve one
+    // viewer another viewer's projection (2026-07-17 adversarial round,
+    // Codex session 019f7389-9e32-78a2-94ee-7a1b2827f3d3). The cache key is
+    // in-memory only and never serialized.
     pub(crate) fn projection_for(&mut self, viewer: &ViewerContext) -> Projection {
-        let fingerprint = viewer_fingerprint(&self.state, viewer);
-        if let Some(projection) = self.projection_cache.get(&fingerprint) {
+        let key = viewer_cache_key(&self.state, viewer);
+        if let Some(projection) = self.projection_cache.get(&key) {
             return projection.clone();
         }
         let projection = project(&self.state, viewer, self.revision);
-        self.projection_cache
-            .insert(fingerprint, projection.clone());
+        self.projection_cache.insert(key, projection.clone());
         projection
     }
 
     pub(crate) fn index_for(&mut self, viewer: &ViewerContext) -> (Projection, GraphIndex) {
+        let key = viewer_cache_key(&self.state, viewer);
         let projection = self.projection_for(viewer);
-        let key = projection.viewer_fingerprint.clone();
         if let Some(index) = self.index_cache.get(&key) {
             return (projection, index.clone());
         }

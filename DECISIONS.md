@@ -532,3 +532,47 @@ verdict CONDITIONAL NO-GO). Director accepted the findings; the rulings:
    and human visual acceptance; it never gates check-all.
 7. **Serialization compat.** GroupRole::Facilitator ships with membership
    round-trip and unknown-role loud-rejection tests (I7-adjacent).
+
+## D-045 (2026-07-17) - Facilitator adversarial round: findings, fixes, rulings
+
+The mandatory adversarial Codex round on the Lane C permission diff (D-028;
+gpt-5.6-sol review profile, session 019f7389-9e32-78a2-94ee-7a1b2827f3d3;
+verdict BLOCKING FINDINGS: yes) returned three blockers and one advisory.
+Integrator rulings at Barrier 1:
+
+1. **StoryUpdate blind overwrite (blocker - FIXED).** The loosened rule
+   checked only the submitter role, so a facilitator could overwrite a
+   hidden story by guessing its id. Fixed target-aware in
+   cn-perm/src/authz.rs (authorize_story_update): governance unrestricted;
+   facilitators require an existing, visible target (target_missing /
+   target_hidden); role is checked before the target so non-facilitators
+   learn nothing. Cells added to authority_matrix.rs; doc updated.
+2. **"facilitator" enum value under the 0.1.0 line (blocker - RULED, no
+   code change).** Widening the persisted role value set without a minor
+   bump would strand same-line readers. Ruling: the 0.1 line is unreleased
+   with zero external readers (no remotes, D-026; schemas authored this
+   wave document the tree as-is, facilitator included), and the ratified
+   blueprint pinned "op-log major stays". The widening is absorbed into
+   the unreleased 0.1.0 definition. Standing rule going forward: once any
+   persisted format has left this machine, enum value-set widenings bump
+   the compatibility line (minor while major is 0) with reader tests.
+3. **Five-class no-leak property scope (blocker - PARTIALLY ACCEPTED,
+   hardened).** Search/path/export all consume the Projection
+   (GraphIndex::build(&Projection); exports serialize it), so the
+   project() property covers the sole read root; surface-specific leak
+   paths do not exist by construction. Accepted hardening: the property
+   now also asserts report redaction per generated viewer class
+   (governance exact; everyone else zeroed counts, no invisible-subject
+   warnings, only own finding-stripped quarantine stubs).
+4. **CRC32 fingerprint cache collision (advisory - FIXED).** Codex
+   produced a concrete member/facilitator canonical-input pair colliding
+   at the 32-bit viewer_fingerprint for any shared template suffix
+   (verified independently), voiding P3.3's "never cross-serve" claim.
+   Fix: cn-api GroupSession caches now key on new
+   cn_perm::viewer_cache_key (the canonical authorization context,
+   collision-free, in-memory only, never serialized); the exported
+   Projection.viewer_fingerprint field and its 8-hex schema pattern are
+   unchanged (ADR-003 untouched). Regression test pins the collision pair
+   (cache_key_survives_fingerprint_collision). Rejected: raw-context
+   cache keys in exports (leaks grant ids); new crypto-hash dependency
+   (heavier than needed for an in-memory key).

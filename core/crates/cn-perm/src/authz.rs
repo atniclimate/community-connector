@@ -1,5 +1,5 @@
 use cn_model::{
-    CustodyEvent, Entity, Membership, MembershipId, PersonId, SensitivityTier, TrustGrant,
+    CustodyEvent, Entity, Membership, MembershipId, PersonId, SensitivityTier, StoryId, TrustGrant,
     TrustGrantId,
 };
 use cn_store::{
@@ -8,7 +8,9 @@ use cn_store::{
 };
 
 use crate::projection::{edge_visible, entity_visible, story_visible, visible_entity_attributes};
-use crate::viewer::{ViewerContext, is_active_member, is_governance};
+use crate::viewer::{
+    ViewerContext, has_member_role, is_active_member, is_facilitator_or_governance, is_governance,
+};
 
 /// cn-store authorizer implementing ADR-002 A-B6.
 pub struct PermAuthorizer;
@@ -21,8 +23,9 @@ impl Authorizer for PermAuthorizer {
 
 /// Stable denial codes returned by `PermAuthorizer`:
 /// `group_exists`, `group_missing`, `not_member`, `not_owner_or_governance`,
-/// `not_governance`, `not_owner`, `tier_not_tightened`, `bootstrap_denied`,
-/// `grantor_mismatch`, `target_missing`, and `target_hidden`.
+/// `not_governance`, `not_facilitator_or_governance`, `not_owner`,
+/// `tier_not_tightened`, `bootstrap_denied`, `grantor_mismatch`,
+/// `target_missing`, `target_hidden`, and `custody_not_own_record`.
 pub fn authorize_op(state: &GroupState, op: &Operation) -> Result<(), AuthzDenial> {
     let submitter = op.responsible_human;
     match &op.kind {
@@ -51,7 +54,7 @@ pub fn authorize_op(state: &GroupState, op: &Operation) -> Result<(), AuthzDenia
         OpKind::CustodyAppend { target, event } => {
             authorize_custody(state, submitter, target, event)
         }
-        OpKind::StoryUpdate { .. } => require_governance(state, submitter),
+        OpKind::StoryUpdate { story, .. } => authorize_story_update(state, submitter, story),
     }
 }
 
@@ -305,6 +308,11 @@ fn authorize_grant_revoke(
     }
 }
 
+/// Custody rule (facilitator blueprint section 4): governance reaches any
+/// target; a viewer with the Member role reaches any visible target (the
+/// member rule dominates for dual-role holders); a facilitator-only viewer
+/// reaches only visible targets whose provenance `responsible_human` is the
+/// submitter - their own created/imported records.
 fn authorize_custody(
     state: &GroupState,
     submitter: PersonId,
@@ -315,10 +323,58 @@ fn authorize_custody(
         return Ok(());
     }
     require_member(state, submitter)?;
-    if custody_target_visible(state, submitter, target)? {
+    if !custody_target_visible(state, submitter, target)? {
+        return Err(denial("target_hidden", "custody target is not visible"));
+    }
+    if has_member_role(state, submitter) {
+        return Ok(());
+    }
+    if custody_target_responsible_human(state, target)? == submitter {
         Ok(())
     } else {
-        Err(denial("target_hidden", "custody target is not visible"))
+        Err(denial(
+            "custody_not_own_record",
+            "facilitator custody append is limited to own created records",
+        ))
+    }
+}
+
+/// Returns the accountable human of the targeted record's own provenance
+/// envelope. Attribute targets use the attribute instance's envelope, not the
+/// containing entity's - a facilitator's custody authority follows the entry
+/// work itself (facilitator blueprint section 4 least-new-privilege rule).
+fn custody_target_responsible_human(
+    state: &GroupState,
+    target: &CustodyTarget,
+) -> Result<PersonId, AuthzDenial> {
+    let missing = || denial("target_missing", "custody target missing");
+    match target {
+        CustodyTarget::Entity(id) => state
+            .entities
+            .get(id)
+            .map(|entity| entity.provenance.responsible_human())
+            .ok_or_else(missing),
+        CustodyTarget::Attribute(id, attr) => state
+            .entities
+            .get(id)
+            .and_then(|entity| entity.attributes.get(attr))
+            .map(|instance| instance.provenance.responsible_human())
+            .ok_or_else(missing),
+        CustodyTarget::Edge(id) => state
+            .edges
+            .get(id)
+            .map(|edge| edge.provenance.responsible_human())
+            .ok_or_else(missing),
+        CustodyTarget::Story(id) => state
+            .stories
+            .get(id)
+            .map(|story| story.provenance.responsible_human())
+            .ok_or_else(missing),
+        CustodyTarget::Group => state
+            .group
+            .as_ref()
+            .map(|group| group.provenance.responsible_human())
+            .ok_or_else(missing),
     }
 }
 
@@ -377,6 +433,49 @@ fn require_governance(state: &GroupState, submitter: PersonId) -> Result<(), Aut
         Err(denial(
             "not_governance",
             "operation requires governance role",
+        ))
+    }
+}
+
+/// StoryUpdate authorization (facilitator blueprint loosening, made
+/// target-aware by the 2026-07-17 adversarial round): governance updates any
+/// story; a facilitator updates only stories that exist and are visible to
+/// them, so facilitator write reach never exceeds facilitator read reach (no
+/// blind overwrite of hidden stories). The role is checked before the target
+/// so non-facilitators learn nothing about a story's existence.
+fn authorize_story_update(
+    state: &GroupState,
+    submitter: PersonId,
+    story: &StoryId,
+) -> Result<(), AuthzDenial> {
+    if is_governance(state, submitter) {
+        return Ok(());
+    }
+    require_facilitator_or_governance(state, submitter)?;
+    let viewer = ViewerContext::Person { person: submitter };
+    let Some(record) = state.stories.get(story) else {
+        return Err(denial("target_missing", "story update target missing"));
+    };
+    if story_visible(state, &viewer, record) {
+        Ok(())
+    } else {
+        Err(denial(
+            "target_hidden",
+            "story update target is not visible",
+        ))
+    }
+}
+
+fn require_facilitator_or_governance(
+    state: &GroupState,
+    submitter: PersonId,
+) -> Result<(), AuthzDenial> {
+    if is_facilitator_or_governance(state, submitter) {
+        Ok(())
+    } else {
+        Err(denial(
+            "not_facilitator_or_governance",
+            "operation requires facilitator or governance role",
         ))
     }
 }

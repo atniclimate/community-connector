@@ -57,4 +57,60 @@ pub enum GroupRole {
     Member,
     /// Governance role.
     Governance,
+    /// Pilot facilitator: entry/import and story authoring authority
+    /// without governance powers (D-028, integration plan 6.3).
+    Facilitator,
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        ActorRef, Membership, MembershipId, Origin, PersonId, ProvenanceEnvelope, Timestamp,
+    };
+    use std::str::FromStr;
+
+    use super::GroupRole;
+
+    fn person() -> PersonId {
+        PersonId::from_str("00000000-0000-0000-0000-000000000001").expect("person id")
+    }
+
+    fn membership(role: GroupRole) -> Membership {
+        let who = person();
+        let provenance =
+            ProvenanceEnvelope::new(Origin::Authored, ActorRef::Human(who), who, Timestamp(1))
+                .expect("valid provenance");
+        Membership::new(
+            MembershipId::from_str("00000000-0000-0000-0000-000000000002").expect("membership id"),
+            crate::GroupId::from_str("00000000-0000-0000-0000-000000000003").expect("group id"),
+            who,
+            role,
+            provenance,
+        )
+    }
+
+    #[test]
+    fn facilitator_membership_round_trips_as_snake_case() {
+        let original = membership(GroupRole::Facilitator);
+        let json = serde_json::to_string(&original).expect("serialize membership");
+        assert!(
+            json.contains("\"role\":\"facilitator\""),
+            "facilitator must be snake_case on the wire: {json}"
+        );
+        let decoded: Membership = serde_json::from_str(&json).expect("deserialize membership");
+        assert_eq!(decoded, original);
+    }
+
+    #[test]
+    fn unknown_future_role_is_rejected_loudly() {
+        let json = serde_json::to_string(&membership(GroupRole::Facilitator))
+            .expect("serialize membership")
+            .replace("\"role\":\"facilitator\"", "\"role\":\"coordinator\"");
+        let err = serde_json::from_str::<Membership>(&json)
+            .expect_err("unknown role must not deserialize");
+        assert!(
+            err.to_string().contains("coordinator"),
+            "rejection must name the unknown role: {err}"
+        );
+    }
 }
