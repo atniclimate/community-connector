@@ -2,8 +2,15 @@ import { createInitialState } from "./state/state";
 import { createStore } from "./state/store";
 import { selectProjectedEntityCount } from "./state/selectors";
 import { loadGroup } from "./state/effects";
+import { bootSnapshot, readSnapshotEnvelope, snapshotError } from "./state/snapshot";
 import { WasmClient } from "./wasm/client";
 import { mountViz } from "./viz";
+import { mountLegend } from "./viz/legend";
+import { mountSearch } from "./ui/search";
+import { mountDetailPanel } from "./ui/detail";
+import { mountFlatProjection } from "./ui/flat";
+
+declare const __CN_SNAPSHOT_MODE__: boolean;
 
 const app = document.querySelector<HTMLElement>("#app");
 if (app === null) {
@@ -11,10 +18,32 @@ if (app === null) {
 }
 const appElement = app;
 const statusElement = document.createElement("div");
+const searchElement = document.createElement("div");
 const vizElement = document.createElement("div");
+const detailElement = document.createElement("div");
+const flatElement = document.createElement("div");
 statusElement.className = "cn-status";
+statusElement.setAttribute("role", "status");
+statusElement.setAttribute("aria-live", "polite");
+searchElement.className = "cn-search-region";
+searchElement.setAttribute("role", "search");
+searchElement.setAttribute("aria-label", "Search the current network");
 vizElement.className = "cn-viz";
-appElement.replaceChildren(statusElement, vizElement);
+vizElement.setAttribute("role", "region");
+vizElement.setAttribute("aria-label", "Network graph and legend");
+detailElement.className = "cn-detail-region";
+detailElement.setAttribute("role", "complementary");
+detailElement.setAttribute("aria-label", "Selected entity details");
+flatElement.className = "cn-flat-region";
+flatElement.setAttribute("role", "region");
+flatElement.setAttribute("aria-label", "Flat network view");
+appElement.replaceChildren(
+  statusElement,
+  searchElement,
+  vizElement,
+  detailElement,
+  flatElement,
+);
 
 const reducedMotionMedia = matchMedia("(prefers-reduced-motion: reduce)");
 const store = createStore(createInitialState());
@@ -30,7 +59,8 @@ function render(): void {
     `load: ${state.session.loadState}`,
     `quality: ${state.ui.qualityTier}`,
     `entities: ${selectProjectedEntityCount(state)}`,
-  ].join(" | ");
+    state.session.lastError === null ? "" : `error: ${state.session.lastError.message}`,
+  ].filter((part) => part !== "").join(" | ");
 }
 
 async function loadDevDemo(): Promise<void> {
@@ -51,13 +81,20 @@ async function loadDevDemo(): Promise<void> {
   );
 }
 
-reducedMotionMedia.addEventListener("change", (event) => {
+const onReducedMotion = (event: MediaQueryListEvent): void => {
   store.dispatch({ kind: "reducedMotionChanged", reducedMotion: event.matches });
-});
+};
+reducedMotionMedia.addEventListener("change", onReducedMotion);
 
 store.dispatch({ kind: "reducedMotionChanged", reducedMotion: reducedMotionMedia.matches });
-store.subscribe(render);
-mountViz(vizElement, store);
+const unmounts = [
+  store.subscribe(render),
+  mountSearch(searchElement, { store, client }),
+  mountViz(vizElement, store),
+  mountLegend(vizElement, store),
+  mountDetailPanel(detailElement, { store, client }),
+  mountFlatProjection(flatElement, { store }),
+];
 render();
 
 if (import.meta.env.DEV) {
@@ -73,6 +110,26 @@ if (import.meta.env.DEV) {
       error: client.toErrorEnvelope(error),
     });
   });
+} else if (__CN_SNAPSHOT_MODE__) {
+  try {
+    bootSnapshot(store, readSnapshotEnvelope(document));
+  } catch (error) {
+    store.dispatch({ kind: "errorSurfaced", error: snapshotError(error) });
+  }
 }
 
-void client;
+let tornDown = false;
+function teardown(): void {
+  if (tornDown) {
+    return;
+  }
+  tornDown = true;
+  reducedMotionMedia.removeEventListener("change", onReducedMotion);
+  for (const unmount of unmounts.reverse()) {
+    unmount();
+  }
+  client.dispose();
+  worker.terminate();
+}
+
+window.addEventListener("beforeunload", teardown, { once: true });

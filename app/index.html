@@ -14,11 +14,16 @@
       #app {
         min-height: 100vh;
         display: grid;
-        grid-template-rows: 48px minmax(320px, 1fr);
+        grid-template-columns: minmax(0, 1fr) minmax(260px, 22rem);
+        grid-template-rows: auto auto minmax(320px, 1fr) auto;
+        gap: 8px;
+        padding: 8px;
+        box-sizing: border-box;
         color: #e6edf7;
         font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
       }
       .cn-status {
+        grid-column: 1 / -1;
         box-sizing: border-box;
         display: flex;
         align-items: center;
@@ -29,9 +34,20 @@
         line-height: 1.4;
       }
       .cn-viz {
+        grid-column: 1;
+        grid-row: 2 / span 2;
         min-width: 0;
         min-height: 320px;
         clip-path: inset(0);
+      }
+      .cn-search-region,
+      .cn-detail-region {
+        grid-column: 2;
+        min-width: 0;
+      }
+      .cn-flat-region {
+        grid-column: 1 / -1;
+        min-width: 0;
       }
       .cn-viz canvas {
         display: block;
@@ -48,7 +64,18 @@
       }
       @media (max-width: 375px) {
         #app {
-          grid-template-rows: 48px minmax(320px, 1fr);
+          grid-template-columns: minmax(0, 1fr);
+          grid-template-rows: auto auto minmax(320px, 55vh) auto auto;
+          padding: 4px;
+          gap: 4px;
+        }
+        .cn-status,
+        .cn-search-region,
+        .cn-viz,
+        .cn-detail-region,
+        .cn-flat-region {
+          grid-column: 1;
+          grid-row: auto;
         }
         .cn-status {
           padding: 0 10px;
