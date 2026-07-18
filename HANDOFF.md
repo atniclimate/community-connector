@@ -1,163 +1,136 @@
 # HANDOFF.md - Live State
 
 > This file outranks session memory. Reading order for a new session: CLAUDE.md,
-> then this file, then current-phase ADRs.
+> then this file, then PLAN_1.0.md "Current Position" + "Decision Gates", then
+> current-phase ADRs. DECISIONS.md is the durable judgment record (through D-048).
 
-Last updated: 2026-07-06 afternoon, session 2 (the DECISION SESSION:
-SESSION_2_LAUNCH interview Parts 1-5 answered, D-019..D-040 recorded,
-Execution Plan v2 adopted, graph-networks deep research commissioned).
+Last updated: 2026-07-18, one-shot build session (started as Fable 5; switched to
+Opus 4.8 after an Anthropic monthly spend limit interrupted the build workflow).
 
-## Phase status
+## Phase status (acceptance-unit inventory, not a fraction - PLAN_1.0.md Current Position)
 
-**Phase 0 - Bootstrap: COMPLETE.**
-**Phase 1 - Domain model and ADRs: COMPLETE** (ADR-001..003 accepted).
-**Phase 2 - Rust core: CLOSED** (six crates behind cn-api; permission
-property test green; measurement gates recorded; closing review D-016).
-**Phase 3 - Frontend: see the acceptance-unit inventory.** The completion
-truth is PLAN_1.0.md "Current Position" (acceptance-unit inventory, verified
-against the tree 2026-07-11; the file itself stays untracked pending the
-parked P0.6 decision) - not a fraction. Done per that inventory: ADR-004
-instanced renderer landed + visual fixes DIRECTOR-ACCEPTED
-(docs/design/screenshots/viz-fixes-2026-07-06.png), I4 state machine + wasm
-worker, theming pipeline. Absent: all app/src/ui/ surfaces, snapshot data
-payload, facilitator role, ingest/CLI, persisted-format schemas.
+- **Phase 0 - Workflow/congruence/ratification foundation: COMPLETE.**
+  `scripts/check-all.ps1` single orchestrator (11 members) + scoped `-Staged`
+  pre-commit enforcement (D-043); AGENTS.md automated/human-only gate split;
+  G-RAT/G-DATE/G-BACKUP recorded below. P0.1 (convention date) and P0.6
+  (tracked-status of MANIFEST.md/PLAN_1.0.md/DEPENDENCIES.md) remain human-owned.
+- **Phase 1 - Constellation legible + explore: COMPLETE except P1.3.**
+  Committed and green: P1.1 troika SDF labels (offline-proven bundled OFL font);
+  P1.2 focus/motion with reduced-motion variants; P1.6 legend; P1.4 search;
+  P1.5 detail panel (tier code primary D-032 + governance-gated provenance
+  one-liner D-033, via a cn-perm/cn-api EntityDetail extension); P1.7 flat
+  reading projection (D-035 down-payment). **P1.3 benchmark re-run vs the 50ms
+  p95 goal is NOT done** - park; needs the app/spike harness run + ADR-004 update.
+- **Phase 2 - Persisted schemas + snapshot envelope: schemas COMPLETE; snapshot
+  pipeline SCAFFOLDED + GATED + PARKED (D-048).** P2.1 op-log/export + story-path
+  + snapshot-envelope schemas; P2.2 unknown-major loud rejection in readers. The
+  P2.3 snapshot data-embed plugin, `--public-layer` generator, and boot reader
+  (`app/src/state/snapshot.ts`, I7 unknown-major rejection) are committed but the
+  embed is gated behind `CN_EMBED_SNAPSHOT=1`; default snapshot builds a valid
+  single-file shell. **PARKED completion (D-048), = P2.4/P2.5:** offline
+  main-thread wasm transport so the artifact carries no external worker (D-046 -
+  the snapshot is NOT yet self-contained: it still emits a ~1.57MB external
+  worker chunk); wire `--public-layer` into `build:snapshot`; per-artifact size
+  gate; the no-leak acceptance test (D-047.4). Then flip the gate on.
+- **Phase 3 - Facilitator role: role COMPLETE; wizard/forms NOT done.** P3.1-P3.4
+  `GroupRole::Facilitator` with the authority matrix, fingerprint distinctness,
+  and five-class no-leak property landed in Wave 1 with the mandatory adversarial
+  round (D-045). **P3.5 facilitator wizard and P3.6 template-driven entry forms
+  are NOT done** - park (facilitator authority already exists in cn-perm; these
+  are UI-only, I2/I4 discipline).
+- **Phase 4 - Stories, comprehension, snapshot acceptance: NOT STARTED.** P4.1-P4.4.
+- **Phase 5 (non-gated slice):** P5.10 evidence template COMPLETE; the
+  semantics-free `cn` CLI router + validate/export adapters (P5.4-partial, D-044.2)
+  COMPLETE; P5.7 CPF-RCN migration recipe (docs-only) COMPLETE this session.
+  P5.1-P5.3/P5.5/P5.6/P5.8/P5.9 park on G-RAT / G1 / human review as before.
 
-## Session 2 outcomes (this session)
+## This session's arc
 
-1. Decision interview conducted through Part 5; the human ended it there;
-   Parts 6-8 defaults apply. Eighteen entries: **D-019..D-040**. The
-   spine: ATNI Climate convention pilot (D-022 arc), snapshot-first
-   (D-024), facilitator laptop (D-025), backup risk ACCEPTED (D-026),
-   identity deferred (D-027), facilitator role in cn-perm (D-028),
-   personal mode = v0.2 (D-029), form-respondents-only + QR joins
-   (D-030), TSDF codes primary (D-032), demo-wide T1 with ATNI Climate
-   as tier authority (D-034), accessibility deferred post-pilot (D-035),
-   facilitator wizard (D-036), in-app story authoring in v0.1 (D-037),
-   DESIGN sitting deferred (D-038).
-2. **Execution Plan v2** written into docs/PROJECT_PLAN.md section 3
-   (D-039): v0.1.0 = convention-pilot ready; 9-12 sessions; Phase 5 /
-   Session D / Session A / Session F remainder -> v0.2.
-3. Real-data gate process added to CLAUDE.md gates section (D-030/D-034).
-4. NEXT_SESSION.md refreshed (brief + remaining questions Q-A..Q-F).
-5. docs/SESSION_2_LAUNCH.md retired to docs/archive/.
-6. Graph-networks deep research COMPLETE (D-040): report at
-   **docs/research/graph-networks-report-2026-07-06.md** (~870 lines,
-   committed). The workflow's auto-synthesis died on a usage limit; the
-   director synthesized the report from the full 25-source agent journal
-   plus two supplemental research passes (resource-matching /
-   closed-loop evidence; epidemiology-energy-GQL). Section 6 is the
-   plan-v3 input: six design commitments, sibling-tool integration
-   hypotheses (cap-assessor/TCR-policy-scanner/GeoBase/engagement-database
-   feed one shared taxonomy + TSDF envelope + graph), and three cautions
-   (lay graph-literacy is a measured barrier; closed-loop routing is
-   funding-gated not software-gated; external graph engines carry
-   viability risk - Kuzu archived mid-2025).
+1. **Setup + strategy.** Codex capability interview; profiles repinned to the
+   gpt-5.6-sol family (grind low / review+adversary high), full read/write granted
+   (D-042). One-shot strategy put through a Codex gpt-5.6-sol adversarial round
+   (CONDITIONAL NO-GO -> rulings D-044: honest status model, DP-1 = no generic
+   importer, serial-integrator commit model, mechanics/language split,
+   snapshot-size discipline). Facilitator blueprint at docs/blueprints/facilitator-role.md.
+2. **Wave-build workflow.** Phase 0 landed green. A wave-build Workflow ran Wave 0
+   (deps) + Wave 1 (labels, schemas, facilitator role, evidence template) through
+   Barrier 1 (D-045/D-046), then Wave 2 lanes.
+3. **Spend-limit interruption at Barrier 2.** The last three workflow agents died
+   on the Anthropic monthly spend limit, leaving Wave 2 uncommitted. Switched to
+   Opus 4.8.
+4. **Codex-offload recovery (D-047).** Codex triage returned SALVAGE for all four
+   lanes (review artifact C:\dev\_reviews\community-connector\2026-07-18_wave2-triage.md).
+   The R2 detail provenance/tier core extension, R3 scoped-response fix, and boot
+   reader were completed via Codex; the snapshot data pipeline was decoupled and
+   parked (D-048) once Codex `exec` began persistently exiting early. Everything
+   green was committed in seven atomic [codex-offload] commits (f5a913b..700f14f);
+   final check-all is 11/11 green.
 
-## Session 2b addendum (integration panel, same day)
+## Exact next actions (recommended order)
 
-Per human directive (D-041): an adversarial multi-model panel produced
-**docs/design/integration-plan-2026-07-06.md** - the decision-ready plan
-for applying the research to the pilot. Panel = codebase map (Fable) +
-two opposed proposers (MIN pilot-first / MAX spine) + two critics (Codex
-gpt-5.5 high, session 019f3a59; Fable sovereignty skeptic) + Opus 4.8
-max-effort review (which caught 3 must-fix errors, all corrected).
-Verdict: MIN is the base; MAX's spine deferred to a design note.
-TWO NEW HUMAN GATES opened (plan Section 9, added to Open Gates below):
-G1 vocabulary authority (ATNI Climate authors capability terms, not a
-seeded US taxonomy - redirects D-023), G2 Open Eligibility licensing
-(CC BY-SA vs PolyForm - isolate any mapping). The plan promotes the
-assembly comprehension layer to critical path and corrects two build
-specs (structural routing consent gate; deterministic-UUIDv5 idempotent
-ingest). It is PROVISIONAL input to plan v3; changes no accepted ADR.
-
-## Session 2c addendum (FORM deliverable drafted, same day)
-
-Proceeding autonomously after the integration plan, the FORM deliverable
-(integration plan R1; Execution Plan v2's earliest critical-path item) is
-drafted at **docs/design/pilot-form-and-template-2026-07-06.md**: the
-participant intake form (required 5-min core + optional edge-generating
-depth + per-field visibility + contactability consent), the ATNI template
-STRUCTURE (skeleton, vocabulary arrays empty and parked per G1, offer/need
-as tags on Person per spec 6.2), the consent-email draft, and the feedback
-plan. It respects both new gates (G1 terms parked; no Open Eligibility
-terms embedded, G2) and is marked DRAFT FOR HUMAN REVIEW - community-facing
-text is not to be used until reviewed (D-023). No real data touched.
-
-## Exact next actions
-
-1. **Human review / plan-v3 sitting (preferred next):** read the research
-   report + docs/design/integration-plan-2026-07-06.md + the FORM
-   deliverable alongside Execution Plan v2; shape plan v3; answer
-   NEXT_SESSION Q-A (convention date), Q-B (form platform), gates G1
-   (vocabulary authority - unblocks the FORM's parked terms) + G2 (Open
-   Eligibility licensing); review the intake form + consent email text;
-   schedule the DESIGN sitting (D-038).
-2. **Ready-to-build (autonomous, when the plan is confirmed or on "go"),
-   in dependency order per the integration plan specs:** R5 facilitator
-   role (spec 6.3 - grind HIGH + adversarial round); R2 cn-ingest
-   AtniIntakeBatchV0_1 importer (spec 6.1 - director blueprint first, the
-   idempotency semantics are subtle); R3 routing capability + structural
-   consent gate (spec 6.2); R4 explore surface + flat reveal projection;
-   R6 comprehension layer. Note: these implement a PROVISIONAL plan - if
-   the human wants plan v3 shaped first, they park until then.
-2. **Autonomous build (if no human):** S3-A2 "Constellation legible" -
-   labels (troika, grind HIGH), motion/focus polish (grind medium),
-   benchmark re-run vs p95 goal. Then S3-B "Explore + Route".
-3. **FORM deliverable (docs, any time):** draft the intake form + ATNI
-   template + consent email per D-023 for HUMAN REVIEW - it gates the
-   consent email and needs no code. Do not send or publish anything.
+1. **Verify Codex health, then complete the snapshot pipeline (D-048 / P2.3-P2.5).**
+   Add a main-thread `WasmTransport` used in snapshot mode (the `WasmClient`
+   already takes a transport) so `dist/index.html` needs no external worker; wire
+   `--public-layer` into `build:snapshot` (isolated non-tracked dir); extend
+   `scripts/check-size.mjs` to gate every `dist/snapshot.*.html`; add the no-leak
+   acceptance test (3+ above-scope sentinels absent from the HTML, D-047.4); flip
+   `CN_EMBED_SNAPSHOT` on. Hardest piece - focused session, small Codex jobs.
+2. **P3.5 facilitator wizard + P3.6 template-driven entry forms** (UI over
+   existing cn-api submit/load; validation surfaced from cn-schema).
+3. **Phase 4:** P4.1 story authoring under facilitator authority, P4.2 primer over
+   the flat projection, P4.3 seeded synthetic stories + reveal-script doc, P4.4
+   snapshot acceptance - all with the D-044.4 mechanics/language split
+   (participant-facing prose marked "DRAFT - PENDING HUMAN REVIEW (D-023)").
+4. **P1.3 benchmark** re-run with labels+halos+motion live; record in ADR-004.
 
 ## Open human gates
 
-1. License variant: PolyForm Noncommercial 1.0.0 stands by default
-   (D-019/Q7.4); one line changes it to Internal Use / Small Business.
-2. (Standing) no remotes (risk explicitly accepted, D-026), no real data
-   (pilot gate process now defined in CLAUDE.md), no spend without
-   explicit instruction.
-3. Community-facing text (form, consent email) requires human review
-   before any use (D-023).
-4. **G1 - Vocabulary authority (new, D-041).** Confirm ATNI Climate
-   authors the capability categories in its own words (like tier
-   authority, D-034), facilitator-elicited under FPIC. Default: FORM
-   drafts an empty HSDS-shaped structure; no settler vocabulary committed.
-5. **G2 - Open Eligibility licensing (new, D-041).** Any later mapping to
-   Open Eligibility (CC BY-SA) must be isolated as separately-licensed
-   third-party data, out of the PolyForm code. Default: no mapping in v0.1.
-6. **G-RAT - 1.0 line ratification (BLOCKER; PLAN_1.0.md Decision Gates).**
-   Default: v0.1.0 convention pilot is the committed deliverable; Phases 6-9
-   and Phase 5's ratification-dependent specs stay provisional scenarios,
-   not scheduled commitments, until ratified at the plan-v3 sitting.
-7. **G-DATE - Convention date / consent-email runway (BLOCKER; Q-A, P0.1).**
-   Default: if the answered date leaves insufficient runway, cut to the
-   minimum rehearsalable pilot (near-date fallback) and record a dated
-   re-scope in DECISIONS.md.
-8. **G-BACKUP - Single-machine backup mitigation (MAJOR; D-026).** Default:
-   risk remains ACCEPTED - no remote, no bundles, the remotes gate stays
-   closed; a maintainer-run H: local mirror is offered as interim mitigation
-   but requires human approval, never autonomous action.
+1. **G-RAT** - 1.0-line ratification at the plan-v3 sitting. Default: v0.1.0 is the
+   committed deliverable; Phases 6-9 + the ratification-dependent Phase 5
+   routing/importer specs stay provisional until ratified.
+2. **G-DATE (Q-A, P0.1)** - the ATNI convention date + consent-email runway.
+   Default: near-date fallback to a minimum rehearsalable pilot.
+3. **G1** - vocabulary authority (ATNI Climate authors capability terms). Default:
+   empty HSDS-shaped structure; fixtures stay in the two synthetic domains.
+4. **G2** - Open Eligibility licensing isolated as separately-licensed data.
+5. **D-023** - all community-facing text needs human review before use.
+6. **License variant (Q7.4)** - PolyForm Noncommercial default; one line changes it.
+7. **G-BACKUP** - single-machine loss risk ACCEPTED; re-raise each session; H:\
+   mirror procedure in DEPENDENCIES.md, human-run only.
+8. **P0.6** - MANIFEST.md, PLAN_1.0.md, DEPENDENCIES.md remain untracked pending
+   the human's tracked-vs-review-only decision. Do NOT commit them autonomously.
 
 ## Degraded modes / standing directives
 
-- Codex runs use `--sandbox danger-full-access` (D-008 mitigations).
-- Routing policy MANDATORY (docs/CODEX_GUIDE.md section 7); effort-match
-  grind tasks (D-014).
-- Atomic commits without asking (CLAUDE.md cadence).
-- 8:00 AM safety cron re-armed this session (job 85cd754f, one-shot
-  2026-07-07 08:03; session-only, dies with the terminal).
-- Never point codex --output-last-message at a task's own artifact path.
+- **Codex `exec` is persistently exiting early on multi-step jobs this session**
+  (the recovery, B2-finish, and the R2 adversarial round all stopped
+  mid-investigation without writing output; the shorter triage completed).
+  Degraded mode (CODEX_GUIDE section 8) IN EFFECT: the R2 permission commit
+  (5e9c176) carries the director's own self-review and is marked
+  `[unreviewed-by-codex]`. Re-verify Codex health next session; prefer small,
+  bounded Codex jobs over large ones.
+- Codex profiles: gpt-5.6-sol family, danger-full-access, approval never (D-042).
+- Atomic per-unit commits without asking; `[codex-offload]` marks failover-mode
+  commits. Verification loop before every commit; the pre-commit hook runs scoped
+  check-all; a full `check-all` precedes each commit series.
+- Never point codex `--output-last-message` at a task's own artifact path.
 
 ## Warnings that must not be lost
 
-- Backup risk is ACCEPTED, not solved (D-026): single-machine total loss
-  remains risk #1; re-raise at every decision session.
-- D-032 (TSDF codes primary) and D-037 (in-app authoring in v0.1) are
-  deliberate human choices AGAINST recommendations - do not "fix" them.
-- Same-day QR joiners create the fast re-ingest requirement (D-030) -
-  it is S4-A acceptance, not a nice-to-have.
-- The design brief's rendering numbers are labeled allocations, not
-  validated measurements; DESIGN sitting (D-038) is where aesthetics get
-  human eyes.
-- Predecessor PII exclusion list (CLAUDE.md) applies to every Codex
-  prompt AND to research tasks; nothing is cleared.
-- .codex/ is gitignored scratch; session-2 interview notes live at
-  .codex/interview-notes-s2.md (DECISIONS entries are the durable record).
+- **The snapshot is NOT yet a self-contained single file** - it still references a
+  ~1.57MB external worker; an offline `file://` open will fail on worker load
+  until the D-048 main-thread transport lands. `build:snapshot` ships a valid but
+  data-empty shell by default (embed gated behind `CN_EMBED_SNAPSHOT=1`).
+- The R2 provenance one-liner exposes the recorder's opaque PersonId (UUID, not
+  PII) to all viewers - matches D-033 intent; flag to the human if undesired.
+- Backup risk ACCEPTED, not solved (D-026); single-machine total loss remains
+  risk #1.
+- D-032 (TSDF codes primary) and D-037 (in-app authoring) are deliberate choices
+  against recommendations - do not "fix" them.
+- Same-day QR joiners create the fast re-ingest requirement (D-030) - S4-A
+  acceptance, not a nice-to-have (parks on G-RAT).
+- Predecessor PII exclusion list applies to every Codex prompt and research task.
+- `.codex/` is gitignored scratch; recovery review artifacts are under
+  `C:\dev\_reviews\community-connector\`.
+- 8:00 AM safety cron re-armed this session (one-shot 2026-07-18 08:04,
+  session-only, dies with the terminal).
