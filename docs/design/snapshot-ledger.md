@@ -25,6 +25,7 @@ Append one row per size-relevant unit. "Total" is the printed size of
 | Unit id | Delta | Total | Date |
 |---|---|---|---|
 | baseline (pre-Wave-1) | - | 0.55MB (572.78 kB raw, 146.52 kB gzip) | 2026-07-17 |
+| P1.1 labels (troika-three-text + Atkinson Hyperlegible latin-400 inlined) | +139.18 kB raw / +59.00 kB gzip | 0.68MB (711.96 kB raw, 205.52 kB gzip) | 2026-07-17 |
 
 Notes:
 
@@ -34,3 +35,9 @@ Notes:
   labels unit must append a row.
 - `dist/worker-*.js` is emitted alongside the snapshot but is not part of the
   single-file artifact or its budget; only `dist/index.html` is measured.
+- P1.1 composition: troika-three-text and dependencies ~120 kB minified JS;
+  Atkinson Hyperlegible latin-400 woff 14.02 kB (data:font/woff URI in the
+  snapshot; hashed local asset in the regular build). Regular build
+  reference: assets/index-*.js 691.75 kB raw / 190.23 kB gzip. Check-size
+  PASS at 0.68MB against the 5.00MB hard budget, well under the 4.20MB soft
+  ceiling.
