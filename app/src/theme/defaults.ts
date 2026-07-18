@@ -10,6 +10,8 @@ export const DEFAULT_THEME_TOKENS = {
   "text.onAccent": { hex: "#081018", source: "default" },
   "accent.primary": { hex: "#e8b87c", source: "default" },
   "accent.focusRing": { hex: "#ffd38a", source: "default" },
+  "label.text": { hex: "#e6edf7", source: "default" },
+  "label.outline": { hex: "#06080d", source: "default" },
   "kind.default-1.base": { hex: "#7cc8e8", source: "default" },
   "kind.default-2.base": { hex: "#7ce8b2", source: "default" },
   "kind.default-3.base": { hex: "#e8a87c", source: "default" },

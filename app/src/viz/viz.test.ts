@@ -20,6 +20,13 @@ import { motionSettings } from "./camera";
 import { RENDER_TOKENS } from "./config";
 import { buildEdgeBuffers, expectedEdgeVertexCount, weightToAlpha } from "./edges";
 import { buildHaloLayer } from "./halos";
+import {
+  labelCandidates,
+  selectVisibleLabels,
+  truncateLabel,
+  visibleLabelCap,
+  type LabelCandidate,
+} from "./labels";
 import { computeLayout, layoutSnapshot } from "./layout";
 import { buildNodeLayer, degreeToScale, degreesForProjection, recolorNodeLayer } from "./nodes";
 import {
@@ -191,6 +198,74 @@ describe("halos", () => {
     expect(haloCount).toBe(data.entities?.length);
     expect(decomposed.scale.x).toBeGreaterThan(degreeToScale(1));
     layer.dispose();
+  });
+});
+
+describe("labels", () => {
+  const origin = new Vector3(0, 0, 0);
+
+  function candidate(id: string, distance: number, degree: number): LabelCandidate {
+    return { id, text: id, position: new Vector3(distance, 0, 0), degree };
+  }
+
+  it("extracts projection display names and truncates long ones with an ascii ellipsis", () => {
+    const data: ProjectionDto = {
+      revision: 1,
+      entities: [
+        {
+          id: entityA,
+          kind: "person",
+          attributes: { display_name: { type: "text", value: "Synthetic Researcher One" } },
+        },
+        {
+          id: entityB,
+          kind: "place",
+          attributes: {
+            display_name: { type: "text", value: "An Extremely Long Synthetic Fixture Location Name" },
+          },
+        },
+      ],
+    };
+    const layout = computeLayout(data.entities ?? []);
+    const candidates = labelCandidates(data, layout, kindMeta(), new Map([[entityA, 2]]));
+
+    expect(candidates.map((entry) => entry.id)).toEqual([entityA, entityB]);
+    expect(candidates[0]?.text).toBe("Synthetic Researcher One");
+    expect(candidates[0]?.degree).toBe(2);
+    expect(candidates[1]?.text.length).toBeLessThanOrEqual(RENDER_TOKENS.label.maxChars);
+    expect(candidates[1]?.text.endsWith("...")).toBe(true);
+    expect(truncateLabel("short")).toBe("short");
+  });
+
+  it("density-culls to a per-tier cap and never renders all labels at pilot scale", () => {
+    const pilotScale = 1500;
+    const near = Array.from({ length: pilotScale }, (_, index) => candidate(`entity-${index}`, 10, 0));
+    for (const tier of ["A", "B", "C", "D"] as const) {
+      const visible = selectVisibleLabels(near, origin, tier);
+      expect(visible.length).toBe(visibleLabelCap(tier));
+      expect(visible.length).toBeLessThan(pilotScale);
+    }
+    expect(visibleLabelCap("D")).toBeLessThan(visibleLabelCap("C"));
+    expect(visibleLabelCap("C")).toBeLessThan(visibleLabelCap("B"));
+    expect(visibleLabelCap("B")).toBeLessThan(visibleLabelCap("A"));
+  });
+
+  it("is zoom-adaptive: near leaves label, far leaves do not, hubs label from farther out", () => {
+    const nearLeaf = candidate("near-leaf", RENDER_TOKENS.label.visibleDistance - 50, 0);
+    const farLeaf = candidate("far-leaf", RENDER_TOKENS.label.visibleDistance * 2, 0);
+    const farHub = candidate("far-hub", RENDER_TOKENS.label.visibleDistance * 2, RENDER_TOKENS.node.referenceDegree);
+    const visible = selectVisibleLabels([nearLeaf, farLeaf, farHub], origin, "A");
+
+    expect(visible.map((entry) => entry.id)).toContain("near-leaf");
+    expect(visible.map((entry) => entry.id)).toContain("far-hub");
+    expect(visible.map((entry) => entry.id)).not.toContain("far-leaf");
+  });
+
+  it("orders deterministically by adjusted distance with id tie-break", () => {
+    const tied = [candidate("b-tied", 100, 0), candidate("a-tied", 100, 0), candidate("closer", 50, 0)];
+    const visible = selectVisibleLabels(tied, origin, "A");
+
+    expect(visible.map((entry) => entry.id)).toEqual(["closer", "a-tied", "b-tied"]);
   });
 });
 

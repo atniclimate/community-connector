@@ -4,6 +4,7 @@ import type { Store } from "../state/store";
 import { RENDER_TOKENS } from "./config";
 import { buildEdgeLayer, type EdgeLayer } from "./edges";
 import { buildHaloLayer, type HaloLayer } from "./halos";
+import { buildLabelLayer, type LabelLayer } from "./labels";
 import { computeLayout, type LayoutResult } from "./layout";
 import { buildNodeLayer, degreesForProjection, type NodeLayer } from "./nodes";
 import { PickingController } from "./picking";
@@ -27,6 +28,7 @@ type RenderState = {
   nodes: NodeLayer | null;
   edges: EdgeLayer | null;
   halos: HaloLayer | null;
+  labels: LabelLayer | null;
   picking: PickingController | null;
   quality: QualityManager;
   profile: QualityProfile;
@@ -58,6 +60,7 @@ export function mountViz(container: HTMLElement, store: Store): MountedViz {
     nodes: null,
     edges: null,
     halos: null,
+    labels: null,
     picking: null,
     quality,
     profile: quality.profile,
@@ -83,13 +86,16 @@ export function mountViz(container: HTMLElement, store: Store): MountedViz {
 function handleState(renderState: RenderState, container: HTMLElement, store: Store): void {
   const state = store.getState();
   resize(renderState, container);
-  rebuildIfNeeded(renderState, state);
+  rebuildIfNeeded(renderState, state, () => {
+    renderState.dirty = true;
+    schedule(renderState, store);
+  });
   updateAria(renderState, state);
   renderState.dirty = true;
   schedule(renderState, store);
 }
 
-function rebuildIfNeeded(renderState: RenderState, state: AppState): void {
+function rebuildIfNeeded(renderState: RenderState, state: AppState, onNeedsRender: () => void): void {
   const projection = state.data.projection;
   const themeKey = JSON.stringify(state.theme.resolved?.tokens ?? {});
   if (projection === null || !needsRebuild(renderState, projection, themeKey)) {
@@ -98,12 +104,13 @@ function rebuildIfNeeded(renderState: RenderState, state: AppState): void {
   disposeGraphLayers(renderState);
   const entities = projectedEntities(projection);
   renderState.layout = computeLayout(entities);
+  const degrees = degreesForProjection(projection);
   renderState.nodes = buildNodeLayer({
     projection,
     layout: renderState.layout,
     kindMeta: state.data.kindMeta,
     theme: state.theme.resolved,
-    degrees: degreesForProjection(projection),
+    degrees,
   });
   renderState.edges = buildEdgeLayer(projection, renderState.layout, state.theme.resolved);
   renderState.halos = buildHaloLayer({
@@ -114,7 +121,21 @@ function rebuildIfNeeded(renderState: RenderState, state: AppState): void {
     tier: renderState.profile.tier,
     cameraPosition: renderState.cameraRig.camera.position.clone(),
   });
-  renderState.sceneSetup.scene.add(renderState.edges.object, renderState.nodes.group, renderState.halos.group);
+  renderState.labels = buildLabelLayer({
+    projection,
+    layout: renderState.layout,
+    kindMeta: state.data.kindMeta,
+    theme: state.theme.resolved,
+    degrees,
+    tier: renderState.profile.tier,
+    onNeedsRender,
+  });
+  renderState.sceneSetup.scene.add(
+    renderState.edges.object,
+    renderState.nodes.group,
+    renderState.halos.group,
+    renderState.labels.group,
+  );
   renderState.projectionRevision = projection.revision ?? ZERO;
   renderState.themeKey = themeKey;
 }
@@ -165,6 +186,9 @@ function frame(renderState: RenderState, store: Store, time: number): void {
   }
   renderState.renderer.setPixelRatio(renderState.profile.dpr);
   const animated = renderState.cameraRig.update(deltaSeconds);
+  const labelsChanged =
+    renderState.labels?.update(renderState.cameraRig.camera, deltaSeconds * RENDER_TOKENS.time.secondsToMs) ?? false;
+  renderState.dirty = renderState.dirty || labelsChanged;
   if (renderState.dirty || animated) {
     renderState.renderer.render(renderState.sceneSetup.scene, renderState.cameraRig.camera);
     renderState.dirty = false;
@@ -186,6 +210,11 @@ function disposeGraphLayers(renderState: RenderState): void {
   if (renderState.halos !== null) {
     renderState.sceneSetup.scene.remove(renderState.halos.group);
     renderState.halos.dispose();
+  }
+  if (renderState.labels !== null) {
+    renderState.sceneSetup.scene.remove(renderState.labels.group);
+    renderState.labels.dispose();
+    renderState.labels = null;
   }
 }
 
