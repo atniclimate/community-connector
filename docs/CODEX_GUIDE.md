@@ -49,9 +49,12 @@ synthetic runs.
 
 ### 2.4 Model pinning
 Profiles live as `$CODEX_HOME\<name>.config.toml` files, selected with
-`--profile <name>`. Pinned full ids (never aliases; see docs/ENVIRONMENT.md):
-- `grind`: model `gpt-5.4-mini`, effort low, sandbox workspace-write, approval never.
-- `review`: model `gpt-5.5`, effort high, sandbox read-only, approval never.
+`--profile <name>`. Pinned full ids (never aliases; see docs/ENVIRONMENT.md;
+repinned 2026-07-17 per D-042 - gpt-5.6-sol family, full read/write granted):
+- `grind`: model `gpt-5.6-sol`, effort low, sandbox danger-full-access, approval never.
+- `review`: model `gpt-5.6-sol`, effort high, sandbox danger-full-access, approval never.
+- `adversary`: model `gpt-5.6-sol`, effort high, danger-full-access, approval never
+  (plan/design adversarial rounds; writes only to `C:\dev\_reviews\`).
 Director side: this bootstrap session is Claude Fable, exact reported model id
 `claude-fable-5`.
 

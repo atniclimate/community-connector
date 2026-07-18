@@ -444,3 +444,22 @@ custody), a nonexistent file reference (cn-perm/session.rs -> cn-perm/viewer.rs
 + cn-api/session.rs), and the misplaced consent gate - all fixed before commit.
 The plan is PROVISIONAL input to plan v3 (the D-040 sitting); it changes no
 accepted ADR and reserves G1/G2 to the human.
+
+## D-042 (2026-07-17) - One-shot session directive: gpt-5.6-sol repin, Codex full read/write
+
+Human directive at session start (verbatim intent): pick the project up, give
+Codex full read/write permissions, run the session on gpt-5.6-sol models, and
+strategize a one-shot completion of the gate-blind scope with Codex as a
+continuous adversarial thought partner and Claude workflow subagents for
+parallel work. Actions taken: grind and review profiles repinned from
+gpt-5.4-mini / gpt-5.5 to gpt-5.6-sol (effort low / high; the adversary
+profile already ran gpt-5.6-sol); all three profiles set danger-full-access
+(the Windows ACL sandbox backend fails on C:\dev and workspace-write silently
+downgrades to read-only under codex exec - the behavioral guardrail is
+C:\dev\AGENTS.md). Codex CLI 0.144.0 cannot enumerate model variants, so the
+confirmed family base id is used for all roles per Codex's own capability
+interview (.codex/capability-interview.md). docs/ENVIRONMENT.md and
+docs/CODEX_GUIDE.md section 2.4 updated to match. Human gates are NOT
+affected: G-RAT, G-DATE, G1, G2, D-023 review, no-remotes, no-real-data all
+stand; the one-shot targets the gate-blind scope of PLAN_1.0.md Phases 0-4
+plus non-gated Phase 5 items, parking everything gated.

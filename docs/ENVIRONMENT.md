@@ -30,13 +30,19 @@ Full model ids are pinned deliberately - alias drift burned the predecessor proj
 
 | Profile | Model (full id) | Effort | Sandbox | Approval | Use |
 |---|---|---|---|---|---|
-| grind | gpt-5.4-mini | low | workspace-write | never | mechanical implementation, bulk transforms, lint burn-down |
-| review | gpt-5.5 | high | read-only | never | diff review, adversarial ADR rounds, triage |
+| grind | gpt-5.6-sol | low | danger-full-access | never | mechanical implementation, bulk transforms, lint burn-down |
+| review | gpt-5.6-sol | high | danger-full-access | never | diff review, adversarial ADR rounds, triage |
+| adversary | gpt-5.6-sol | high | danger-full-access | never | adversarial plan/design review (writes to C:\dev\_reviews\) |
 
-Source: https://developers.openai.com/codex/models (fetched 2026-07-06).
-gpt-5.5 is the current default/strongest recommended; gpt-5.4-mini is the documented
-fast/low-cost tier for mechanical subagent work. gpt-5.2 and gpt-5.3-codex are
-deprecated - never fall back to them. Re-verify ids after any codex CLI update.
+Repinned 2026-07-17 per human directive (DECISIONS.md D-042): gpt-5.6-sol family
+throughout, Codex granted full read/write for the one-shot session. Codex CLI
+0.144.0 cannot enumerate model variants; the confirmed family base gpt-5.6-sol is
+used for all three roles (effort differentiates grind from review). Sandboxes are
+danger-full-access because the Windows ACL backend fails on C:\dev and
+workspace-write silently downgrades to read-only under `codex exec`; the
+behavioral guardrail is C:\dev\AGENTS.md. Prior pins (gpt-5.4-mini / gpt-5.5,
+fetched 2026-07-06) are retired. gpt-5.2 and gpt-5.3-codex are deprecated -
+never fall back to them. Re-verify ids after any codex CLI update.
 
 ## Frontend toolchain
 
