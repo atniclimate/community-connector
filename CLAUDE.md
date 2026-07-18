@@ -181,6 +181,16 @@ three actions, live warnings), refresh the 60-second brief in docs/NEXT_SESSION.
 append DECISIONS.md entries, commit everything, print a human summary with
 one-line-answerable gate questions.
 
+## Asana tracking
+
+This project has an Asana board in the ATNI Climate Software portfolio.
+At session close after a phase ship or notable progress, refresh it per
+the ratified convention at `C:\dev\asana-sync\CONVENTION.md` (write split:
+sessions post status updates, completion comments, task fields, and tasks
+under ratified phases; milestones, due dates, deletions, and description
+edits stay with the maintainer). Board gids: `C:\dev\asana-sync\ASANA_MAP.yaml`.
+Never copy Asana gids or tracker metadata into this repository.
+
 ## Phase plan (acceptance criteria in docs/LAUNCH_PROMPT.md section 5)
 
 0 Bootstrap | 1 Domain model + ADRs | 2 Rust core | 3 Frontend | 4 Ingestor |
