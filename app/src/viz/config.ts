@@ -62,6 +62,17 @@ export const RENDER_TOKENS = {
     degradeFrames: 60,
     upgradeFrames: 300,
   },
+  focus: {
+    blendMs: 280,
+    edgeDimFactor: 0.45,
+    edgeDimAlphaFactor: 0.6,
+    adjacentMinAlpha: 0.5,
+    haloDimFactor: 0.3,
+  },
+  drift: {
+    autoRotateSpeed: 0.25,
+    idleDelayMs: 5000,
+  },
   camera: {
     fov: 50,
     near: 0.1,
@@ -70,6 +81,7 @@ export const RENDER_TOKENS = {
     targetDistance: 220,
     dampingFactor: 0.08,
     dampLambda: 5,
+    nearFlightDistance: 320,
     nearDurationMs: 600,
     standardDurationMs: 800,
     maxDurationMs: 900,

@@ -132,6 +132,25 @@ export function buildHaloLayer(args: {
   };
 }
 
+/**
+ * Dims the halo field as the focus blend rises (P1.2). Halos are instanced per
+ * kind with a shared material, so the dim is uniform across the field; the
+ * focused node's emphasis comes from its scale, color, and label instead.
+ */
+export function setHaloFocusDim(layer: HaloLayer, blend: number): void {
+  const resting = RENDER_TOKENS.halo.restingAlpha;
+  const dimmed = resting * RENDER_TOKENS.focus.haloDimFactor;
+  const alpha = resting + (dimmed - resting) * blend;
+  for (const child of layer.group.children) {
+    const material = (child as InstancedMesh).material as ShaderMaterial;
+    const uniform = material.uniforms.uAlpha;
+    if (uniform === undefined) {
+      throw new Error("Halo material is missing the uAlpha uniform");
+    }
+    uniform.value = alpha;
+  }
+}
+
 function addKindHalos(
   group: Group,
   geometry: IcosahedronGeometry,

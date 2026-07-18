@@ -12,16 +12,23 @@ import { RENDER_TOKENS } from "./config";
 import type { LayoutResult } from "./layout";
 import { kindColor, projectedEdges } from "./projection";
 
+/** One entry per edge actually written into the buffers, in buffer order. */
+export type EdgeRenderRecord = {
+  readonly id: string;
+  readonly fromKind: string;
+  readonly toKind: string;
+  readonly weight: number;
+};
+
 export type EdgeLayer = {
   readonly object: LineSegments<BufferGeometry, ShaderMaterial>;
+  readonly records: readonly EdgeRenderRecord[];
   readonly dispose: () => void;
 };
 
 const XYZ_COMPONENTS = 3;
 const RGBA_COMPONENTS = 4;
 const VERTICES_PER_EDGE = 2;
-const TARGET_DIM_FACTOR = 0.45;
-const TARGET_ALPHA_FACTOR = 0.6;
 const BASE_BLEND = 0;
 
 export function weightToAlpha(weight: number): number {
@@ -62,11 +69,15 @@ function rgba(color: Color, alpha: number): readonly number[] {
 
 function targetRgba(color: Color, alpha: number): readonly number[] {
   return [
-    color.r * TARGET_DIM_FACTOR,
-    color.g * TARGET_DIM_FACTOR,
-    color.b * TARGET_DIM_FACTOR,
-    alpha * TARGET_ALPHA_FACTOR,
+    color.r * RENDER_TOKENS.focus.edgeDimFactor,
+    color.g * RENDER_TOKENS.focus.edgeDimFactor,
+    color.b * RENDER_TOKENS.focus.edgeDimFactor,
+    alpha * RENDER_TOKENS.focus.edgeDimAlphaFactor,
   ];
+}
+
+function highlightRgba(color: Color, alpha: number): readonly number[] {
+  return [color.r, color.g, color.b, Math.max(alpha, RENDER_TOKENS.focus.adjacentMinAlpha)];
 }
 
 function pushEndpoint(
@@ -85,10 +96,12 @@ export function buildEdgeBuffers(
   readonly positions: Float32Array;
   readonly colors: Float32Array;
   readonly targetColors: Float32Array;
+  readonly records: readonly EdgeRenderRecord[];
 } {
   const positions: number[] = [];
   const colors: number[] = [];
   const targetColors: number[] = [];
+  const records: EdgeRenderRecord[] = [];
   const entities = new Map((projection.entities ?? []).map((entity) => [entity.id, entity]));
   for (const edge of projectedEdges(projection)) {
     const from = entities.get(edge.from);
@@ -105,11 +118,13 @@ export function buildEdgeBuffers(
     pushEndpoint(positions, toPosition, []);
     colors.push(...rgba(fromColor, alpha), ...rgba(toColor, alpha));
     targetColors.push(...targetRgba(fromColor, alpha), ...targetRgba(toColor, alpha));
+    records.push({ id: edge.id, fromKind: from.kind ?? "", toKind: to.kind ?? "", weight: edge.weight });
   }
   return {
     positions: new Float32Array(positions),
     colors: new Float32Array(colors),
     targetColors: new Float32Array(targetColors),
+    records,
   };
 }
 
@@ -127,6 +142,7 @@ export function buildEdgeLayer(
   const object = new LineSegments(geometry, material);
   return {
     object,
+    records: buffers.records,
     dispose: () => {
       geometry.dispose();
       material.dispose();
@@ -136,4 +152,42 @@ export function buildEdgeLayer(
 
 export function expectedEdgeVertexCount(edgeCount: number): number {
   return edgeCount * VERTICES_PER_EDGE;
+}
+
+/**
+ * Rewrites the focus-target color buffer (P1.2): edges adjacent to the focused
+ * entity keep full endpoint colors with a boosted minimum alpha, everything
+ * else takes the dimmed variant. With `adjacentEdgeIds` null every edge dims,
+ * which matches the buffer's built state.
+ */
+export function writeFocusTargetColors(
+  layer: EdgeLayer,
+  theme: Theme | null,
+  adjacentEdgeIds: ReadonlySet<string> | null,
+): void {
+  const attribute = layer.object.geometry.getAttribute("targetColor");
+  if (!(attribute instanceof BufferAttribute)) {
+    throw new Error("Edge layer is missing its targetColor attribute");
+  }
+  for (const [index, record] of layer.records.entries()) {
+    const alpha = weightToAlpha(record.weight);
+    const adjacent = adjacentEdgeIds?.has(record.id) ?? false;
+    const fromColor = new Color(kindColor(record.fromKind, theme));
+    const toColor = new Color(kindColor(record.toKind, theme));
+    const fromRgba = adjacent ? highlightRgba(fromColor, alpha) : targetRgba(fromColor, alpha);
+    const toRgba = adjacent ? highlightRgba(toColor, alpha) : targetRgba(toColor, alpha);
+    const vertex = index * VERTICES_PER_EDGE;
+    attribute.setXYZW(vertex, fromRgba[0] ?? 0, fromRgba[1] ?? 0, fromRgba[2] ?? 0, fromRgba[3] ?? 0);
+    attribute.setXYZW(vertex + 1, toRgba[0] ?? 0, toRgba[1] ?? 0, toRgba[2] ?? 0, toRgba[3] ?? 0);
+  }
+  attribute.needsUpdate = true;
+}
+
+/** Drives the shader's mix between resting and focus-target edge colors. */
+export function setEdgeFocusBlend(layer: EdgeLayer, blend: number): void {
+  const uniform = layer.object.material.uniforms.uFocusBlend;
+  if (uniform === undefined) {
+    throw new Error("Edge material is missing the uFocusBlend uniform");
+  }
+  uniform.value = blend;
 }

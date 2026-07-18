@@ -2,8 +2,8 @@ import { WebGLRenderer } from "three";
 import type { AppState, ProjectionDto } from "../state/state";
 import type { Store } from "../state/store";
 import { RENDER_TOKENS } from "./config";
-import { buildEdgeLayer, type EdgeLayer } from "./edges";
-import { buildHaloLayer, type HaloLayer } from "./halos";
+import { buildEdgeLayer, setEdgeFocusBlend, writeFocusTargetColors, type EdgeLayer } from "./edges";
+import { buildHaloLayer, setHaloFocusDim, type HaloLayer } from "./halos";
 import { buildLabelLayer, type LabelLayer } from "./labels";
 import { computeLayout, type LayoutResult } from "./layout";
 import { buildNodeLayer, degreesForProjection, type NodeLayer } from "./nodes";
@@ -11,6 +11,7 @@ import { PickingController } from "./picking";
 import { projectedEntities } from "./projection";
 import { createVizScene, type SceneSetup } from "./scene";
 import { createCameraRig, type CameraRig } from "./camera";
+import { applyFocusToNodeLayer, computeFocusSet, FocusBlend } from "./focus";
 import { QualityManager, type QualityProfile } from "./quality";
 
 export type MountedViz = () => void;
@@ -19,6 +20,8 @@ const CANVAS_LABEL_EMPTY = "Community graph loading";
 const ZERO = 0;
 const UNIT = 1;
 const MIN_HEIGHT = 320;
+const BLEND_OFF = 0;
+const BLEND_ON = 1;
 
 type RenderState = {
   sceneSetup: SceneSetup;
@@ -32,6 +35,9 @@ type RenderState = {
   picking: PickingController | null;
   quality: QualityManager;
   profile: QualityProfile;
+  degrees: ReadonlyMap<string, number> | null;
+  focusedEntityId: string | null;
+  focusBlend: FocusBlend;
   projectionRevision: number | null;
   themeKey: string;
   dirty: boolean;
@@ -47,10 +53,15 @@ export function mountViz(container: HTMLElement, store: Store): MountedViz {
   live.className = "cn-viz-live";
   canvas.setAttribute("role", "img");
   canvas.setAttribute("aria-label", CANVAS_LABEL_EMPTY);
+  canvas.setAttribute("tabindex", "0");
   container.append(canvas, live);
   const renderer = new WebGLRenderer({ canvas, antialias: true });
   const sceneSetup = createVizScene(store.getState().theme.resolved);
-  const cameraRig = createCameraRig(canvas);
+  let markViewDirty = (): void => {
+    // Replaced below once renderState exists; camera changes before then are
+    // covered by the initial handleState render.
+  };
+  const cameraRig = createCameraRig(canvas, () => markViewDirty());
   const quality = new QualityManager();
   const renderState: RenderState = {
     sceneSetup,
@@ -64,11 +75,18 @@ export function mountViz(container: HTMLElement, store: Store): MountedViz {
     picking: null,
     quality,
     profile: quality.profile,
+    degrees: null,
+    focusedEntityId: null,
+    focusBlend: new FocusBlend(),
     projectionRevision: null,
     themeKey: "",
     dirty: true,
     frame: null,
     lastTime: null,
+  };
+  markViewDirty = () => {
+    renderState.dirty = true;
+    schedule(renderState, store);
   };
   renderState.picking = new PickingController(canvas, cameraRig.camera, () => renderState.nodes, store);
   const unsubscribe = store.subscribe(() => handleState(renderState, container, store));
@@ -86,25 +104,27 @@ export function mountViz(container: HTMLElement, store: Store): MountedViz {
 function handleState(renderState: RenderState, container: HTMLElement, store: Store): void {
   const state = store.getState();
   resize(renderState, container);
-  rebuildIfNeeded(renderState, state, () => {
+  const rebuilt = rebuildIfNeeded(renderState, state, () => {
     renderState.dirty = true;
     schedule(renderState, store);
   });
+  syncMotion(renderState, state, rebuilt);
   updateAria(renderState, state);
   renderState.dirty = true;
   schedule(renderState, store);
 }
 
-function rebuildIfNeeded(renderState: RenderState, state: AppState, onNeedsRender: () => void): void {
+function rebuildIfNeeded(renderState: RenderState, state: AppState, onNeedsRender: () => void): boolean {
   const projection = state.data.projection;
   const themeKey = JSON.stringify(state.theme.resolved?.tokens ?? {});
   if (projection === null || !needsRebuild(renderState, projection, themeKey)) {
-    return;
+    return false;
   }
   disposeGraphLayers(renderState);
   const entities = projectedEntities(projection);
   renderState.layout = computeLayout(entities);
   const degrees = degreesForProjection(projection);
+  renderState.degrees = degrees;
   renderState.nodes = buildNodeLayer({
     projection,
     layout: renderState.layout,
@@ -138,6 +158,38 @@ function rebuildIfNeeded(renderState: RenderState, state: AppState, onNeedsRende
   );
   renderState.projectionRevision = projection.revision ?? ZERO;
   renderState.themeKey = themeKey;
+  return true;
+}
+
+/**
+ * P1.2 focus/motion wiring. Focus state comes exclusively from the app state
+ * machine (view.mode / view.focusedEntityId); this only projects it onto the
+ * already-built render layers, and re-projects after any layer rebuild.
+ */
+function syncMotion(renderState: RenderState, state: AppState, rebuilt: boolean): void {
+  const reduced = state.ui.reducedMotion;
+  renderState.cameraRig.setReducedMotion(reduced);
+  renderState.cameraRig.setDrift(state.view.mode === "overview" && !reduced);
+  const focusedId = state.view.mode === "focus" ? state.view.focusedEntityId : null;
+  const focusChanged = focusedId !== renderState.focusedEntityId;
+  if (!focusChanged && !rebuilt) {
+    return;
+  }
+  renderState.focusedEntityId = focusedId;
+  const projection = state.data.projection;
+  if (projection === null || renderState.nodes === null || renderState.edges === null || renderState.degrees === null) {
+    return;
+  }
+  const focus = computeFocusSet(projection, focusedId);
+  applyFocusToNodeLayer(renderState.nodes, projection, state.theme.resolved, renderState.degrees, focus);
+  writeFocusTargetColors(renderState.edges, state.theme.resolved, focus?.adjacentEdgeIds ?? null);
+  renderState.focusBlend.setTarget(focus === null ? BLEND_OFF : BLEND_ON);
+  if (focusChanged && focus !== null) {
+    const position = renderState.layout?.positions.get(focus.focusedId);
+    if (position !== undefined) {
+      renderState.cameraRig.flyTo(position.clone(), reduced);
+    }
+  }
 }
 
 function needsRebuild(renderState: RenderState, projection: ProjectionDto, themeKey: string): boolean {
@@ -178,22 +230,29 @@ function frame(renderState: RenderState, store: Store, time: number): void {
   const state = store.getState();
   const deltaSeconds = renderState.lastTime === null ? ZERO : (time - renderState.lastTime) / RENDER_TOKENS.time.secondsToMs;
   renderState.lastTime = time;
+  const deltaMs = deltaSeconds * RENDER_TOKENS.time.secondsToMs;
   const previousTier = renderState.profile.tier;
-  renderState.profile = renderState.quality.sample(deltaSeconds * RENDER_TOKENS.time.secondsToMs);
+  renderState.profile = renderState.quality.sample(deltaMs);
   if (renderState.profile.tier !== previousTier) {
     renderState.projectionRevision = null;
     store.dispatch({ kind: "qualityTierChanged", tier: renderState.profile.tier });
   }
   renderState.renderer.setPixelRatio(renderState.profile.dpr);
   const animated = renderState.cameraRig.update(deltaSeconds);
-  const labelsChanged =
-    renderState.labels?.update(renderState.cameraRig.camera, deltaSeconds * RENDER_TOKENS.time.secondsToMs) ?? false;
-  renderState.dirty = renderState.dirty || labelsChanged;
+  const labelsChanged = renderState.labels?.update(renderState.cameraRig.camera, deltaMs) ?? false;
+  const blendChanged = renderState.focusBlend.update(deltaMs, state.ui.reducedMotion);
+  if (renderState.edges !== null) {
+    setEdgeFocusBlend(renderState.edges, renderState.focusBlend.value);
+  }
+  if (renderState.halos !== null) {
+    setHaloFocusDim(renderState.halos, renderState.focusBlend.value);
+  }
+  renderState.dirty = renderState.dirty || labelsChanged || blendChanged;
   if (renderState.dirty || animated) {
     renderState.renderer.render(renderState.sceneSetup.scene, renderState.cameraRig.camera);
     renderState.dirty = false;
   }
-  if (animated && !state.ui.reducedMotion) {
+  if ((animated || blendChanged) && !state.ui.reducedMotion) {
     schedule(renderState, store);
   }
 }
