@@ -488,3 +488,47 @@ Verified: a deliberately failing vitest blocked a commit through the hook
 (check-all reported app-test FAIL, exit 1, HEAD unchanged); the breakage was
 then reverted. Rejected: pre-push (never fires locally), unconditional full
 battery per commit (breaks atomic-commit cadence for docs lanes).
+
+## D-044 (2026-07-17) - One-shot execution rulings from the adversarial strategy round
+
+The session strategy went through a Codex gpt-5.6-sol adversarial round
+(review at C:\dev\_reviews\community-connector\2026-07-17_one-shot-strategy.md,
+verdict CONDITIONAL NO-GO). Director accepted the findings; the rulings:
+
+1. **Status model.** Gate-blind units land as "implemented and verified -
+   phase exit PARKED on human items." No "Phase CLOSED" or milestone-exit
+   claim is made this session; M0 and later exits await P0.1, P0.6, and the
+   human-only acceptances. Honest end state: separable gate-blind foundations
+   landed; ratification-dependent critical path (importer, routing, FORM,
+   rehearsal) remains designed but nontrivial.
+2. **DP-1: generic importer contract = NO.** The G1/Q-B blocking-map rows in
+   the untracked route map lose to the explicit G-RAT park (routing semantics
+   and importer contract) and the accepted D-041 anti-general-DTO ruling.
+   This session lands only: a zero-semantics `cn` router (help, typed exit
+   codes, unknown-subcommand failure tests), `validate`/`export` adapters
+   over already-ratified core behavior, and parked stubs for `ingest`
+   (names G-RAT) and `snapshot` (names the Phase 2 envelope dependency).
+   No generic column-mapping schema, no mapping fixtures.
+3. **Wave-build concurrency model.** Parallel lanes edit disjoint file sets
+   and NEVER stage or commit; a single serial integrator owns the git index,
+   app/src/main.ts and shell mounting, package.json/package-lock.json,
+   scripts/check-all wiring, generated wasm pkg, and DECISIONS/HANDOFF edits,
+   committing unit-by-unit at wave barriers after one quiescent full
+   check-all. Two check-all instances never run concurrently.
+4. **Mechanics/language split (D-023/G1 protection).** All user-visible
+   instructional, consent, or tier prose (primer, story seeds, reveal
+   script, wizard/form help) is marked "DRAFT - PENDING HUMAN REVIEW
+   (D-023)" and non-deployable; generic UI chrome is not gated prose.
+   Fixture vocabulary stays inside the two existing synthetic domains; no
+   plausible ATNI capability terms anywhere (G1).
+5. **Snapshot discipline.** A byte ledger with a 4.2MB soft-ceiling headroom
+   target is recorded after every size-relevant unit; one fixture per
+   snapshot artifact; troika-three-text lands with a repo-bundled
+   OFL-licensed font and an offline-render proof before broad UI work.
+6. **Browser gate.** Automated snapshot acceptance uses a repo-local
+   headless playwright test asserting non-zero projected entities, zero
+   external requests, zero console/page errors, and no above-scope values
+   in the serialized HTML. D-017's headed Chrome remains for measurement
+   and human visual acceptance; it never gates check-all.
+7. **Serialization compat.** GroupRole::Facilitator ships with membership
+   round-trip and unknown-role loud-rejection tests (I7-adjacent).
