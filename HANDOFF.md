@@ -13,10 +13,14 @@ Execution Plan v2 adopted, graph-networks deep research commissioned).
 **Phase 1 - Domain model and ADRs: COMPLETE** (ADR-001..003 accepted).
 **Phase 2 - Rust core: CLOSED** (six crates behind cn-api; permission
 property test green; measurement gates recorded; closing review D-016).
-**Phase 3 - Frontend: ~HALF.** Done: ADR-004 renderer (instanced layer),
-design brief final, I4 state machine + wasm worker, theming pipeline,
-base renderer landed + visual fixes DIRECTOR-ACCEPTED
-(docs/design/screenshots/viz-fixes-2026-07-06.png).
+**Phase 3 - Frontend: see the acceptance-unit inventory.** The completion
+truth is PLAN_1.0.md "Current Position" (acceptance-unit inventory, verified
+against the tree 2026-07-11; the file itself stays untracked pending the
+parked P0.6 decision) - not a fraction. Done per that inventory: ADR-004
+instanced renderer landed + visual fixes DIRECTOR-ACCEPTED
+(docs/design/screenshots/viz-fixes-2026-07-06.png), I4 state machine + wasm
+worker, theming pipeline. Absent: all app/src/ui/ surfaces, snapshot data
+payload, facilitator role, ingest/CLI, persisted-format schemas.
 
 ## Session 2 outcomes (this session)
 
@@ -119,6 +123,18 @@ text is not to be used until reviewed (D-023). No real data touched.
 5. **G2 - Open Eligibility licensing (new, D-041).** Any later mapping to
    Open Eligibility (CC BY-SA) must be isolated as separately-licensed
    third-party data, out of the PolyForm code. Default: no mapping in v0.1.
+6. **G-RAT - 1.0 line ratification (BLOCKER; PLAN_1.0.md Decision Gates).**
+   Default: v0.1.0 convention pilot is the committed deliverable; Phases 6-9
+   and Phase 5's ratification-dependent specs stay provisional scenarios,
+   not scheduled commitments, until ratified at the plan-v3 sitting.
+7. **G-DATE - Convention date / consent-email runway (BLOCKER; Q-A, P0.1).**
+   Default: if the answered date leaves insufficient runway, cut to the
+   minimum rehearsalable pilot (near-date fallback) and record a dated
+   re-scope in DECISIONS.md.
+8. **G-BACKUP - Single-machine backup mitigation (MAJOR; D-026).** Default:
+   risk remains ACCEPTED - no remote, no bundles, the remotes gate stays
+   closed; a maintainer-run H: local mirror is offered as interim mitigation
+   but requires human approval, never autonomous action.
 
 ## Degraded modes / standing directives
 
