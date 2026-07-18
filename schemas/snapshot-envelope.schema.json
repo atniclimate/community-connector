@@ -1,0 +1,116 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://community-navigator.example.test/schemas/snapshot-envelope/0.1.0",
+  "title": "Community Navigator snapshot data envelope",
+  "description": "Data envelope embedded in the single-file offline snapshot build (R8, P2.3). The snapshot bakes exactly one viewer's permission-filtered export plus the resolved theme, and MUST state that viewer scope explicitly (D-044.5; integration plan 2026-07-06 section 6.4). Only the anonymous and group-member scopes are admissible for a baked artifact - never a facilitator, trusted, or private-bearing view - so a room-shown file cannot embed attributes above the audience's circle. Full custody chains and seed taxonomy data stay out of the critical bundle (section 6.4 budget discipline); the export projection already omits provenance envelopes and tiers by construction. Version semantics: instances carry schema_version; readers accept the same major - and, while the major is 0, the same minor (cn_model::accepts_schema) - and MUST reject unknown majors loudly with a typed error (I7, I3). A breaking change bumps the major and mints a new $id. Cross-file refs: the export payload resolves against schemas/op-log.schema.json (and transitively schemas/story-path.schema.json), which must be registered alongside this schema.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "viewer_scope", "viewer_context", "export", "theme"],
+  "properties": {
+    "schema_version": {
+      "description": "schema_version accepted by 0.1-line readers: major 0, minor 1 (cn_model::accepts_schema).",
+      "type": "string",
+      "pattern": "^0\\.1\\.[0-9]+$"
+    },
+    "viewer_scope": {
+      "description": "Explicit statement of whose view is baked into this artifact (D-044.5). This enum is deliberately closed: no trusted, self, facilitator, or private-bearing scope is representable.",
+      "type": "string",
+      "enum": ["anonymous", "group-member"]
+    },
+    "viewer_context": {
+      "description": "The exact cn_perm::ViewerContext the embedded export was computed for.",
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind"],
+          "properties": {
+            "kind": { "const": "anonymous" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "person"],
+          "properties": {
+            "kind": { "const": "person" },
+            "person": { "$ref": "#/$defs/uuid" }
+          }
+        }
+      ]
+    },
+    "export": {
+      "description": "Output of cn-api export_snapshot for the declared viewer: boundary_version, schema_version, serialized group template, and the permission-filtered projection.",
+      "$ref": "https://community-navigator.example.test/schemas/op-log/0.1.0#/$defs/export_snapshot"
+    },
+    "theme": {
+      "description": "Resolved theme tokens for rendering, matching the theme member of schemas/theme-tokens.schema.json (tokens only; the adjustment report stays out of the bundle).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "tokens"],
+      "properties": {
+        "schema_version": {
+          "type": "string",
+          "pattern": "^0\\.1\\.[0-9]+$"
+        },
+        "tokens": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["hex", "source"],
+            "properties": {
+              "hex": {
+                "type": "string",
+                "pattern": "^#[0-9a-f]{6}$"
+              },
+              "source": {
+                "type": "string",
+                "enum": ["template", "default", "adjusted"]
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "viewer_scope": { "const": "anonymous" } },
+        "required": ["viewer_scope"]
+      },
+      "then": {
+        "properties": {
+          "viewer_context": {
+            "type": "object",
+            "properties": { "kind": { "const": "anonymous" } },
+            "required": ["kind"]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "viewer_scope": { "const": "group-member" } },
+        "required": ["viewer_scope"]
+      },
+      "then": {
+        "properties": {
+          "viewer_context": {
+            "type": "object",
+            "properties": { "kind": { "const": "person" } },
+            "required": ["kind"]
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "uuid": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    }
+  }
+}

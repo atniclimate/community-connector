@@ -1,0 +1,175 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://community-navigator.example.test/schemas/story-path/0.1.0",
+  "title": "Community Navigator story path",
+  "description": "Documents the EXISTING ratified persisted story format (R7, I7): a curated narrative path over graph entities, matching cn_model::Story (core/crates/cn-model/src/story.rs). Stories are data, referencing entities by stable id; the core validates them at load and silently elides steps whose entity is not visible to the viewer (ADR-001 A-B4). Version semantics: this schema documents the 0.1 line. Instances carry schema_version; readers accept the same major - and, while the major is 0, the same minor (cn_model::accepts_schema) - and MUST reject unknown majors loudly with a typed error (I7, I3). A breaking change bumps the major and mints a new $id. This schema is self-contained; schemas/op-log.schema.json references it for StoryCreate and StoryUpdate payloads.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "group_id",
+    "title",
+    "steps",
+    "visibility",
+    "lifecycle",
+    "provenance",
+    "tier",
+    "schema_version"
+  ],
+  "properties": {
+    "id": { "$ref": "#/$defs/uuid" },
+    "group_id": { "$ref": "#/$defs/uuid" },
+    "title": { "type": "string" },
+    "steps": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/story_step" }
+    },
+    "visibility": { "$ref": "#/$defs/circle" },
+    "lifecycle": { "$ref": "#/$defs/lifecycle" },
+    "provenance": { "$ref": "#/$defs/provenance" },
+    "tier": { "$ref": "#/$defs/tier" },
+    "schema_version": { "$ref": "#/$defs/accepted_schema_version" }
+  },
+  "$defs": {
+    "uuid": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "accepted_schema_version": {
+      "description": "schema_version accepted by 0.1-line readers: major 0, minor 1 (cn_model::accepts_schema).",
+      "type": "string",
+      "pattern": "^0\\.1\\.[0-9]+$"
+    },
+    "timestamp": {
+      "description": "Milliseconds since the Unix epoch (cn_model::Timestamp, i64).",
+      "type": "integer"
+    },
+    "circle": {
+      "type": "string",
+      "enum": ["private", "trusted", "group", "network", "public"]
+    },
+    "lifecycle": {
+      "type": "string",
+      "enum": ["active", "archived"]
+    },
+    "tier": {
+      "type": "string",
+      "enum": ["T0", "T1", "T2", "T3"]
+    },
+    "story_step": {
+      "description": "Single narrated story step (cn_model::StoryStep), referencing an entity by stable id.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["entity", "narration"],
+      "properties": {
+        "entity": { "$ref": "#/$defs/uuid" },
+        "narration": { "type": "string" }
+      }
+    },
+    "actor_ref": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["human"],
+          "properties": {
+            "human": { "$ref": "#/$defs/uuid" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["agent"],
+          "properties": {
+            "agent": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["agent_id"],
+              "properties": {
+                "agent_id": { "type": "string" }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "origin": {
+      "oneOf": [
+        { "const": "self_reported" },
+        { "const": "authored" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["ingested"],
+          "properties": {
+            "ingested": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["source"],
+              "properties": {
+                "source": { "type": "string" }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["derived"],
+          "properties": {
+            "derived": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["inputs"],
+              "properties": {
+                "inputs": {
+                  "type": "array",
+                  "items": { "$ref": "#/$defs/uuid" }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "custody_event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "action", "at", "actor"],
+      "properties": {
+        "id": { "$ref": "#/$defs/uuid" },
+        "action": {
+          "type": "string",
+          "enum": ["created", "imported", "migrated", "corrected", "exported"]
+        },
+        "at": { "$ref": "#/$defs/timestamp" },
+        "actor": { "$ref": "#/$defs/actor_ref" },
+        "note": { "type": ["string", "null"] }
+      }
+    },
+    "provenance": {
+      "description": "Provenance envelope (I6, R10). recorded_by human actors must equal responsible_human; that rule is enforced by the reader, not expressible here.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "origin",
+        "recorded_by",
+        "responsible_human",
+        "recorded_at",
+        "custody",
+        "schema_version"
+      ],
+      "properties": {
+        "origin": { "$ref": "#/$defs/origin" },
+        "recorded_by": { "$ref": "#/$defs/actor_ref" },
+        "responsible_human": { "$ref": "#/$defs/uuid" },
+        "recorded_at": { "$ref": "#/$defs/timestamp" },
+        "custody": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/custody_event" }
+        },
+        "schema_version": { "$ref": "#/$defs/accepted_schema_version" }
+      }
+    }
+  }
+}

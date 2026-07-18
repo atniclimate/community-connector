@@ -1,0 +1,986 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://community-navigator.example.test/schemas/op-log/0.1.0",
+  "title": "Community Navigator op-log record / export envelope",
+  "description": "Documents the EXISTING ratified persisted formats written by the Rust core (I7): (1) one operation record, the line format of *.ops.jsonl append-only logs written by cn-store (core/crates/cn-store/src/op.rs, Operation with internally tagged OpKind under the 'op' key); (2) the export snapshot envelope returned by cn-api export_snapshot (core/crates/cn-api/src/dto.rs, ExportSnapshot). Version semantics: this schema documents the 0.1 line. Instances carry schema_version; readers accept the same major - and, while the major is 0, the same minor (cn_model::accepts_schema) - and MUST reject unknown majors loudly with a typed error (I7, I3). A breaking change to either shape bumps the major and mints a new $id. Cross-file refs: story shapes resolve against schemas/story-path.schema.json, which must be registered alongside this schema.",
+  "oneOf": [
+    { "$ref": "#/$defs/operation" },
+    { "$ref": "#/$defs/export_snapshot" }
+  ],
+  "$defs": {
+    "uuid": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "slug": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_-]*$"
+    },
+    "accepted_schema_version": {
+      "description": "schema_version accepted by 0.1-line readers: major 0, minor 1 (cn_model::accepts_schema).",
+      "type": "string",
+      "pattern": "^0\\.1\\.[0-9]+$"
+    },
+    "timestamp": {
+      "description": "Milliseconds since the Unix epoch (cn_model::Timestamp, i64).",
+      "type": "integer"
+    },
+    "circle": {
+      "type": "string",
+      "enum": ["private", "trusted", "group", "network", "public"]
+    },
+    "lifecycle": {
+      "type": "string",
+      "enum": ["active", "archived"]
+    },
+    "tier": {
+      "type": "string",
+      "enum": ["T0", "T1", "T2", "T3"]
+    },
+    "actor_ref": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["human"],
+          "properties": {
+            "human": { "$ref": "#/$defs/uuid" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["agent"],
+          "properties": {
+            "agent": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["agent_id"],
+              "properties": {
+                "agent_id": { "type": "string" }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "origin": {
+      "oneOf": [
+        { "const": "self_reported" },
+        { "const": "authored" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["ingested"],
+          "properties": {
+            "ingested": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["source"],
+              "properties": {
+                "source": { "type": "string" }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["derived"],
+          "properties": {
+            "derived": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["inputs"],
+              "properties": {
+                "inputs": {
+                  "type": "array",
+                  "items": { "$ref": "#/$defs/uuid" }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "custody_event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "action", "at", "actor"],
+      "properties": {
+        "id": { "$ref": "#/$defs/uuid" },
+        "action": {
+          "type": "string",
+          "enum": ["created", "imported", "migrated", "corrected", "exported"]
+        },
+        "at": { "$ref": "#/$defs/timestamp" },
+        "actor": { "$ref": "#/$defs/actor_ref" },
+        "note": { "type": ["string", "null"] }
+      }
+    },
+    "provenance": {
+      "description": "Provenance envelope (I6, R10). recorded_by human actors must equal responsible_human; that rule is enforced by the reader, not expressible here.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "origin",
+        "recorded_by",
+        "responsible_human",
+        "recorded_at",
+        "custody",
+        "schema_version"
+      ],
+      "properties": {
+        "origin": { "$ref": "#/$defs/origin" },
+        "recorded_by": { "$ref": "#/$defs/actor_ref" },
+        "responsible_human": { "$ref": "#/$defs/uuid" },
+        "recorded_at": { "$ref": "#/$defs/timestamp" },
+        "custody": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/custody_event" }
+        },
+        "schema_version": { "$ref": "#/$defs/accepted_schema_version" }
+      }
+    },
+    "attribute_value": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "value"],
+          "properties": {
+            "type": { "const": "text" },
+            "value": { "type": "string" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "value"],
+          "properties": {
+            "type": { "const": "number" },
+            "value": { "type": "number" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "value"],
+          "properties": {
+            "type": { "const": "enum" },
+            "value": { "type": "string" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "value"],
+          "properties": {
+            "type": { "const": "tags" },
+            "value": {
+              "description": "The reader deserializes into an ordered set; duplicate entries are accepted and collapsed.",
+              "type": "array",
+              "items": { "type": "string" }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "value"],
+          "properties": {
+            "type": { "const": "date" },
+            "value": {
+              "type": "string",
+              "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "value"],
+          "properties": {
+            "type": { "const": "geo" },
+            "value": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["point"],
+                  "properties": {
+                    "point": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["lat", "lon"],
+                      "properties": {
+                        "lat": { "type": "number", "minimum": -90, "maximum": 90 },
+                        "lon": { "type": "number", "minimum": -180, "maximum": 180 }
+                      }
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["region"],
+                  "properties": {
+                    "region": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["name"],
+                      "properties": {
+                        "name": { "type": "string" }
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "value"],
+          "properties": {
+            "type": { "const": "link" },
+            "value": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["url"],
+              "properties": {
+                "url": { "type": "string", "minLength": 1 },
+                "format": {
+                  "enum": ["email", "url", null]
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "value"],
+          "properties": {
+            "type": { "const": "media" },
+            "value": { "type": "string", "minLength": 1 }
+          }
+        }
+      ]
+    },
+    "attribute_instance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["value", "visibility", "provenance"],
+      "properties": {
+        "value": { "$ref": "#/$defs/attribute_value" },
+        "visibility": { "$ref": "#/$defs/circle" },
+        "tier_override": {
+          "oneOf": [{ "$ref": "#/$defs/tier" }, { "type": "null" }]
+        },
+        "provenance": { "$ref": "#/$defs/provenance" }
+      }
+    },
+    "attributes_map": {
+      "type": "object",
+      "propertyNames": { "pattern": "^[a-z][a-z0-9_-]*$" },
+      "additionalProperties": { "$ref": "#/$defs/attribute_instance" }
+    },
+    "entity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "group_id",
+        "kind",
+        "attributes",
+        "presence_visibility",
+        "lifecycle",
+        "provenance",
+        "tier",
+        "schema_version"
+      ],
+      "properties": {
+        "id": { "$ref": "#/$defs/uuid" },
+        "group_id": { "$ref": "#/$defs/uuid" },
+        "kind": { "$ref": "#/$defs/slug" },
+        "attributes": { "$ref": "#/$defs/attributes_map" },
+        "owner": {
+          "oneOf": [{ "$ref": "#/$defs/uuid" }, { "type": "null" }]
+        },
+        "presence_visibility": { "$ref": "#/$defs/circle" },
+        "lifecycle": { "$ref": "#/$defs/lifecycle" },
+        "provenance": { "$ref": "#/$defs/provenance" },
+        "tier": { "$ref": "#/$defs/tier" },
+        "schema_version": { "$ref": "#/$defs/accepted_schema_version" }
+      }
+    },
+    "edge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "group_id",
+        "kind",
+        "from",
+        "to",
+        "directed",
+        "attributes",
+        "visibility",
+        "lifecycle",
+        "provenance",
+        "tier",
+        "schema_version"
+      ],
+      "properties": {
+        "id": { "$ref": "#/$defs/uuid" },
+        "group_id": { "$ref": "#/$defs/uuid" },
+        "kind": { "$ref": "#/$defs/slug" },
+        "from": { "$ref": "#/$defs/uuid" },
+        "to": { "$ref": "#/$defs/uuid" },
+        "directed": { "type": "boolean" },
+        "weight": { "type": ["number", "null"] },
+        "attributes": { "$ref": "#/$defs/attributes_map" },
+        "visibility": { "$ref": "#/$defs/circle" },
+        "lifecycle": { "$ref": "#/$defs/lifecycle" },
+        "provenance": { "$ref": "#/$defs/provenance" },
+        "tier": { "$ref": "#/$defs/tier" },
+        "schema_version": { "$ref": "#/$defs/accepted_schema_version" }
+      }
+    },
+    "membership": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "group_id",
+        "person",
+        "role",
+        "lifecycle",
+        "provenance",
+        "schema_version"
+      ],
+      "properties": {
+        "id": { "$ref": "#/$defs/uuid" },
+        "group_id": { "$ref": "#/$defs/uuid" },
+        "person": { "$ref": "#/$defs/uuid" },
+        "role": {
+          "description": "cn_model::GroupRole; facilitator is the pilot entry/story-authoring role without governance powers (D-028). Readers reject unknown role strings loudly.",
+          "type": "string",
+          "enum": ["member", "governance", "facilitator"]
+        },
+        "lifecycle": { "$ref": "#/$defs/lifecycle" },
+        "provenance": { "$ref": "#/$defs/provenance" },
+        "schema_version": { "$ref": "#/$defs/accepted_schema_version" }
+      }
+    },
+    "trust_scope": {
+      "oneOf": [
+        { "const": "all" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["group"],
+          "properties": {
+            "group": { "$ref": "#/$defs/uuid" }
+          }
+        }
+      ]
+    },
+    "trust_grant": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "grantor",
+        "grantee",
+        "scope",
+        "granted_at",
+        "provenance",
+        "schema_version"
+      ],
+      "properties": {
+        "id": { "$ref": "#/$defs/uuid" },
+        "grantor": { "$ref": "#/$defs/uuid" },
+        "grantee": { "$ref": "#/$defs/uuid" },
+        "scope": { "$ref": "#/$defs/trust_scope" },
+        "granted_at": { "$ref": "#/$defs/timestamp" },
+        "revoked_at": {
+          "oneOf": [{ "$ref": "#/$defs/timestamp" }, { "type": "null" }]
+        },
+        "provenance": { "$ref": "#/$defs/provenance" },
+        "schema_version": { "$ref": "#/$defs/accepted_schema_version" }
+      }
+    },
+    "group": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "name",
+        "template_id",
+        "template_version",
+        "provenance",
+        "tier",
+        "schema_version"
+      ],
+      "properties": {
+        "id": { "$ref": "#/$defs/uuid" },
+        "name": { "type": "string", "minLength": 1 },
+        "template_id": { "$ref": "#/$defs/slug" },
+        "template_version": { "$ref": "#/$defs/accepted_schema_version" },
+        "provenance": { "$ref": "#/$defs/provenance" },
+        "tier": { "$ref": "#/$defs/tier" },
+        "schema_version": { "$ref": "#/$defs/accepted_schema_version" }
+      }
+    },
+    "story": {
+      "$ref": "https://community-navigator.example.test/schemas/story-path/0.1.0"
+    },
+    "story_step": {
+      "$ref": "https://community-navigator.example.test/schemas/story-path/0.1.0#/$defs/story_step"
+    },
+    "hlc": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["wall_ms", "counter"],
+      "properties": {
+        "wall_ms": { "type": "integer" },
+        "counter": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "sort_key": {
+      "description": "Canonical total order from ADR-002 D5.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["hlc", "actor_key", "op_id"],
+      "properties": {
+        "hlc": { "$ref": "#/$defs/hlc" },
+        "actor_key": { "type": "string", "pattern": "^(human|agent):" },
+        "op_id": { "$ref": "#/$defs/uuid" }
+      }
+    },
+    "attribute_target_tuple": {
+      "description": "Serialized (EntityId, AttrId) tuple variant payload.",
+      "type": "array",
+      "prefixItems": [{ "$ref": "#/$defs/uuid" }, { "$ref": "#/$defs/slug" }],
+      "items": false,
+      "minItems": 2
+    },
+    "visibility_target": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["EntityPresence"],
+          "properties": { "EntityPresence": { "$ref": "#/$defs/uuid" } }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["Attribute"],
+          "properties": { "Attribute": { "$ref": "#/$defs/attribute_target_tuple" } }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["Edge"],
+          "properties": { "Edge": { "$ref": "#/$defs/uuid" } }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["Story"],
+          "properties": { "Story": { "$ref": "#/$defs/uuid" } }
+        }
+      ]
+    },
+    "tier_target": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["Entity"],
+          "properties": { "Entity": { "$ref": "#/$defs/uuid" } }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["Attribute"],
+          "properties": { "Attribute": { "$ref": "#/$defs/attribute_target_tuple" } }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["Edge"],
+          "properties": { "Edge": { "$ref": "#/$defs/uuid" } }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["Story"],
+          "properties": { "Story": { "$ref": "#/$defs/uuid" } }
+        }
+      ]
+    },
+    "custody_target": {
+      "oneOf": [
+        { "const": "Group" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["Entity"],
+          "properties": { "Entity": { "$ref": "#/$defs/uuid" } }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["Attribute"],
+          "properties": { "Attribute": { "$ref": "#/$defs/attribute_target_tuple" } }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["Edge"],
+          "properties": { "Edge": { "$ref": "#/$defs/uuid" } }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["Story"],
+          "properties": { "Story": { "$ref": "#/$defs/uuid" } }
+        }
+      ]
+    },
+    "op_kind": {
+      "description": "Internally tagged cn_store::OpKind; the 'op' key names the variant.",
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["op", "group", "template_json"],
+          "properties": {
+            "op": { "const": "GroupCreate" },
+            "group": { "$ref": "#/$defs/group" },
+            "template_json": {
+              "description": "Embedded authored group-template JSON document as a string; its parsed form validates against schemas/group-template.schema.json.",
+              "type": "string"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["op", "entity"],
+          "properties": {
+            "op": { "const": "EntityCreate" },
+            "entity": { "$ref": "#/$defs/entity" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["op", "entity", "lifecycle"],
+          "properties": {
+            "op": { "const": "EntityLifecycleSet" },
+            "entity": { "$ref": "#/$defs/uuid" },
+            "lifecycle": { "$ref": "#/$defs/lifecycle" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["op", "entity", "attr", "instance"],
+          "properties": {
+            "op": { "const": "AttributeSet" },
+            "entity": { "$ref": "#/$defs/uuid" },
+            "attr": { "$ref": "#/$defs/slug" },
+            "instance": { "$ref": "#/$defs/attribute_instance" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["op", "entity", "attr"],
+          "properties": {
+            "op": { "const": "AttributeRemove" },
+            "entity": { "$ref": "#/$defs/uuid" },
+            "attr": { "$ref": "#/$defs/slug" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["op", "target", "visibility"],
+          "properties": {
+            "op": { "const": "VisibilitySet" },
+            "target": { "$ref": "#/$defs/visibility_target" },
+            "visibility": { "$ref": "#/$defs/circle" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["op", "target", "tier"],
+          "properties": {
+            "op": { "const": "TierSet" },
+            "target": { "$ref": "#/$defs/tier_target" },
+            "tier": { "$ref": "#/$defs/tier" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["op", "edge"],
+          "properties": {
+            "op": { "const": "EdgeCreate" },
+            "edge": { "$ref": "#/$defs/edge" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["op", "edge"],
+          "properties": {
+            "op": { "const": "EdgeWeightSet" },
+            "edge": { "$ref": "#/$defs/uuid" },
+            "weight": { "type": ["number", "null"] }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["op", "edge", "lifecycle"],
+          "properties": {
+            "op": { "const": "EdgeLifecycleSet" },
+            "edge": { "$ref": "#/$defs/uuid" },
+            "lifecycle": { "$ref": "#/$defs/lifecycle" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["op", "membership"],
+          "properties": {
+            "op": { "const": "MembershipAdd" },
+            "membership": { "$ref": "#/$defs/membership" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["op", "membership", "lifecycle"],
+          "properties": {
+            "op": { "const": "MembershipLifecycleSet" },
+            "membership": { "$ref": "#/$defs/uuid" },
+            "lifecycle": { "$ref": "#/$defs/lifecycle" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["op", "grant"],
+          "properties": {
+            "op": { "const": "TrustGrantCreate" },
+            "grant": { "$ref": "#/$defs/trust_grant" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["op", "grant", "at"],
+          "properties": {
+            "op": { "const": "TrustGrantRevoke" },
+            "grant": { "$ref": "#/$defs/uuid" },
+            "at": { "$ref": "#/$defs/timestamp" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["op", "target", "event"],
+          "properties": {
+            "op": { "const": "CustodyAppend" },
+            "target": { "$ref": "#/$defs/custody_target" },
+            "event": { "$ref": "#/$defs/custody_event" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["op", "story"],
+          "properties": {
+            "op": { "const": "StoryCreate" },
+            "story": { "$ref": "#/$defs/story" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["op", "story"],
+          "properties": {
+            "op": { "const": "StoryUpdate" },
+            "story": { "$ref": "#/$defs/uuid" },
+            "title": { "type": ["string", "null"] },
+            "steps": {
+              "oneOf": [
+                { "type": "array", "items": { "$ref": "#/$defs/story_step" } },
+                { "type": "null" }
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["op", "story", "lifecycle"],
+          "properties": {
+            "op": { "const": "StoryLifecycleSet" },
+            "story": { "$ref": "#/$defs/uuid" },
+            "lifecycle": { "$ref": "#/$defs/lifecycle" }
+          }
+        }
+      ]
+    },
+    "operation": {
+      "description": "One line of a *.ops.jsonl append-only op log (cn_store::Operation).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "op_id",
+        "group_id",
+        "actor",
+        "responsible_human",
+        "recorded_at",
+        "sort_key",
+        "template_version",
+        "kind",
+        "schema_version"
+      ],
+      "properties": {
+        "op_id": { "$ref": "#/$defs/uuid" },
+        "group_id": { "$ref": "#/$defs/uuid" },
+        "actor": { "$ref": "#/$defs/actor_ref" },
+        "responsible_human": { "$ref": "#/$defs/uuid" },
+        "recorded_at": { "$ref": "#/$defs/timestamp" },
+        "sort_key": { "$ref": "#/$defs/sort_key" },
+        "template_version": { "$ref": "#/$defs/accepted_schema_version" },
+        "kind": { "$ref": "#/$defs/op_kind" },
+        "schema_version": { "$ref": "#/$defs/accepted_schema_version" }
+      }
+    },
+    "projected_entity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "owner_is_viewer", "attributes"],
+      "properties": {
+        "id": { "$ref": "#/$defs/uuid" },
+        "kind": { "$ref": "#/$defs/slug" },
+        "owner_is_viewer": { "type": "boolean" },
+        "attributes": {
+          "type": "object",
+          "propertyNames": { "pattern": "^[a-z][a-z0-9_-]*$" },
+          "additionalProperties": { "$ref": "#/$defs/attribute_value" }
+        }
+      }
+    },
+    "projected_edge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "from", "to", "directed", "weight", "attributes"],
+      "properties": {
+        "id": { "$ref": "#/$defs/uuid" },
+        "kind": { "$ref": "#/$defs/slug" },
+        "from": { "$ref": "#/$defs/uuid" },
+        "to": { "$ref": "#/$defs/uuid" },
+        "directed": { "type": "boolean" },
+        "weight": { "type": ["number", "null"] },
+        "attributes": {
+          "type": "object",
+          "propertyNames": { "pattern": "^[a-z][a-z0-9_-]*$" },
+          "additionalProperties": { "$ref": "#/$defs/attribute_value" }
+        }
+      }
+    },
+    "projected_story": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "title", "steps"],
+      "properties": {
+        "id": { "$ref": "#/$defs/uuid" },
+        "title": { "type": "string" },
+        "steps": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["entity", "narration"],
+            "properties": {
+              "entity": { "$ref": "#/$defs/uuid" },
+              "narration": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "projection": {
+      "description": "Permission-filtered viewer projection (cn_perm::Projection) - the only read path. Projections omit provenance envelopes and tiers by construction.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "group_id",
+        "viewer_fingerprint",
+        "revision",
+        "entities",
+        "edges",
+        "stories"
+      ],
+      "properties": {
+        "group_id": { "$ref": "#/$defs/uuid" },
+        "viewer_fingerprint": { "type": "string", "pattern": "^[0-9a-f]{8}$" },
+        "revision": { "type": "integer", "minimum": 0 },
+        "entities": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/projected_entity" }
+        },
+        "edges": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/projected_edge" }
+        },
+        "stories": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/projected_story" }
+        }
+      }
+    },
+    "template_attr_def": {
+      "description": "Serialized cn_schema::AttrDef. Unlike the authored form in group-template.schema.json, the Rust serializer materializes defaults and emits nulls for absent options.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type"],
+      "properties": {
+        "id": { "$ref": "#/$defs/slug" },
+        "type": {
+          "type": "string",
+          "enum": ["text", "number", "enum", "tags", "date", "geo", "link", "media"]
+        },
+        "required": { "type": "boolean" },
+        "values": {
+          "oneOf": [
+            { "type": "array", "items": { "type": "string" } },
+            { "type": "null" }
+          ]
+        },
+        "format": {
+          "enum": ["email", "url", null]
+        },
+        "default_visibility": { "$ref": "#/$defs/circle" }
+      }
+    },
+    "template_kind_def": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "label", "shape", "color_role", "attributes"],
+      "properties": {
+        "id": { "$ref": "#/$defs/slug" },
+        "label": { "type": "string" },
+        "shape": {
+          "type": "string",
+          "enum": ["sphere", "cube", "octahedron", "tetrahedron", "torus", "cone"]
+        },
+        "color_role": { "type": "string", "pattern": "^kind-[1-9][0-9]*$" },
+        "attributes": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/template_attr_def" }
+        }
+      }
+    },
+    "template_edge_kind_def": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "label", "from", "to", "directed"],
+      "properties": {
+        "id": { "$ref": "#/$defs/slug" },
+        "label": { "type": "string" },
+        "from": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/slug" }
+        },
+        "to": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/slug" }
+        },
+        "directed": { "type": "boolean" },
+        "weighted": {
+          "type": "string",
+          "enum": ["required", "optional", "forbidden"]
+        }
+      }
+    },
+    "template_theme": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "roles"],
+      "properties": {
+        "mode": { "type": "string" },
+        "roles": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string",
+            "pattern": "^#[0-9a-f]{6}$"
+          }
+        }
+      }
+    },
+    "group_template_serialized": {
+      "description": "Serialized cn_schema::GroupTemplate as embedded in exports. The authored on-disk template format is schemas/group-template.schema.json; this def additionally admits serializer-materialized defaults and nulls.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "template_id",
+        "name",
+        "description",
+        "kinds",
+        "edge_kinds"
+      ],
+      "properties": {
+        "schema_version": { "$ref": "#/$defs/accepted_schema_version" },
+        "template_id": { "$ref": "#/$defs/slug" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "vocabulary": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        },
+        "kinds": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/template_kind_def" }
+        },
+        "edge_kinds": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/template_edge_kind_def" }
+        },
+        "theme": {
+          "oneOf": [{ "$ref": "#/$defs/template_theme" }, { "type": "null" }]
+        }
+      }
+    },
+    "export_snapshot": {
+      "description": "cn-api export_snapshot envelope (cn_api ExportSnapshot): a narrowing-only export of one viewer's projection plus the group template. The export gate additionally excludes effective-tier T3 values even for the owner (ADR-001 A-B2, ADR-002 A-B8).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["boundary_version", "schema_version", "template", "projection"],
+      "properties": {
+        "boundary_version": { "$ref": "#/$defs/accepted_schema_version" },
+        "schema_version": { "$ref": "#/$defs/accepted_schema_version" },
+        "template": { "$ref": "#/$defs/group_template_serialized" },
+        "projection": { "$ref": "#/$defs/projection" }
+      }
+    }
+  }
+}
