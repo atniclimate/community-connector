@@ -463,3 +463,28 @@ docs/CODEX_GUIDE.md section 2.4 updated to match. Human gates are NOT
 affected: G-RAT, G-DATE, G1, G2, D-023 review, no-remotes, no-real-data all
 stand; the one-shot targets the gate-blind scope of PLAN_1.0.md Phases 0-4
 plus non-gated Phase 5 items, parking everything gated.
+
+## D-043 (2026-07-17) - P0.3 enforcement design: scoped check-all on pre-commit, no pre-push
+
+Trigger: PLAN_1.0.md P0.3 requires the battery enforced by a local hook without
+crossing the no-remotes gate (D-026). A pre-push hook never fires with no
+remote, and adding any remote is a human gate, so pre-commit is the only local
+enforcement point that actually executes.
+
+Choice: expand scripts/hooks/pre-commit to run the staged PII scan always and
+scripts/check-all.ps1 -Staged -Quiet when staged paths touch code (core/, app/,
+schemas/, fixtures/, scripts/). The -Staged trigger map keeps per-commit cost
+proportional (measured on the reference laptop, warm caches): docs-only ~1s
+(PII only), app-only ~10-15s, core-touching ~3min (fmt, clippy, test,
+wasm-pack, smoke, snapshot). The PLAN_1.0.md impracticality threshold (~3min
+for an app-only docs-adjacent change) is not met - app-only commits are well
+under it - so the fast-subset fallback (fmt/typecheck/PII only, with full
+check-all as a pre-commit-series gate) was NOT taken. Core commits pay ~3min,
+which is judged proportional for permission-adjacent work. Full check-all
+(everything, warm) is ~3.5-4min and remains the phase-exit / pre-commit-series
+standard in AGENTS.md.
+
+Verified: a deliberately failing vitest blocked a commit through the hook
+(check-all reported app-test FAIL, exit 1, HEAD unchanged); the breakage was
+then reverted. Rejected: pre-push (never fires locally), unconditional full
+battery per commit (breaks atomic-commit cadence for docs lanes).

@@ -1,4 +1,13 @@
 #!/bin/sh
-# PII tripwire (AGENTS.md I1) - blocks commits containing PII patterns.
+# Pre-commit verification gate (AGENTS.md I1; PLAN_1.0.md P0.3).
+# - Staged PII scan ALWAYS runs (directly, or inside check-all -Staged).
+# - When staged paths touch code (core/, app/, schemas/, fixtures/, scripts/),
+#   the scoped battery runs: scripts/check-all.ps1 -Staged -Quiet.
 # Installed via: git config core.hooksPath scripts/hooks  (scripts/install-hooks.ps1)
-pwsh -NoProfile -File "$(git rev-parse --show-toplevel)/scripts/pii-scan.ps1" -Staged
+root="$(git rev-parse --show-toplevel)"
+if git diff --cached --name-only --diff-filter=ACMRD | grep -qE '^(core|app|schemas|fixtures|scripts)/'; then
+    # check-all -Staged includes the staged PII scan as an unconditional member.
+    pwsh -NoProfile -File "$root/scripts/check-all.ps1" -Staged -Quiet || exit 1
+else
+    pwsh -NoProfile -File "$root/scripts/pii-scan.ps1" -Staged || exit 1
+fi
