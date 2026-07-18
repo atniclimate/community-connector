@@ -3,9 +3,17 @@
 # - Staged PII scan ALWAYS runs (directly, or inside check-all -Staged).
 # - When staged paths touch code (core/, app/, schemas/, fixtures/, scripts/),
 #   the scoped battery runs: scripts/check-all.ps1 -Staged -Quiet.
+# Known limitation (accepted, Codex review 019f7367): members execute against
+# the working tree, not a staged checkout; the repo's atomic-writes directive
+# (CLAUDE.md cadence) keeps staged == worktree in normal practice, and a
+# stash-based staged checkout risks destroying work.
 # Installed via: git config core.hooksPath scripts/hooks  (scripts/install-hooks.ps1)
-root="$(git rev-parse --show-toplevel)"
-if git diff --cached --name-only --diff-filter=ACMRD | grep -qE '^(core|app|schemas|fixtures|scripts)/'; then
+root="$(git rev-parse --show-toplevel)" || exit 1
+staged="$(git diff --cached --name-only --diff-filter=ACMRD)" || {
+    echo "pre-commit: git diff --cached failed; refusing to commit unverified." >&2
+    exit 1
+}
+if printf '%s\n' "$staged" | grep -qE '^(core|app|schemas|fixtures|scripts)/'; then
     # check-all -Staged includes the staged PII scan as an unconditional member.
     pwsh -NoProfile -File "$root/scripts/check-all.ps1" -Staged -Quiet || exit 1
 else

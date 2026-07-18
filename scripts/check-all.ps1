@@ -49,11 +49,12 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$repoRoot = (& git rev-parse --show-toplevel).Trim()
-if ($LASTEXITCODE -ne 0 -or -not $repoRoot) {
+$repoRootRaw = & git rev-parse --show-toplevel
+if ($LASTEXITCODE -ne 0 -or -not $repoRootRaw) {
     Write-Host 'check-all: not inside a git repository.' -ForegroundColor Red
     exit 2
 }
+$repoRoot = "$repoRootRaw".Trim()
 
 $modeCount = @($RustOnly, $AppOnly, $Staged).Where({ $_ }).Count
 if ($modeCount -gt 1) {
@@ -147,8 +148,13 @@ foreach ($m in $selected) {
     $sw = [System.Diagnostics.Stopwatch]::StartNew()
     $exit = 0
     $buffered = $null
-    Push-Location $dir
+    $pushed = $false
     try {
+        # Push-Location stays inside the try so a missing member directory is
+        # recorded as that member's FAILURE (I3) instead of killing the
+        # orchestrator and skipping the aggregate report.
+        Push-Location $dir
+        $pushed = $true
         if ($Quiet) {
             $buffered = & $m.Exe @($m.Args) 2>&1
         } else {
@@ -163,7 +169,7 @@ foreach ($m in $selected) {
         $buffered = @($buffered) + $_.Exception.Message
         if (-not $Quiet) { Write-Host $_.Exception.Message -ForegroundColor Red }
     } finally {
-        Pop-Location
+        if ($pushed) { Pop-Location }
     }
     $sw.Stop()
     $status = if ($exit -eq 0) { 'PASS' } else { 'FAIL' }
