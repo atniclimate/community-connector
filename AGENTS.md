@@ -35,6 +35,19 @@ Docs use hyphens, never em dashes.
 
 ## Repo commands
 
+### AUTOMATED (everything check-all runs)
+
+One command runs the whole battery; it is the phase-exit and pre-commit-series
+standard, and the pre-commit hook runs its staged-scoped subset (D-043):
+
+```
+# Repo root - single orchestrator (P0.2). Modes: -RustOnly, -AppOnly,
+# -SkipSnapshot, -Staged (pre-commit scoping), -Quiet.
+pwsh scripts/check-all.ps1
+```
+
+Members, in order (each runnable individually):
+
 ```
 # Rust core (run from core/)
 cargo fmt --check
@@ -43,13 +56,24 @@ cargo test --workspace
 wasm-pack build crates/cn-wasm --target web
 
 # App (run from app/)
-npm run typecheck        # tsc --noEmit
-npm run build            # vite build
-npm run build:snapshot   # single-file offline build + size budget check
+npm run typecheck            # tsc --noEmit
+npm run build                # vite build
+npm run test                 # vitest run
+npm run validate:templates   # fixture templates vs group-template schema
+npm run smoke:node           # wasm load + projection smoke via Node
+npm run build:snapshot       # single-file offline build + size budget check (I8)
 
 # Cross-cutting (repo root)
-pwsh scripts/pii-scan.ps1          # PII tripwire, also wired as pre-commit hook
+pwsh scripts/pii-scan.ps1    # PII tripwire; staged mode wired into pre-commit
 ```
+
+### HUMAN-ONLY (never automatable; a machine cannot close these)
+
+- Director screenshot review of rendering/visual changes.
+- Accessibility testing (keyboard walkthrough, reduced-motion, 375px layouts).
+- Convention rehearsal - the full facilitator arc dry run (P5.9).
+- Consent, community-facing text, and community-language review (D-023);
+  vocabulary authority rests with ATNI Climate (G1).
 
 ## Red data (never read, never include in prompts)
 
