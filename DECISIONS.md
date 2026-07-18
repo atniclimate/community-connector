@@ -628,3 +628,85 @@ The barrier wave review (Codex gpt-5.6-sol review profile, session
    PARKED).** I12's machine-readable reports exist in the Rust core;
    extending the build-time validator with a JSON summary is queued for
    the Wave 2 schemas lane.
+
+## D-047 (2026-07-18) - Wave 2 recovery rulings (post spend-limit interruption)
+
+The Waves 0-2 build workflow was interrupted by an Anthropic monthly spend
+limit at Barrier 2. HEAD (e43cfc1) is a green Barrier-1 checkpoint (Wave 0 +
+Wave 1 committed); Wave 2 (legend/motion, search/detail/flat, snapshot
+envelope, cn CLI router) is uncommitted in the working tree. Per the
+usage-failover directive (CODEX_GUIDE section 6), recovery is offloaded to
+Codex gpt-5.6-sol with Claude as director; offloaded commits are marked
+[codex-offload]. Codex triage (C:\dev\_reviews\community-connector\
+2026-07-18_wave2-triage.md) returned SALVAGE for all four lanes. Director
+rulings:
+
+1. **Operator/developer chrome is exempt from the D-044.4 / D-023 language
+   quarantine.** The DRAFT-PENDING-HUMAN-REVIEW marker and G1 vocabulary
+   quarantine govern text shown to pilot participants/community: the
+   participant-facing app (detail-panel tier explanations, primer, story
+   prose, wizard/entry-form help) and the pilot's outward documents (intake
+   form, consent email). Developer/operator chrome - `cn` CLI --help/usage/
+   parked-stub messages and build-tool diagnostics - is NOT community-facing
+   and needs no marker. The always-visible detail-panel tier summary IS
+   participant-facing and must carry the visible marker (triage finding 163).
+
+2. **Detail-panel provenance/tier (P1.5, D-032/D-033).** The I2-respecting
+   path is to extend cn-api::EntityDetail so cn-perm supplies the effective
+   tier code (D-032) and a provenance one-liner, with full custody depth only
+   when the viewer projection is governance (D-033); the app renders what it
+   is given and never infers role. Bounded-scope park rule (deep-thinking
+   ladder): if that core extension exceeds a few DTO fields + one cn-perm
+   summary function + tests, PARK it - ship detail with attributes + owner
+   indicator, remove the dead detail.provenance rendering, and record the
+   one-liner as a small deferred follow-up. No dead UI, no I2 violation
+   either way.
+
+3. **A2b scoped-response correctness is BLOCKING.** Search and detail
+   actions/reducers must carry group+viewer+session request identity and
+   reject stale or out-of-scope responses in the state machine (request-
+   identity matching, not app-layer permission logic - I2-safe). Closes the
+   old-scope-data-into-new-session risk the triage flagged.
+
+4. **B2 snapshot completion is required to reach green** (its partial wiring
+   currently fails build:snapshot loudly on empty anonymous projections):
+   a deterministic public-layer synthetic research-network fixture generated,
+   reviewed, and committed (never silently rewritten at build time); pkg-node
+   rebuilt with a freshness check; MISSING WORKER INLINING IS FATAL (D-046
+   self-contained single file); per-artifact (snapshot.*.html) size gate;
+   envelope format version named independently of the export version; the
+   double projection pass removed; and a real snapshot BOOT READER in main.ts
+   with unknown-major rejection (I7 reader half). ACCEPTANCE GATE: no snapshot
+   artifact is committed until a no-leak test that inspects the serialized
+   HTML for above-scope sentinel values passes (P2.5).
+
+## D-048 (2026-07-18) - Snapshot data pipeline (P2.3-P2.5) decoupled and parked
+
+After three consecutive Codex exec sessions exited on an internal step cap
+before finishing B2, the director decoupled the snapshot DATA pipeline from
+the rest of Wave 2. State at the decision: check-all was 10/11 green - only
+app-snapshot failed, because the committed fixtures are all group-visibility
+and the embed produces an empty anonymous projection, and because the
+snapshot still emits a ~1.57MB EXTERNAL worker chunk (a file:// single-file
+snapshot cannot load an external worker, D-046).
+
+Root architectural finding (director): main.ts hydrates the initial snapshot
+render from the embedded envelope with no wasm, but search and detail still
+call cn-api through the Worker at runtime, so an offline self-contained
+snapshot needs an in-process (main-thread) WasmTransport in snapshot mode -
+the WasmClient already accepts a WasmTransport, so this is additive, but it
+was not finished. This is the correct v0.1 design and is the parked follow-up.
+
+Decision: the P2.3 embed plugin is committed but GATED behind
+CN_EMBED_SNAPSHOT=1 (app/vite.config.ts); the default snapshot build produces
+a valid single-file shell so check-all stays green. The snapshot boot reader
+(app/src/state/snapshot.ts, with I7 unknown-major rejection) and its unit
+tests are committed and active. PARKED as a scoped follow-up (P2.3 completion):
+(1) main-thread WasmTransport for snapshot mode so the artifact has no
+external worker; (2) wire the --public-layer generator into build:snapshot
+into an isolated non-tracked dir; (3) per-artifact size gate in
+check-size.mjs; (4) the no-leak acceptance test (D-047.4) asserting no
+above-scope sentinel appears in the serialized HTML; then flip
+CN_EMBED_SNAPSHOT on by default. Everything else in Wave 2 (explore surface,
+detail provenance/tier core extension, CLI router) is complete and committed.
+This changes no accepted ADR and crosses no human gate.
