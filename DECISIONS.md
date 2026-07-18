@@ -576,3 +576,55 @@ Integrator rulings at Barrier 1:
    (cache_key_survives_fingerprint_collision). Rejected: raw-context
    cache keys in exports (leaks grant ids); new crypto-hash dependency
    (heavier than needed for an in-memory key).
+
+## D-046 (2026-07-17) - Wave 1 review sweep: rulings on blockers and advisories
+
+The barrier wave review (Codex gpt-5.6-sol review profile, session
+019f7399-fdc7-75d3-b629-422b8eee6147, verdict BLOCKING FINDINGS: yes over
+5495036..HEAD) returned two blockers and four advisories. Integrator rulings:
+
+1. **Write-outcome existence oracle via story steps (blocker - RULED
+   pre-existing, PARKED as priority Wave 2 design work).** A submitter can
+   distinguish existing-but-hidden entity ids from nonexistent ids through
+   the Applied vs Quarantined submit outcome of ops that reference
+   entities. Verified scope: this is NOT a facilitator regression - the
+   member-open StoryCreate (and EdgeCreate) apply paths have carried the
+   identical oracle since Phase 2 (fold.rs quarantines missing step
+   entities for every member), so a StoryUpdate-only patch is ineffective
+   (facilitators are active members and could probe via StoryCreate). An
+   effective fix uniformly adds reference-visibility authorization to
+   member-open create/update ops in cn-perm - a change to ratified
+   ADR-002 apply semantics that is itself permission-adjacent and needs
+   its own blueprint plus mandatory adversarial round. Mitigations
+   meanwhile: ids are UUIDv7 (blind guessing infeasible; the oracle only
+   confirms possession of an already-known id), read surfaces stay
+   projection-filtered, and the pilot threat model is facilitator-run
+   devices. Owner: Wave 2 permission lane.
+2. **Snapshot-envelope schema cannot bind scope to payload (blocker -
+   FIXED as a documentation boundary).** Correct observation: JSON Schema
+   validation is structural and can never prove the export was computed
+   for the declared viewer_scope. The schema over-claimed. Fixed by
+   stating the I2 enforcement boundary explicitly in the schema
+   descriptions: scope truth lives in the P2.3 generator (export obtained
+   only via cn-api/cn-perm for the declared viewer; generator must refuse
+   viewers whose projection exceeds group-member reach) and the D-044.6
+   snapshot acceptance test (no above-scope values in the artifact).
+   Schema validation was not and is not the permission gate (no instances
+   exist until P2.3).
+3. **Nested story/provenance schema_version not checked at apply
+   (advisory - PARKED).** Runtime readers enforce the operation's
+   schema_version; embedded record versions ride the op line. Wave 2:
+   either a reader-side nested-version check or an explicit documented
+   rule that op.schema_version governs embedded records.
+4. **Snapshot worker outside the measured artifact (advisory - already
+   tracked).** dist/worker-*.js (1.55MB) is externally referenced by the
+   snapshot HTML; single-file inlining and honest budget accounting are
+   the Phase 2 snapshot-envelope lane's existing work item (P2.3).
+5. **Latin-only font subset (advisory - already documented).** Non-latin
+   display names would hit troika's CDN fallback (console error + missing
+   glyphs offline). Post-pilot font-coverage decision stands (Lane A
+   record).
+6. **validate-templates emits no machine-readable report (advisory -
+   PARKED).** I12's machine-readable reports exist in the Rust core;
+   extending the build-time validator with a JSON summary is queued for
+   the Wave 2 schemas lane.
