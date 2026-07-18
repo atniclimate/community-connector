@@ -9,7 +9,7 @@ function viewerJson(request: { readonly viewer: JsonObject }): string {
   return JSON.stringify(request.viewer);
 }
 
-function parseEnvelope<T extends JsonObject>(json: string): Envelope<T> {
+function parseEnvelope<T>(json: string): Envelope<T> {
   try {
     const parsed = JSON.parse(json) as Envelope<T>;
     if ("ok" in parsed || "err" in parsed) {
@@ -65,7 +65,9 @@ function loadGroup(instance: CnApi, request: Extract<WorkerRequest, { readonly k
   return instance.load_group_commit(request.groupId, Date.now());
 }
 
-function toResponse(correlationId: number, envelope: Envelope<JsonObject>): WorkerResponse {
+type WorkerSuccess = Extract<WorkerResponse, { readonly ok: unknown }>["ok"];
+
+function toResponse(correlationId: number, envelope: Envelope<WorkerSuccess>): WorkerResponse {
   if ("err" in envelope) {
     return { correlationId, err: envelope.err };
   }
@@ -80,7 +82,7 @@ async function handleMessage(event: MessageEvent<WorkerRequest>): Promise<void> 
   const correlationId = event.data.correlationId;
   try {
     const instance = await api();
-    const envelope = parseEnvelope<JsonObject>(runRequest(instance, event.data));
+    const envelope = parseEnvelope<WorkerSuccess>(runRequest(instance, event.data));
     postMessage(toResponse(correlationId, envelope));
   } catch (error) {
     postMessage({ correlationId, err: thrownError(error) } satisfies WorkerResponse);

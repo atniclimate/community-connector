@@ -3,6 +3,7 @@ import type {
   ErrorEnvelopeDto,
   JsonObject,
   ProjectionDto,
+  SearchHitDto,
   ViewerContextDto,
 } from "../state/state";
 import type { WorkerRequest, WorkerRequestInput, WorkerResponse } from "./protocol";
@@ -25,7 +26,7 @@ export type WasmTransport = {
 };
 
 type PendingRequest = {
-  readonly resolve: (value: JsonObject) => void;
+  readonly resolve: (value: unknown) => void;
   readonly reject: (error: ErrorEnvelopeDto) => void;
 };
 
@@ -77,7 +78,11 @@ export class WasmClient {
     return this.request({ kind: "submitOps", groupId, viewer, opsJson });
   }
 
-  public search(groupId: string, viewer: ViewerContextDto, query: JsonObject): Promise<JsonObject> {
+  public search(
+    groupId: string,
+    viewer: ViewerContextDto,
+    query: JsonObject,
+  ): Promise<readonly SearchHitDto[]> {
     return this.request({ kind: "search", groupId, viewer, query });
   }
 
@@ -104,12 +109,15 @@ export class WasmClient {
     return protocolError(error instanceof Error ? error.message : "Unknown wasm client error");
   }
 
-  private request(request: WorkerRequestInput): Promise<JsonObject> {
+  private request<T = JsonObject>(request: WorkerRequestInput): Promise<T> {
     const correlationId = this.nextCorrelationId;
     this.nextCorrelationId += 1;
     const workerRequest = { ...request, correlationId } as WorkerRequest;
-    return new Promise((resolve, reject) => {
-      this.pending.set(correlationId, { resolve, reject });
+    return new Promise<T>((resolve, reject) => {
+      this.pending.set(correlationId, {
+        resolve: (value) => resolve(value as T),
+        reject,
+      });
       this.transport.postMessage(workerRequest);
     });
   }

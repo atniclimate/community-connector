@@ -3,6 +3,7 @@ import type {
   ErrorEnvelopeDto,
   JsonObject,
   ProjectionDto,
+  SearchHitDto,
   ViewerContextDto,
 } from "../state/state";
 
@@ -69,7 +70,7 @@ export type WorkerRequestInput =
 export type WorkerResponse =
   | {
       readonly correlationId: number;
-      readonly ok: ProjectionDto | EntityDetailDto | JsonObject;
+      readonly ok: ProjectionDto | EntityDetailDto | readonly SearchHitDto[] | JsonObject;
     }
   | {
       readonly correlationId: number;

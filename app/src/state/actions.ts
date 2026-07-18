@@ -4,6 +4,8 @@ import type {
   KindMeta,
   ProjectionDto,
   QualityTierName,
+  RequestIdentity,
+  SearchHitDto,
   ViewerContextDto,
 } from "./state";
 import type { Theme, ThemeReport } from "../theme/tokens";
@@ -46,10 +48,21 @@ export type Action =
       readonly kind: "entityFocusCleared";
     }
   | {
+      readonly kind: "detailRequested";
+      readonly entityId: string;
+      readonly request: RequestIdentity;
+    }
+  | {
       readonly kind: "detailReceived";
       readonly detail: EntityDetailDto;
       readonly entityId: string;
-      readonly revision: number;
+      readonly request: RequestIdentity;
+    }
+  | {
+      readonly kind: "detailFailed";
+      readonly entityId: string;
+      readonly request: RequestIdentity;
+      readonly error: ErrorEnvelopeDto;
     }
   | {
       readonly kind: "detailCleared";
@@ -79,6 +92,26 @@ export type Action =
   | {
       readonly kind: "qualityTierChanged";
       readonly tier: QualityTierName;
+    }
+  | {
+      readonly kind: "searchRequested";
+      readonly query: string;
+      readonly request: RequestIdentity;
+    }
+  | {
+      readonly kind: "searchSucceeded";
+      readonly query: string;
+      readonly hits: readonly SearchHitDto[];
+      readonly request: RequestIdentity;
+    }
+  | {
+      readonly kind: "searchFailed";
+      readonly query: string;
+      readonly error: ErrorEnvelopeDto;
+      readonly request: RequestIdentity;
+    }
+  | {
+      readonly kind: "searchCleared";
     }
   | {
       readonly kind: "errorSurfaced";

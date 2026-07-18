@@ -45,6 +45,35 @@ export type ProjectionDto = JsonObject & {
 
 export type EntityDetailDto = JsonObject & {
   readonly id: string;
+  readonly kind?: string;
+  readonly owner_is_viewer?: boolean;
+  readonly tier?: string;
+  readonly provenance?: JsonObject;
+  readonly attributes?: JsonObject;
+};
+
+export type SearchHitDto = {
+  readonly entity: string;
+  readonly kind: string;
+  readonly matched_attr: string;
+  readonly snippet: string;
+};
+
+export type SearchStatus = "idle" | "pending" | "ready" | "error";
+
+export type RequestIdentity = {
+  readonly requestId: number;
+  readonly sessionId: number;
+  readonly groupId: string;
+  readonly viewer: ViewerContextDto;
+};
+
+export type SearchState = {
+  readonly query: string;
+  readonly status: SearchStatus;
+  readonly hits: readonly SearchHitDto[];
+  readonly error: ErrorEnvelopeDto | null;
+  readonly request: RequestIdentity | null;
 };
 
 export type LoadState = "idle" | "loading" | "ready" | "error";
@@ -62,6 +91,7 @@ export interface AppState {
   readonly session: {
     readonly groupId: string | null;
     readonly viewer: ViewerContextDto;
+    readonly sessionId: number;
     readonly revision: number;
     readonly loadState: LoadState;
     readonly lastError: ErrorEnvelopeDto | null;
@@ -83,11 +113,24 @@ export interface AppState {
   readonly data: {
     readonly projection: ProjectionDto | null;
     readonly detail: EntityDetailDto | null;
+    readonly detailRequest: (RequestIdentity & { readonly entityId: string }) | null;
+    readonly detailError: ErrorEnvelopeDto | null;
     readonly kindMeta: Readonly<Record<string, KindMeta>>;
   };
+  readonly search: SearchState;
   readonly theme: {
     readonly resolved: Theme | null;
     readonly report: ThemeReport | null;
+  };
+}
+
+export function initialSearchState(): SearchState {
+  return {
+    query: "",
+    status: "idle",
+    hits: [],
+    error: null,
+    request: null,
   };
 }
 
@@ -96,6 +139,7 @@ export function createInitialState(reducedMotion = false): AppState {
     session: {
       groupId: null,
       viewer: { kind: "anonymous" },
+      sessionId: 0,
       revision: 0,
       loadState: "idle",
       lastError: null,
@@ -117,8 +161,11 @@ export function createInitialState(reducedMotion = false): AppState {
     data: {
       projection: null,
       detail: null,
+      detailRequest: null,
+      detailError: null,
       kindMeta: {},
     },
+    search: initialSearchState(),
     theme: {
       resolved: null,
       report: null,

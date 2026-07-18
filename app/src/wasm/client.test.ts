@@ -44,9 +44,14 @@ describe("WasmClient protocol routing", () => {
     const second = client.queryPaths("group-alpha", { kind: "anonymous" }, { from: "a", to: "b" });
 
     transport.reply({ correlationId: 2, ok: { id: "second" } });
-    transport.reply({ correlationId: 1, ok: { id: "first" } });
+    transport.reply({
+      correlationId: 1,
+      ok: [{ entity: "e1", kind: "person", matched_attr: "name", snippet: "first" }],
+    });
 
-    await expect(first).resolves.toEqual({ id: "first" });
+    await expect(first).resolves.toEqual([
+      { entity: "e1", kind: "person", matched_attr: "name", snippet: "first" },
+    ]);
     await expect(second).resolves.toEqual({ id: "second" });
   });
 
