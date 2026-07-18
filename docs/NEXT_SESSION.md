@@ -4,28 +4,33 @@
 > CLAUDE.md -> HANDOFF.md -> this file. Refresh the Brief at each session
 > end (CLAUDE.md session-end protocol).
 
-## The 60-second brief (refreshed 2026-07-06, end of session 2 - the decision session)
+## The 60-second brief (refreshed 2026-07-18, end of the one-shot build session)
 
-The decision session happened: eighteen decisions (D-019..D-040) now
-define v0.1.0 as "convention-pilot ready" - a facilitator-run,
-snapshot-first build for an ATNI Climate convention arc: consent email ->
-intake form (QR joins at the convention) -> ingest at T1 -> full-graph
-reveal at the general assembly -> need-to-solution pathway exploration in
-the committee meeting -> feedback. Personal mode, identity, and deep
-accessibility moved to v0.2. Execution Plan v2 is in
-docs/PROJECT_PLAN.md section 3 (9-12 sessions remain). A comprehensive
-graph-networks research report was commissioned (D-040) and lands at
-docs/research/graph-networks-report-2026-07-06.md - the next sitting
-reads it and shapes plan v3, including possible integrations with
-cap-assessor, TCR-policy-scanner, GeoBase, and engagement-database.
+A large gate-blind build session ran against PLAN_1.0.md. Landed and green
+(check-all 11/11): Phase 0 (the check-all verification battery + enforced
+hook), the entire Phase 1 explore surface (labels, focus/motion, legend,
+search, detail with tier + governance-gated provenance, flat reading
+projection), Phase 2 persisted-format schemas, the Phase 3
+`GroupRole::Facilitator` role with its authority matrix and five-class
+no-leak property, the semantics-free `cn` CLI router, the pilot evidence
+template, and the CPF-RCN migration recipe. An Anthropic spend limit
+interrupted the build workflow mid-Wave-2; a Codex-offload recovery salvaged
+all of it (seven atomic commits). PARKED for the next session: the
+self-contained snapshot data pipeline (needs an offline main-thread wasm
+transport - D-048), the facilitator wizard + entry forms (P3.5/P3.6), all of
+Phase 4 (stories, primer, snapshot acceptance), and the P1.3 benchmark. See
+HANDOFF.md "Exact next actions". Codex `exec` was persistently exiting early
+on long jobs by session end - verify its health before leaning on it.
 
 ## How to resume work (for the director)
 
-1. Read HANDOFF.md - exact in-flight state and next actions.
-2. If the human is present: deliver the Brief; offer the plan-v3 sitting
-   (research report + Execution Plan v2 side by side); then the
-   remaining questions below.
-3. If autonomous: continue Execution Plan v2 from HANDOFF (S3-A2 next).
+1. Read HANDOFF.md - exact in-flight state, parked work, and next actions.
+2. If the human is present: deliver the Brief; the highest-value answers are
+   the gates below (especially G-DATE / Q-A and G1). Offer the plan-v3
+   sitting (research report + Execution Plan v2 side by side).
+3. If autonomous: verify Codex health, then resume from HANDOFF's next
+   actions (complete the snapshot pipeline per D-048, then P3.5/P3.6, then
+   Phase 4). Prefer small bounded Codex jobs.
 4. Re-arm the 8:00 AM safety cron if the usage-failover directive stands.
 
 ## Remaining open questions (defaults keep autonomous work unblocked)
