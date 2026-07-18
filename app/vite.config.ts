@@ -3,6 +3,7 @@ import { viteSingleFile } from "vite-plugin-singlefile";
 import { createReadStream, existsSync, statSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { cnSnapshotEmbedPlugin } from "./scripts/embed-snapshot-data";
 
 const FIXTURE_PREFIX = "/fixtures/";
 const NOT_FOUND_STATUS = 404;
@@ -19,8 +20,22 @@ function contentType(file: string): string {
 }
 
 export default defineConfig(({ mode }) => ({
+  define: {
+    __CN_SNAPSHOT_MODE__: JSON.stringify(mode === "snapshot"),
+  },
   plugins: [
-    ...(mode === "snapshot" ? [viteSingleFile()] : []),
+    // Snapshot mode: single-file shell. The P2.3 data-embed plugin (one
+    // self-contained artifact per bakeable fixture, D-044.5, D-046.4) is
+    // authored but gated behind CN_EMBED_SNAPSHOT=1 until its remaining
+    // pieces land - the offline main-thread wasm transport (so the artifact
+    // has no external worker) and the no-leak acceptance test (D-047.4).
+    // Default snapshot builds a valid single-file shell so check-all stays
+    // green; see HANDOFF.md and DECISIONS.md D-048.
+    ...(mode === "snapshot"
+      ? process.env.CN_EMBED_SNAPSHOT === "1"
+        ? [viteSingleFile(), cnSnapshotEmbedPlugin()]
+        : [viteSingleFile()]
+      : []),
     {
       name: "cn-dev-fixtures",
       configureServer(server) {

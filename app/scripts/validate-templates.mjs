@@ -180,11 +180,12 @@ if (validateOperation && validateStory && validateTemplate) {
   }
 }
 
-// 3. Snapshot envelope: no instances exist until P2.3 embeds snapshot data;
-// compiling above already proves the schema itself is well-formed.
+// 3. Snapshot envelope: instances are produced at snapshot build time and
+// validated there by app/scripts/embed-snapshot-data.ts (P2.3); no committed
+// instances exist, so compiling above proves the schema itself is well-formed.
 if (validateSnapshotEnvelope) {
   console.log(
-    'PASS schemas/snapshot-envelope.schema.json (compile only - no instances until P2.3)',
+    'PASS schemas/snapshot-envelope.schema.json (compile only - instances validated at snapshot build by embed-snapshot-data.ts)',
   );
 }
 

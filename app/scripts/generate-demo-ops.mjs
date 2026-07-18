@@ -5,7 +5,53 @@ import { fileURLToPath } from "node:url";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repo = path.resolve(here, "../..");
 const fixtures = path.join(repo, "fixtures");
-const outDir = path.join(fixtures, "groups");
+
+// Flags:
+//   --public-layer  give entities of non-person kinds whose label-bearing
+//                   attribute is template-public a "public" presence, and make
+//                   edges between two such entities "public", so the baked
+//                   anonymous snapshot scope (P2.3/P2.5,
+//                   docs/design/snapshot-viewer-scope.md) projects a real
+//                   graph. Persons and all attribute-instance visibilities are
+//                   never touched. Kinds with no public label attr (all of
+//                   fisheries-committee, by design) are unaffected, so that
+//                   fixture's output is byte-identical with or without the
+//                   flag.
+//   --out-dir <dir> write op logs somewhere other than fixtures/groups
+//                   (testing only).
+const args = process.argv.slice(2);
+const publicLayer = args.includes("--public-layer");
+const outDirFlagIndex = args.indexOf("--out-dir");
+const outDirOverride = outDirFlagIndex === -1 ? null : args[outDirFlagIndex + 1];
+const knownArgs = new Set(["--public-layer", "--out-dir"]);
+for (const [index, arg] of args.entries()) {
+  if (index === outDirFlagIndex + 1 && outDirFlagIndex !== -1) {
+    continue;
+  }
+  if (!knownArgs.has(arg)) {
+    console.error(`Unknown argument: ${arg}\nUsage: node scripts/generate-demo-ops.mjs [--public-layer] [--out-dir <dir>]`);
+    process.exit(1);
+  }
+}
+if (outDirFlagIndex !== -1 && (outDirOverride === undefined || outDirOverride.startsWith("--"))) {
+  console.error("--out-dir requires a directory argument");
+  process.exit(1);
+}
+const outDir = outDirOverride == null ? path.join(fixtures, "groups") : path.resolve(outDirOverride);
+
+// Mirrors the label candidate list in app/src/viz/projection.ts entityLabel:
+// the public layer only publishes entities the anonymous viewer could actually
+// read a label for.
+const labelAttrIds = ["display_name", "title", "common_name", "scientific_name"];
+
+function kindHasPublicLabel(kind) {
+  if (kind.id === "person") {
+    return false;
+  }
+  return (kind.attributes ?? []).some(
+    (attr) => labelAttrIds.includes(attr.id) && attr.default_visibility === "public",
+  );
+}
 const schemaVersion = "0.1.0";
 const groupVisibility = "group";
 const publicVisibility = "public";
@@ -216,7 +262,8 @@ function entityOp(spec, templateKind, entityId, owner, label, index, sort, rando
       kind: templateKind.id,
       attributes,
       owner: templateKind.id === "person" ? owner : null,
-      presence_visibility: groupVisibility,
+      presence_visibility:
+        publicLayer && kindHasPublicLabel(templateKind) ? publicVisibility : groupVisibility,
       lifecycle: "active",
       provenance: provenance(owner, sort),
       tier: tierT0,
@@ -225,7 +272,8 @@ function entityOp(spec, templateKind, entityId, owner, label, index, sort, rando
   });
 }
 
-function edgeOp(spec, edgeKind, from, to, edgeIndex, sort, actor) {
+function edgeOp(spec, edgeKind, from, to, edgeIndex, sort, actor, publicIds) {
+  const publicEdge = publicLayer && publicIds.has(from) && publicIds.has(to);
   return operation(spec, sort, actor, {
     op: "EdgeCreate",
     edge: {
@@ -237,7 +285,7 @@ function edgeOp(spec, edgeKind, from, to, edgeIndex, sort, actor) {
       directed: edgeKind.directed,
       weight: edgeKind.weighted === "optional" ? 1 + (edgeIndex % 5) : null,
       attributes: {},
-      visibility: groupVisibility,
+      visibility: publicEdge ? publicVisibility : groupVisibility,
       lifecycle: "active",
       provenance: provenance(actor, sort),
       tier: tierT0,
@@ -269,10 +317,12 @@ function storyOp(spec, entityIds, sort, actor) {
 function buildEntities(spec, template, random, startSort) {
   const ops = [];
   const byKind = new Map();
+  const publicIds = new Set();
   let sort = startSort;
   let entityIndex = 0;
   for (const kind of template.kinds) {
     const ids = [];
+    const publicKind = publicLayer && kindHasPublicLabel(kind);
     for (let index = 0; index < entityCountPerKind; index += 1) {
       const id = kind.id === "person"
         ? uuid(spec.personBase + index + 1)
@@ -282,11 +332,14 @@ function buildEntities(spec, template, random, startSort) {
       sort += 1;
       ops.push(entityOp(spec, kind, id, owner, label, entityIndex + 1, sort, random));
       ids.push(id);
+      if (publicKind) {
+        publicIds.add(id);
+      }
       entityIndex += 1;
     }
     byKind.set(kind.id, ids);
   }
-  return { ops, byKind, sort };
+  return { ops, byKind, publicIds, sort };
 }
 
 function compatibleIds(edgeKind, byKind, side, random) {
@@ -295,7 +348,7 @@ function compatibleIds(edgeKind, byKind, side, random) {
   return byKind.get(kind) ?? [];
 }
 
-function buildEdges(spec, template, byKind, random, startSort) {
+function buildEdges(spec, template, byKind, publicIds, random, startSort) {
   const ops = [];
   let sort = startSort;
   for (let index = 0; index < edgeCount; index += 1) {
@@ -308,7 +361,7 @@ function buildEdges(spec, template, byKind, random, startSort) {
       to = toIds[(toIds.indexOf(to) + 1) % toIds.length];
     }
     sort += 1;
-    ops.push(edgeOp(spec, edgeKind, from, to, spec.personBase + index, sort, uuid(spec.personBase + 1)));
+    ops.push(edgeOp(spec, edgeKind, from, to, spec.personBase + index, sort, uuid(spec.personBase + 1), publicIds));
   }
   return { ops, sort };
 }
@@ -325,7 +378,7 @@ function buildOps(spec) {
   }
   const entities = buildEntities(spec, template, random, sort);
   ops.push(...entities.ops);
-  const edges = buildEdges(spec, template, entities.byKind, random, entities.sort);
+  const edges = buildEdges(spec, template, entities.byKind, entities.publicIds, random, entities.sort);
   ops.push(...edges.ops);
   ops.push(storyOp(spec, [...entities.byKind.values()].flat(), edges.sort + 1, actor));
   return ops.map((op) => JSON.stringify(op)).join("\n") + "\n";
