@@ -19,8 +19,9 @@ flagged in HANDOFF.md. No code depends on the folder name.
 
 ## D-003 (2026-07-06) - Git identity set deliberately, pending confirmation
 
-Predecessor commits auto-resolved to `patrick@atni57.onmicrosoft.com` (a machine
-identity nobody chose - exactly the failure the brief flags). This repo sets
+Predecessor commits auto-resolved to a machine-resolved tenant identity nobody
+chose (address redacted for publication, D-059 - exactly the failure the brief
+flags). This repo sets
 in-repo config: `Patrick Freeland <accounts@indigenousaccess.org>` (the account
 identity of this machine's Claude session). **Human gate-adjacent: confirm or
 correct in HANDOFF.md.**
@@ -959,3 +960,51 @@ needs-human dispositions park on the human before the first push:
 6. The maintainer's mirror recipe does not exclude _private/, so the local
    mirror will carry it - confirm that is desired (recommended: yes, the
    content must not be lost; it simply must not be pushed).
+
+## D-059 (2026-07-24) - Grill session rulings: pre-push dispositions, split stability bars, checkpoint posture, retention
+
+The human ruled on every open blockage in a structured grill session. All ten
+rulings below are the human's; recorded verbatim in effect.
+
+1. **Redaction philosophy: targeted.** Redact only genuinely gratuitous
+   exposure; keep workspace paths, historical records, and the git-identity
+   email (public in commit metadata) as-is.
+2. **Emails.** The machine-resolved tenant address is redacted from D-003 and
+   dropped from scripts/pii-allowlist.txt; `accounts@indigenousaccess.org`
+   stays.
+3. **Exclusion list.** The enumerated predecessor-repo PII paths moved to
+   gitignored `_private/PREDECESSOR-EXCLUSIONS.md`; CLAUDE.md keeps the
+   binding rule with a pointer; LAUNCH_PROMPT.md carries an in-place
+   bracketed redaction note; the migration recipe references the private
+   list. The rule remains absolute regardless of the private file's
+   availability.
+4. **Workspace paths** in contract docs and archives: accepted as-is.
+5. **THE_STORY.md: approved as-is.** Publishes with the first push; no
+   further review step.
+6. **Consent drafts stay public** as banner-marked drafts; the 2026-07-06
+   Parts A/C carry a SUPERSEDED banner pointing at the 2026-07-24 package.
+7. **Mirror carries `_private/`** (its only redundancy; never-pushed, not
+   never-copied).
+8. **Q-STABLE split bars.** PUSH bar: D-059 disposition edits committed +
+   check-all green (no ADR-005 wait). DEPLOY bar (Pages form + Workers
+   relay): ADR-005 ACCEPTED post-round + P3.5/P3.6 intake pipeline working +
+   keygen ceremony executed + D-023 sign-off on form text. The human
+   authorized sessions to execute the first push autonomously once the push
+   bar is met.
+9. **Collective checkpoint: timing unknown; default holds.** All engineering
+   proceeds on synthetic data; the August internal pilots are explicitly
+   CONDITIONAL on the recorded ATNI Climate approval existing - no session
+   treats mid-August as committed.
+10. **D-023 loop: bundled.** The human does the solo correctness pass soon
+    (reviewer checklist in the package), which clears the text for build and
+    synthetic-pilot use; the committee sees the reviewed text together with
+    the checkpoint ask; community use waits for that moment.
+11. **Rejected-record retention (amends ADR-005 D4 open question).** Full
+    rejected records persist in the gitignored queue for the pilot window,
+    then are purged in ONE RECORDED SWEEP - a mandatory dated checklist item
+    at window close. Accepted implication: declined people's decrypted data
+    persists on the pilot PC for the window.
+
+With the disposition edits in this commit and check-all green, the D-053/
+D-055 push preconditions are SATISFIED; the first push to
+`atniclimate/community-connector` is authorized.

@@ -15,8 +15,12 @@
 > in-app facilitator entry plus the QR -> static GitHub Pages form ->
 > sealed-envelope -> Cloudflare relay path, and ALL submissions land in the
 > facilitator pending-review queue. The convention is 2026-09-14 with August
-> internal pilots (D-050). The wording here will be revised when the form text
-> is drafted for D-023 review.
+> internal pilots (D-050).
+>
+> **SUPERSEDED (D-059): the form wording in Part A and the consent email in
+> Part C are superseded by `docs/design/intake-consent-text-draft-2026-07-24.md`,
+> which is the package under D-023 human review. The text below is retained as
+> the drafting record only and is NOT a candidate for use in any form.**
 >
 > **Two gates this deliverable deliberately respects:**
 > - **G1 (vocabulary authority).** The capability vocabulary - the actual list

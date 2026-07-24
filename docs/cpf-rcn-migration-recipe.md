@@ -16,10 +16,10 @@ tier it, obtain FPIC, and ingest only the result - outside this repository.
 
 ## Hard fence (never crossed)
 
-- The CLAUDE.md predecessor exclusion list is absolute: `source_data/` (all),
-  `T1_partners/`, `research_edges/`, `entities/persons/*.yaml`, `archive/MANIFEST.md`,
-  `archive/vision_docs/data_participants.txt`, derived `data/*.json`, and any file
-  pairing a real name with contact info. No agent (Claude or Codex) reads these, ever.
+- The predecessor exclusion list is absolute (maintained machine-locally at
+  `_private/PREDECESSOR-EXCLUSIONS.md`, gitignored, per D-059): no predecessor
+  data directory, person file, or derived output, and no file pairing a real
+  name with contact info. No agent (Claude or Codex) reads these, ever.
 - No real PII enters this repository, any commit, any fixture, or any Codex prompt
   (Prime Directive 1, I1). Real pilot data lives outside the repo or in gitignored
   staging and is never committed.

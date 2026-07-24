@@ -142,11 +142,12 @@ fixture content; refactors; Codex task routing; phase-internal sequencing.
 ## Predecessor repo rules
 
 `C:\dev\CPF-RCN_demo` is read-only reference. Port concepts and isolated frontend
-techniques; never bulk-copy code; never copy data. Hard PII exclusion list (never
-read, copy, fixture, or pipe to Codex): `source_data/` (all), `T1_partners/`,
-`research_edges/`, `entities/persons/*.yaml`, `archive/MANIFEST.md`,
-`archive/vision_docs/data_participants.txt`, `data/*.json` outputs derived from
-those, and any file pairing a real name with contact info.
+techniques; never bulk-copy code; never copy data. The hard PII exclusion list
+(never read, copy, fixture, or pipe to Codex) is maintained machine-locally at
+`_private/PREDECESSOR-EXCLUSIONS.md` (gitignored; enumerations redacted from the
+public repo per D-059). The rule is absolute regardless of that file's
+availability: no predecessor data directory, person file, or derived output is
+ever read, and no file pairing a real name with contact info is ever touched.
 
 ## Autonomy protocol
 

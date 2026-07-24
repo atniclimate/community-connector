@@ -337,6 +337,10 @@ Negative / accepted:
 - Whether the Worker returns the receipt id to the phone as a user-facing
   "submitted" confirmation, and what that wording needs from D-023 human
   review.
-- Queue retention policy for rejected records (kept for audit vs purged
-  after the pilot window) - a consent-semantics question to put to the
-  human with the D-023 text review.
+- ~~Queue retention policy for rejected records~~ RESOLVED by the human
+  (D-059, 2026-07-24): rejected records are kept IN FULL in the gitignored
+  queue for the duration of the pilot window (audit and un-reject ability),
+  then purged in one recorded sweep. The purge sweep is a mandatory dated
+  checklist item at pilot-window close; the accepted implication - declined
+  people's decrypted data persists on the pilot PC for the window - is
+  recorded with the ruling. D4's queue format carries the ruling unchanged.

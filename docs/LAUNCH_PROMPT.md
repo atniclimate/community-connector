@@ -62,13 +62,12 @@ setup). You may not bulk-copy code, and you must never copy data.
 
 **Hard PII exclusion.** The old repo contains real partner PII, some of it
 already in its git history. Never read into context, copy, reference in
-fixtures, or pipe to Codex any of the following from the old repo:
+fixtures, or pipe to Codex any of the excluded content from the old repo.
 
-- `source_data/` (all of it), `T1_partners/`, `research_edges/`
-- `entities/persons/*.yaml` (every file carries a real `email:` field)
-- `archive/MANIFEST.md`, `archive/vision_docs/data_participants.txt`
-- `data/*.json` outputs derived from the above
-- Any other file containing a real name paired with contact info
+[Redacted for publication, D-059: the enumerated exclusion list moved to the
+gitignored `_private/PREDECESSOR-EXCLUSIONS.md`; the historical record here
+listed the predecessor's data directories, person files, derived outputs, and
+the general rule against any file pairing a real name with contact info.]
 
 The old repo's history cleanup is the old project's problem and a human
 decision; it is out of scope here. Your job is to ensure the new repo starts

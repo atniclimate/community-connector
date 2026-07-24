@@ -2,8 +2,5 @@
 # OPERATOR IDENTITIES ONLY. Never add a partner or community member address;
 # that is a stop-the-line event, not an allowlist entry.
 #
-# Repo operator git identity (DECISIONS.md D-003, pending human confirmation):
+# Repo operator git identity (DECISIONS.md D-003/D-011, human-confirmed):
 accounts@indigenousaccess.org
-# Predecessor machine identity, documented in DECISIONS.md D-003 as the
-# auto-resolved identity problem being corrected:
-patrick@atni57.onmicrosoft.com
