@@ -3,8 +3,8 @@
 > This file is the /pickup target and outranks session memory. Reading order for a
 > fresh session: CLAUDE.md, then this file, then PLAN_1.0.md "Current Position" +
 > "Decision Gates", then current-phase ADRs. DECISIONS.md is the durable judgment
-> record (through D-049). Every path below was verified on disk at true-up
-> (2026-07-18).
+> record (through D-055; D-050..D-055 are the 2026-07-24 gate-grill rulings).
+> Every path below was verified on disk at true-up (2026-07-18).
 
 ## What this project is
 
@@ -51,7 +51,9 @@ parked root docs):**
 - Phase 5 slice: semantics-free `cn` CLI router + validate/export (P5.4-partial, D-044.2);
   pilot evidence template (P5.10); CPF-RCN migration recipe (P5.7, docs-only).
 
-**NOT done - ordered next actions:**
+**NOT done - ordered next actions (reordered 2026-07-24 per D-050..D-055; the
+pilot calendar is now hard: internal pilots mid-to-late August, convention
+2026-09-14):**
 1. **R2 EntityDetail fixes (FIRST - reviewer-confirmed defects, D-049).** BLOCK-1: report
    the effective tier as max(entity.tier, effective tier over the PROJECTED attribute set),
    in cn-perm (fixes the T0-shown-beside-T2 mislabel). BLOCK-2: relocate `own_settings`
@@ -65,34 +67,55 @@ parked root docs):**
    wire `--public-layer` into `build:snapshot` (isolated non-tracked dir); per-artifact
    size gate in `check-size.mjs`; no-leak acceptance test (3+ above-scope sentinels absent
    from the HTML, D-047.4); then flip `CN_EMBED_SNAPSHOT` on by default. Hardest piece.
-3. **P3.5 facilitator wizard + P3.6 entry forms** (UI over existing cn-api submit/load;
-   validation surfaced from cn-schema; I2/I4).
-4. **Phase 4:** P4.1 story authoring under facilitator authority, P4.2 comprehension primer
+3. **P3.5 facilitator wizard + P3.6 entry forms - now THE intake pipeline (D-053).**
+   Direct in-app entry is an initial feature, plus the pending-review staging queue:
+   every submission (in-app or remote) lands pending and enters the graph only on
+   facilitator approval. UI over existing cn-api submit/load; validation surfaced from
+   cn-schema; I2/I4.
+4. **Remote intake relay (NEW, D-053).** Static intake form (name, tribe, orgs, roles)
+   for GitHub Pages; client-side sealed-box encryption to the facilitator public key
+   (private key only on the pilot PC); minimal Cloudflare Workers + KV ciphertext relay
+   (human's account, spend approved); pilot-PC puller that decrypts locally and stages
+   into the review queue; wipe relay after pull. Prereqs for any push/deploy: PolyForm
+   Noncommercial 1.0.0 in-repo (D-054), full pre-publish sweep (D-055), and core
+   stability (human directive). Localized offline intake is the later stretch goal.
+5. **Phase 4:** P4.1 story authoring under facilitator authority, P4.2 comprehension primer
    over the flat projection, P4.3 seeded synthetic stories + reveal-script doc, P4.4
    snapshot acceptance - all with the mechanics/language split (D-044.4).
-5. **P1.3 benchmark** re-run with labels+halos+motion live; record in ADR-004.
+6. **P1.3 benchmark** re-run with labels+halos+motion live; record in ADR-004.
 
-## The human's queue (blocked on you - nothing here is autonomous)
+## The human's queue
 
-1. **G-DATE / Q-A:** the ATNI convention date + registration window + consent-email lead
-   time? (Sets the whole pilot calendar; near-date fallback is the default.)
-2. **G1:** confirm ATNI Climate authors the capability vocabulary in its own words?
-   (Default: empty HSDS-shaped structure; no settler vocabulary committed.)
-3. **G-RAT:** is v0.1.0 the finish line, or do we ratify the fuller 1.0 line (Phases 6-9)?
-4. **Q-B:** which form platform collects intake responses (Google/Microsoft/other)?
-5. **Q-C (license):** PolyForm Noncommercial 1.0.0 stays, or change it?
-6. **P0.6:** track or keep review-only the three untracked root docs (`PLAN_1.0.md`,
-   `MANIFEST.md`, `DEPENDENCIES.md`)? Until you decide, a fresh session must NOT commit them.
-- Standing / for review: community-facing text needs human review before use (D-023);
-  Open Eligibility mapping isolated if ever added (G2); single-machine backup risk still
-  ACCEPTED, not solved (G-BACKUP / D-026).
+**All six queued gates were answered 2026-07-24 in the gate-grill session -
+see D-050..D-055.** Summary: convention 2026-09-14 with August internal pilots
+(D-050); ATNI authors vocabulary post-stability (D-051); v0.1.0 ratified as the
+convention-arc finish line with a real-usage acceptance bar (D-052); intake is
+in-app entry + a QR sealed-envelope relay via GitHub Pages + Cloudflare Workers,
+gates opened by the human (D-053); PolyForm Noncommercial 1.0.0 (D-054); the
+three root docs tracked after a pre-publish sweep (D-055).
+
+Still on the human:
+1. **Collective checkpoint:** a recorded ATNI Climate committee approval must
+   exist BEFORE the first internal-pilot ingestion of real people (D-030/D-050).
+2. **D-023 review:** intake-form text, consent wording, and any community-facing
+   language need human review before use - now concretely needed for the relay
+   form and the August pilots.
+3. Standing: Open Eligibility mapping isolated if ever added (G2); single-machine
+   backup risk still ACCEPTED, not solved (G-BACKUP / D-026) - note the public
+   remote will hold code only, not data, so it is not a backup answer for ops.
 
 ## Non-negotiables a fresh session must not violate
 
-- **Human gates are absolute** (CLAUDE.md): no git remote / no publishing off-machine; no
-  real-person PII in the repo, any commit, any fixture, or any Codex prompt (I1); no spend;
-  no external protocol/identity/license commitment; the six queued gates above stay parked.
-- Do **not** commit `PLAN_1.0.md`, `MANIFEST.md`, `DEPENDENCIES.md` (P0.6 is the human's).
+- **Human gates are absolute** (CLAUDE.md). Three were OPENED by the human on
+  2026-07-24 with conditions (D-053/D-054/D-055): the public remote
+  `atniclimate/community-connector` may be added and pushed ONLY after the
+  PolyForm Noncommercial 1.0.0 license is in-repo, the pre-publish sweep has
+  passed, and core stability is reached; Cloudflare Workers spend is approved
+  for the intake relay only. Everything else stands unchanged: no real-person
+  PII in the repo, any commit, any fixture, or any Codex prompt (I1); no other
+  spend; no protocol/identity/federation commitment beyond D-053's intake path.
+- Do **not** commit `PLAN_1.0.md`, `MANIFEST.md`, `DEPENDENCIES.md` until the
+  D-055 pre-publish sweep unit runs (then track all three).
 - Permission logic lives only in `cn-perm` (I2); state mutates only through `app/src/state`
   (I4); every entity/edge carries provenance + tier (I6); persisted formats are versioned
   with unknown-major rejection (I7); snapshot stays under 5MB (I8); docs use hyphens (I10).
@@ -109,6 +132,11 @@ parked root docs):**
   next-action #2.
 - TSDF tier codes primary in the UI (D-032); in-app story authoring in v0.1 (D-037) - both
   deliberate choices against recommendations; do not "fix" them.
+- Intake (D-053): in-app entry + facilitator pending-review queue is the primary
+  path; remote path is QR -> static Pages form -> client-side sealed-box
+  encryption -> Cloudflare ciphertext relay -> pilot-PC pull/decrypt/review. No
+  auth in v0.1.0/v1.0. No server ever holds readable personal data; the graph
+  never listens on the network.
 - Codex is the offload engine (gpt-5.6-sol, D-042) but was exiting early / landing output
   LATE this session (degraded mode, CODEX_GUIDE section 8) - verify its health first, use
   small bounded jobs, and reconcile late-landing review files. See memory

@@ -756,3 +756,80 @@ These are gate-blind (pure cn-perm/cn-api). They are the next session's first
 unit and must get a fresh adversarial round after the fix. Operational note:
 Codex `exec` output files can land LATE (after the process appears done) - verify
 by re-checking the output path before concluding a round failed ([[codex-exec-early-exit]]).
+
+## D-050 (2026-07-24) - Pilot calendar set: convention 2026-09-14, August internal pilots
+
+Human answered G-DATE / Q-A in the gate-grill session. The ATNI Annual
+Convention is 2026-09-14. Early September is the soft deadline for
+pre-convention consent; most joins are expected at the convention itself.
+New commitment: internal pilots with several trusted groups run BEFORE the
+convention (August), building on CPF-RCN demo experience, to accelerate
+development. Consequences: the intake -> review -> ingest -> render pipeline
+must be usable by mid-to-late August; the D-030/D-034 consent process
+(form-based individual consent, outside-repo staging, T1 tiering) applies to
+the internal pilots too; the recorded ATNI Climate collective checkpoint must
+precede the FIRST internal-pilot ingestion, not merely the convention.
+
+## D-051 (2026-07-24) - G1 answered: ATNI authors the vocabulary, post-stability
+
+Human ruling: ATNI Climate authors the capability vocabulary in its own words
+(option a), but language work is sequenced after the system is fully
+functional and stable. Until then the backend/schema layer uses standard
+developer language over the empty HSDS-shaped structure (the D-044.4
+mechanics/language split). A Claude-Design pass over front-facing interface
+text and language corrections is planned for the later stage.
+
+## D-052 (2026-07-24) - G-RAT answered: v0.1.0 ratified as the convention-arc finish line
+
+v0.1.0 is ratified as the committed finish line for the convention arc, with a
+sharpened acceptance bar: ready for ACTUAL USAGE across the real entity kinds
+(persons, organizations, places, skills, needs) at pilot scale (~150 expected,
+300 max signups), not demo-grade. Ratification of the fuller 1.0 line (Phases
+6-9) is deferred to a post-convention retrospective, when pilot evidence
+exists.
+
+## D-053 (2026-07-24) - Intake architecture: QR -> static form -> sealed-envelope relay -> facilitator review queue
+
+Q-B is answered by replacing the form-platform question entirely. Rulings, all
+made by the human in the gate-grill session:
+
+- No external form platform (no Google, no Microsoft). Direct in-app data
+  entry is an initial feature; P3.5/P3.6 are the intake pipeline, not UI
+  polish. CSV ingestion becomes a secondary path for structured sources.
+- No auth in v0.1.0 or v1.0 (future possibility only).
+- Facilitator-review staging: ALL submissions (in-app or remote) land as
+  pending and enter the graph only on facilitator approval (the
+  error/inconsistency gate; also the abuse gate that makes an unauthenticated
+  endpoint tolerable).
+- Remote intake flow (sealed-envelope relay): attendee scans QR -> static
+  intake form hosted on GitHub Pages (interface only; no secrets; no readable
+  data ever transits or rests there) -> the browser encrypts the payload to
+  the facilitator's public key before it leaves the phone (libsodium sealed
+  box; the private key exists only on the pilot PC) -> the ciphertext POSTs to
+  a minimal Cloudflare Workers + KV relay whose only job is to store blobs it
+  cannot read -> the pilot PC pulls, decrypts locally, and stages into the
+  facilitator review queue; relay storage is wiped after pull. The graph
+  itself never listens on the network; the pilot PC may be internet-connected
+  (pull-based).
+- Gates opened BY THE HUMAN: public git remote
+  https://github.com/atniclimate/community-connector (created by the human
+  2026-07-24, empty, public); hosting vendor Cloudflare Workers on the human's
+  existing account; spend for this demo approved. The R5 "not networked"
+  stance is amended for this one intake path; a localized (offline/hotspot)
+  intake system is the later stretch goal.
+- Deploy only after community-connector is stable (human directive).
+
+## D-054 (2026-07-24) - Q-C answered: PolyForm Noncommercial 1.0.0
+
+The license is PolyForm Noncommercial 1.0.0, committed to the repo before the
+first push to the public remote.
+
+## D-055 (2026-07-24) - P0.6 answered: track the three root docs after a pre-publish sweep
+
+PLAN_1.0.md, MANIFEST.md, and DEPENDENCIES.md will be tracked, contingent on a
+pre-publish review pass. Because the remote is public, the first push waits on
+a full-repo sweep for anything unsuitable for world-readability (machine
+paths, CPF-RCN remediation references, convention logistics, community-facing
+text pending D-023 review). Borderline content moves to a gitignored
+_private/ and is reported. Until the sweep unit runs, the three docs stay
+uncommitted.
