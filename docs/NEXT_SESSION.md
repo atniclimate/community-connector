@@ -4,7 +4,25 @@
 > CLAUDE.md -> HANDOFF.md -> this file. Refresh the Brief at each session
 > end (CLAUDE.md session-end protocol).
 
-## The 60-second brief (refreshed 2026-07-24, end of the grill + first-push session)
+## The 60-second brief (refreshed 2026-07-24, end of the ADR-005 acceptance session)
+
+**ADR-005 is ACCEPTED** (D-068) after EIGHT adversarial rounds in one day
+(D-061..D-068; rounds 1-7 FAIL-and-amend with every finding verified
+before judgment, round 8 pass). The remote-intake architecture is now
+binding: native durable owner (`cn intake apply`; the browser app is
+create-only), idempotent decision inbox (decision_generation CAS,
+writeless replays, two-kind history), receipt-ledger reconciliation,
+off-origin full-bundle pin, enforceable rotation cutoff, and consent
+affirmation that survives the purge sweep. The P3.5/P3.6 director
+blueprint (docs/blueprints/intake-pipeline.md) is written, aligned, and
+carries the reviewer's implementation gates in its test lists. The
+consent draft gained section 7: four wording conflicts for the D-023
+pass - the removal-semantics question (no-longer-shown vs erasure) is a
+human decision. Next action: implement the intake pipeline per the
+blueprint's 11-step sequencing (cn-store seam first), then its mandatory
+adversarial round. The deploy bar (D-059.8) is unchanged.
+
+## The previous brief (2026-07-24, end of the grill + first-push session)
 
 **The repo is public.** The grill session resolved every blockage (D-059):
 targeted redactions landed (tenant email out, predecessor exclusion-list

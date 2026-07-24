@@ -33,7 +33,9 @@ on the recorded collective checkpoint (D-059.9).
 | Repo inventory snapshot (descriptive, 2026-07-24) | `MANIFEST.md` |
 | External-dependency audit (world-readable) | `DEPENDENCIES.md` |
 | Machine-local content (NEVER commit) | `_private/` (gitignored): `DEPENDENCIES-local.md`, `PREDECESSOR-EXCLUSIONS.md` |
-| Accepted architecture decisions | `docs/adr/` (ADR-001..004; ADR-005 remote intake DRAFT pending adversarial round) |
+| Accepted architecture decisions | `docs/adr/` (ADR-001..005 ALL ACCEPTED; ADR-005 accepted 2026-07-24 after EIGHT adversarial rounds, D-061..D-068) |
+| Intake-pipeline director blueprint (P3.5/P3.6) | `docs/blueprints/intake-pipeline.md` (aligned to accepted ADR-005 through round 8) |
+| ADR-005 review trail (8 rounds) | `_reviews/community-connector/2026-07-24_adr-005-remote-intake*.md` (out-of-repo lane) |
 | Intake/consent text package (DRAFT, pending D-023) | `docs/design/intake-consent-text-draft-2026-07-24.md` |
 | Facilitator keygen ceremony design | `docs/design/facilitator-keygen-ceremony.md` |
 | Facilitator role blueprint / authority matrix | `docs/blueprints/facilitator-role.md`, `docs/design/authority-matrix.md` |
@@ -68,32 +70,48 @@ remote in sync):**
 - **FIRST PUSH executed (D-060):** origin live, `main` tracking, plain `git push`
   works (repo-local gh credential pin as the atniclimate account).
 
-**NOT done - ordered next actions (NEXT SESSION MANDATE, human-directed 2026-07-24:
-run autonomously; execute items 1 and 2 without waiting for the human; nothing in
-them requires a gate decision - the human's parallel actions are only the D-023
-solo pass and committee timing):**
-1. **ADR-005 adversarial round.** Run via the adversary wrapper (healthy 2026-07-24),
-   judge findings, amend, mark ACCEPTED. Gates the relay implementation and deploy.
-2. **P3.5 facilitator wizard + P3.6 entry forms - THE intake pipeline (D-053).**
-   In-app entry + pending-review staging queue (durable-write-first, gitignored,
-   pii-scan covered, near-duplicate surfacing, D-056.4). Rejected-record retention
-   per D-059.11. Approved remote entries land unowned, facilitator-created
-   (D-056.2). Queue format per ADR-005 D4. Permission-adjacent at the approval
-   boundary: director blueprint + adversarial round.
-3. **Remote intake relay implementation (per accepted ADR-005).** Pages form,
-   client-side sealed box, Workers+KV relay, pilot-PC puller with fingerprint
-   pinning. DEPLOY bar (D-059.8): ADR-005 accepted + item 2 working + keygen
-   ceremony executed + D-023 sign-off on form text.
-4. **Snapshot data pipeline (D-048 / P2.3-P2.5)** - targets the convention build.
-5. **Phase 4 slimmed (D-056.3):** minimal P4.1 story authoring.
-6. **P1.3 benchmark** deferred to September; record in ADR-004.
+**DONE 2026-07-24 (second session): ADR-005 ACCEPTED after eight adversarial
+rounds** (D-061..D-068; rounds 1-7 FAIL-and-amend, round 8 PASS-WITH-NOTES;
+every finding verified against files/code before judgment). Headline design
+outcomes now binding: browser trust model with off-origin full-bundle pin
+(D8); NATIVE durable owner - the app is create-only, `cn intake apply` owns
+all mutation (D4); idempotent decision inbox (decision_generation CAS,
+writeless replays, two-kind history with four transaction events); receipt
+ledger with disjoint reconciliation; enforceable rotation cutoff; consent
+affirmation surviving the purge sweep via the versioned intake provenance
+block. The P3.5/P3.6 director blueprint is written and aligned
+(docs/blueprints/intake-pipeline.md). The consent draft carries new section
+7 (four wording conflicts for the D-023 pass, incl. the removal-semantics
+human decision).
+
+**NOT done - ordered next actions (mandate item 2 continues autonomously):**
+1. **Implement the intake pipeline per the blueprint's 11-step sequencing**
+   (cn-store `append_batch_idempotent` seam FIRST, then cn-model intake
+   provenance block, cn-ingest, `cn intake apply`, facade, forms, wizard,
+   pii-scan tripwires, fixtures). check-all green + atomic commit per step;
+   the reviewer's implementation gates (canonical digest golden vectors,
+   fault injection, digest-bound tombstone reconciliation) are IN the
+   blueprint's test lists. Then the MANDATORY adversarial round on the
+   implementation diff.
+2. **Remote intake relay implementation (per ACCEPTED ADR-005).** Pages form,
+   client-side sealed box, Workers+KV relay (receipt ledger, admission
+   allowlist), pilot-PC puller (bundle+key pins, crash protocol). The
+   acceptance UNLOCKS building this; the DEPLOY bar (D-059.8) still
+   requires: intake pipeline working + keygen ceremony executed + D-023
+   sign-off on form text.
+3. **Snapshot data pipeline (D-048 / P2.3-P2.5)** - targets the convention build.
+4. **Phase 4 slimmed (D-056.3):** minimal P4.1 story authoring.
+5. **P1.3 benchmark** deferred to September; record in ADR-004.
 
 ## The human's queue
 
 1. **D-023 solo correctness pass (D-059.10):** review
    `docs/design/intake-consent-text-draft-2026-07-24.md` using its built-in
-   checklist (~20 min). Your sign-off clears the text for build/synthetic use;
-   record it as a DECISIONS entry.
+   checklist (~20 min). NEW: its section 7 lists four wording conflicts the
+   ADR-005 rounds surfaced - the largest is the removal-semantics decision
+   ("taken out of the network" vs the append-only log: no-longer-shown or
+   true erasure - your call). Your sign-off clears the text for
+   build/synthetic use; record it as a DECISIONS entry.
 2. **Committee touchpoint (bundled, D-059.9/10):** when timing becomes known, put
    the collective-checkpoint ask AND the reviewed consent text to ATNI Climate
    together. Until the recording exists, August pilots remain CONDITIONAL and all
