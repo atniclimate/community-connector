@@ -4,66 +4,48 @@
 > CLAUDE.md -> HANDOFF.md -> this file. Refresh the Brief at each session
 > end (CLAUDE.md session-end protocol).
 
-## The 60-second brief (refreshed 2026-07-24, end of the ultracode execution session)
+## The 60-second brief (refreshed 2026-07-24, end of the grill + first-push session)
 
-Next-actions 1 and 2 both landed. The R2 EntityDetail defects (D-049) are
-fixed and committed: effective tier now computed over the viewer-projected
-attribute set in cn-perm, the detail path is I2-pure (own_settings deleted
-from cn-api), the custody/tier test matrix covers all viewer classes through
-to an end-to-end API test, and the provenance one-liner is structurally
-single-line. The mandatory fresh adversarial round returned PASS-WITH-NOTES
-with both blockers confirmed closed; its residual notes were closed in the
-same commit (D-057). The long-lead gate-openers all shipped: the ADR-005
-"Remote intake" DRAFT (full D-056.1 scope, round still pending), the D-023
-consent-text package (banner-marked NOT FOR USE), the facilitator keygen
-ceremony design, and the D-055 pre-publish sweep unit - a six-agent
-world-readability scan (42 findings), machine-local content split to
-gitignored `_private/`, and PLAN_1.0.md / MANIFEST.md / DEPENDENCIES.md
-revised and now TRACKED, with docs/PROJECT_PLAN.md fully reconciled to
-D-050..D-056. Six sweep findings need human rulings before the first push
-(D-058). check-all was 11/11 green at every commit. Execution resumes at
-HANDOFF next-action 1: the ADR-005 adversarial round, then the P3.5/P3.6
-intake pipeline.
+**The repo is public.** The grill session resolved every blockage (D-059):
+targeted redactions landed (tenant email out, predecessor exclusion-list
+enumerations moved to gitignored `_private/` with pointers), THE_STORY.md was
+approved as-is, the old form text is marked SUPERSEDED by the 2026-07-24
+consent package, and rejected intake records will be kept for the pilot window
+then purged in one recorded sweep. The stability bar split in two: the PUSH
+bar was met and the first push executed (D-060 - origin
+`atniclimate/community-connector`, plain `git push` now works); the DEPLOY bar
+(Pages form + Workers relay) stays unmet until ADR-005 is accepted, the intake
+pipeline works, the keygen ceremony has run, and D-023 sign-off covers the
+form text. The collective checkpoint's timing is UNKNOWN, so the August
+internal pilots are explicitly conditional and engineering stays on synthetic
+data. Earlier the same day: the R2 EntityDetail fixes landed with a clean
+adversarial round (D-057), and the D-055 sweep unit tracked the three root
+docs (D-058). check-all was 11/11 green at every commit. Next action: the
+ADR-005 adversarial round, then the P3.5/P3.6 intake pipeline.
 
 ## How to resume work (for the director)
 
-1. Read HANDOFF.md - state, ordered next actions, non-negotiables.
-2. If the human is present: the three highest-value asks are (a) the six
-   D-058 pre-push dispositions (one-line answers each), (b) scheduling the
-   recorded ATNI Climate collective checkpoint (precedes the FIRST August
-   ingestion, D-050), and (c) the D-023 review of
-   docs/design/intake-consent-text-draft-2026-07-24.md, which now exists.
-3. If autonomous: run the ADR-005 adversarial round first (adversary
-   wrapper; the wrapper path was healthy 2026-07-24), judge and amend, then
-   start the P3.5/P3.6 intake pipeline (director blueprint first - it is
-   permission-adjacent at the approval boundary).
+1. Read HANDOFF.md - state, ordered next actions, non-negotiables. Note the
+   repo is PUBLIC: every pushed commit is world-readable.
+2. If the human is present: the two asks are (a) the D-023 solo correctness
+   pass on docs/design/intake-consent-text-draft-2026-07-24.md (checklist
+   inside, ~20 minutes, record as a DECISIONS entry), and (b) any news on
+   committee timing for the bundled checkpoint + consent-text presentation.
+3. If autonomous: run the ADR-005 adversarial round first (adversary wrapper,
+   healthy 2026-07-24), judge and amend, then start the P3.5/P3.6 intake
+   pipeline (director blueprint first - permission-adjacent at the approval
+   boundary).
 4. Re-arm the 8:00 AM safety cron if the usage-failover directive stands.
 
 ## Remaining open questions (defaults keep autonomous work unblocked)
 
-**Q-PUSH. D-058 dispositions (six one-liners).** Maintainer emails in
-D-003/D-011 + pii-allowlist (redact tenant address?); predecessor-PII
-disclosure wording in CLAUDE.md/LAUNCH_PROMPT/migration recipe (keep,
-generalize, or move specifics to _private/); THE_STORY.md approved for the
-public repo?; pilot-form Parts A/C stay public as marked drafts?; accept
-workspace-layout paths as-is (recommended yes); mirror carries _private/
-(recommended yes). Default: no push until answered.
+**Q-CHK. Collective checkpoint timing (still unknown, D-059.9).** When known,
+bundle the ask with the reviewed consent text (D-059.10). Default: synthetic
+data only; August pilots conditional; no real ingestion.
 
-**Q-CHK. Collective checkpoint scheduling.** When can ATNI Climate record its
-approval of the network activity? It must precede the first internal-pilot
-ingestion of real people (D-030/D-050). Default: engineering proceeds on
-synthetic data; no real ingestion until the recording exists.
-
-**Q-TEXT. D-023 review loop.** The draft now exists
-(docs/design/intake-consent-text-draft-2026-07-24.md, with a reviewer
-checklist inside). Who reviews besides you (ATNI Climate?), and how fast can
-it turn around? It also carries ADR-005's rejected-record retention question
-(audit-keep vs purge - a consent-semantics call). Default: nothing goes live.
-
-**Q-STABLE. Define "stable enough to push/deploy".** Proposed definition: R2
-fixes landed (done) + fresh adversarial round clean (done) + check-all green
-(standing) + ADR-005 accepted (pending) + Q-PUSH answered. Confirm or tighten
-in one line. Default: that definition.
+**Q-TEXT. D-023 solo pass (the human's action, D-059.10).** The package awaits
+your checklist review; your sign-off clears build/synthetic use. Community use
+additionally waits for the committee moment. Default: nothing goes live.
 
 **Q-D. Part 7 process items (defaults per D-019):** autonomy = full with
 ARCHITECTURE-redesign parking; spend = approved for the Cloudflare relay only;
@@ -82,10 +64,11 @@ also plans a Claude-Design pass on front-facing text at the later stage
 ## Decisions already made that the human may want to revisit
 
 D-008 codex sandbox bypass; D-026 backup risk accepted (re-raised every
-decision session by standing rule - note the public remote will hold code
-only, never data, so it is not the backup answer); D-032 TSDF codes primary in
-the UI; D-037 in-app story authoring in v0.1; the v0 layout being client-side
-deterministic; D-056.2 ownership-at-approval (approved remote submissions land
-unowned, facilitator-created; owner-binding them to submitters later is an
-authority-matrix change plus an adversarial round). Revisiting any is a
-DECISIONS entry, not a rewrite - say the word.
+decision session by standing rule - the public remote holds code only, never
+data, so it is not the backup answer); D-032 TSDF codes primary in the UI;
+D-037 in-app story authoring in v0.1; the v0 layout being client-side
+deterministic; D-056.2 ownership-at-approval (unowned, facilitator-created;
+owner-binding later = authority-matrix change + adversarial round); D-059.11
+rejected-record retention (keep for the pilot window + one recorded purge
+sweep - revisiting toward purge-on-reject is a one-line DECISIONS entry).
+Revisiting any is a DECISIONS entry, not a rewrite - say the word.

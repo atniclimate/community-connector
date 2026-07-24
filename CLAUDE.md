@@ -109,12 +109,16 @@ diff, Codex or human. Do not restate it elsewhere; link to it.
 - Anything involving the old repo's (`C:\dev\CPF-RCN_demo`) git history or its PII
   remediation.
 
-Gate status notes (2026-07-24, D-053/D-054/D-055): the license gate is RESOLVED
-(PolyForm Noncommercial 1.0.0, D-054). The remote/publishing, hosting-vendor, and
-spend gates were conditionally OPENED by the human for exactly one path - the
-public remote `atniclimate/community-connector` and the Cloudflare Workers intake
-relay - with preconditions before any push or deploy: license in-repo, the D-055
-pre-publish sweep passed, and core stability. Every other gate stands unchanged.
+Gate status notes (2026-07-24, D-053/D-054/D-055/D-058/D-059/D-060): the license
+gate is RESOLVED (PolyForm Noncommercial 1.0.0, D-054). The remote/publishing,
+hosting-vendor, and spend gates were conditionally OPENED by the human for exactly
+one path - the public remote `atniclimate/community-connector` and the Cloudflare
+Workers intake relay. The push preconditions were satisfied (D-058 sweep + D-059
+dispositions) and the FIRST PUSH was executed 2026-07-24 (D-060); the repo is
+public and stays continuously pushable. The DEPLOY bar for the Pages form +
+Workers relay remains separate and unmet (D-059.8): ADR-005 accepted post-round +
+intake pipeline working + keygen ceremony executed + D-023 sign-off. Every other
+gate stands unchanged.
 
 ### Real-data gate process - ATNI convention pilot (D-030, D-034, D-053)
 

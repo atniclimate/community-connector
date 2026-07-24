@@ -1008,3 +1008,19 @@ rulings below are the human's; recorded verbatim in effect.
 With the disposition edits in this commit and check-all green, the D-053/
 D-055 push preconditions are SATISFIED; the first push to
 `atniclimate/community-connector` is authorized.
+
+## D-060 (2026-07-24) - First push executed; the repo is public
+
+With the D-059.8 push bar satisfied, the session executed the first push per
+the human's explicit authorization: remote `origin` =
+https://github.com/atniclimate/community-connector.git, `main` pushed and
+tracking. Credential mechanics recorded for future sessions: the machine's
+default git credential is the `indigenousaccess` account, which has no write
+access to the atniclimate org repo; pushes authenticate as the `atniclimate`
+account via the GitHub CLI keyring. Repo-local config now pins this
+(`credential.helper = !gh auth git-credential` and
+`credential.https://github.com.username = atniclimate`), so a plain
+`git push` works from this clone. Standing consequence: every future commit
+lands in public history on push - the pre-commit PII scan and the I1 prime
+directive are now also the publication boundary. The deploy bar (Pages form
++ Workers relay) remains unmet and separate (D-059.8).
