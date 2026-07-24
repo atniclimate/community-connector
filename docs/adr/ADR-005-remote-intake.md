@@ -1,7 +1,10 @@
 # ADR-005: Remote Intake - Sealed-Envelope Relay and Facilitator Pending-Review Queue
 
-- Status: DRAFT - rounds 1-7 FAIL judged and amended 2026-07-24; pending round 8
-- Date: 2026-07-24 (amended seven times same day after adversarial rounds 1-7)
+- Status: ACCEPTED 2026-07-24 (D-068) - eight adversarial rounds
+  (gpt-5.6-sol): rounds 1-7 FAIL-and-amend, round 8 PASS-WITH-NOTES with
+  one text note applied in the acceptance commit; review trail at
+  `_reviews/community-connector/2026-07-24_adr-005-remote-intake*.md`
+- Date: 2026-07-24 (amended seven times same day; accepted after round 8)
 - Phase: 3 (intake pipeline P3.5/P3.6 plus the D-053 relay; deploy gated on the
   D-059.8 deploy bar)
 - Drivers: R3 (data entry and ingestion), R5 as amended by D-053 (one remote
@@ -413,7 +416,8 @@ target) and a semantic `decision_generation` - the decision CAS
 authority - which advances EXACTLY when review authority changes: on
 every ADMITTED decision (including note-only `set_aside_note` and
 `clear_failed`) and on every state-changing TRANSACTION event
-(completion, preflight failure, digest conflict), and NEVER on audit
+(completion, preflight failure, digest conflict, durable inconsistency),
+and NEVER on audit
 recordings of stale or illegal decisions (replays write nothing at all).
 Audit bookkeeping therefore cannot invalidate a decision that was current
 when authored - the round-6 crash-replay defect is closed by

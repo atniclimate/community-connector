@@ -1355,3 +1355,32 @@ tests/recovery), and the blueprint wording fix. Implementation gates
 noted by the reviewer (digest-bound tombstone reconciliation,
 fault-testing all decision outcomes) are recorded in the blueprint's
 test lists. Round 8 is verification-only on these two edits.
+
+## D-068 (2026-07-24) - ADR-005 ACCEPTED after eight adversarial rounds
+
+Round 8 (verification-only; review at
+`_reviews/community-connector/2026-07-24_adr-005-remote-intake-round8.md`,
+target HEAD 729251f) returned PASS-WITH-NOTES: both round-7 edits closed,
+one MINOR text note (a stale three-outcome parenthetical), applied in
+this commit, with the reviewer's explicit recommendation to then mark
+ADR-005 ACCEPTED without reopening the round-4..7 closures. Status
+flipped to ACCEPTED.
+
+Process record: the D-056.1 "one adversarial round" became EIGHT
+(rounds 1-7 FAIL-and-amend, round 8 pass). Every round's load-bearing
+findings were verified against the actual files/code before judgment and
+none was rejected; the design hardened materially each round (browser
+trust model; native durable owner; idempotent decision inbox with
+semantic generation CAS; two-kind history; receipt ledger; enforceable
+rotation cutoff; canonical bundle measurement; consent-carrying
+provenance that survives the purge sweep). The full review trail (8
+files) lives in the out-of-repo review lane. Standing implementation
+gates named by the reviewer (canonical digest golden vectors, quiescent
+provenance deployment, fault-injection at every protocol boundary,
+digest-bound tombstone reconciliation, provider-bound evidence in the
+deploy runbook, ceremony rehearsal) are carried in the intake-pipeline
+blueprint and MUST be green in check-all before the D-059.8 deploy bar
+can be met. Acceptance UNLOCKS: the P3.5/P3.6 intake-pipeline
+implementation (blueprint at docs/blueprints/intake-pipeline.md) and,
+separately gated, the relay implementation (mandate item 3). The deploy
+bar itself is unchanged.
