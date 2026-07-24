@@ -84,15 +84,35 @@ block. The P3.5/P3.6 director blueprint is written and aligned
 7 (four wording conflicts for the D-023 pass, incl. the removal-semantics
 human decision).
 
-**NOT done - ordered next actions (mandate item 2 continues autonomously):**
-1. **Implement the intake pipeline per the blueprint's 11-step sequencing**
-   (cn-store `append_batch_idempotent` seam FIRST, then cn-model intake
-   provenance block, cn-ingest, `cn intake apply`, facade, forms, wizard,
-   pii-scan tripwires, fixtures). check-all green + atomic commit per step;
-   the reviewer's implementation gates (canonical digest golden vectors,
-   fault injection, digest-bound tombstone reconciliation) are IN the
-   blueprint's test lists. Then the MANDATORY adversarial round on the
-   implementation diff.
+**Implementation position (2026-07-24, same session): blueprint steps 1-3
+of 11 LANDED, check-all green at each commit:**
+- Step 1 (78e9aae): cn-store `append_batch_idempotent` seam - durable
+  classification, shadow preflight, RecoveryUnderIntent completing without
+  re-authorization; 8 crash-simulation tests.
+- Step 2 (661b02c): cn-model optional `IntakeProvenance` block on the
+  envelope (own version, unknown-major rejected); model schema PATCH bump
+  0.1.0 -> 0.1.1; fixed two version-space conflations the bump exposed in
+  cn-api/cn-schema tests.
+- Step 3 + decision half of step 4 (73e228b): cn-ingest queue formats
+  (record/sidecar, two counters, two-kind history, all four transaction
+  events), decision admission table (generation+state CAS, writeless
+  replays), recovery classification; 15 tests incl. both round-6 mandatory
+  sequences.
+
+**NOT done - ordered next actions (mandate item 2 continues autonomously;
+blueprint docs/blueprints/intake-pipeline.md section 9 is the sequence):**
+1. Blueprint step 4 remainder: cn-ingest near-dup scoring
+   (projection-bounded) + `plan_approval` (pre-link batch digest,
+   intake-block construction inside modeled values).
+2. Step 5: `cn intake apply` CLI (queue lock, recovery execution, decision
+   consumption, the transaction against OpLog, run report).
+3. Step 6: cn-api/cn-wasm READ-ONLY intake facade + the no-leak extension
+   test (near-dup candidates bounded by facilitator projection).
+4. Steps 7-9: app - template->form renderer (P3.6), FSA create-only
+   adapter, wizard panel (P3.5).
+5. Step 10: pii-scan tripwires (queue/secret markers + runtime-generated
+   positive fixtures). Step 11: synthetic fixtures + docs true-up.
+6. Then the MANDATORY adversarial round on the implementation diff.
 2. **Remote intake relay implementation (per ACCEPTED ADR-005).** Pages form,
    client-side sealed box, Workers+KV relay (receipt ledger, admission
    allowlist), pilot-PC puller (bundle+key pins, crash protocol). The
