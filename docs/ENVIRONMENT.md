@@ -1,7 +1,8 @@
 # ENVIRONMENT.md - Toolchain and Pinned Models
 
-Recorded 2026-07-06 on ATNI-PATRICK (Windows 11 Pro 25H2, build 26200; 13th Gen
-i5-1340P, 16GB RAM, Intel Iris Xe iGPU - also the performance-target hardware).
+Recorded 2026-07-06 on the maintainer's development machine (Windows 11 Pro 25H2,
+build 26200; 13th Gen i5-1340P, 16GB RAM, Intel Iris Xe iGPU - also the
+performance-target hardware).
 Primary shell: PowerShell 7. Re-verify this file whenever a tool is upgraded.
 
 ## Toolchain
@@ -25,7 +26,7 @@ role and contract unchanged.
 ## Codex pinned profiles
 
 Profiles are separate files at `$CODEX_HOME\<name>.config.toml`
-(`C:\Users\PatrickFreeland\.codex\`), selected with `codex exec --profile <name>`.
+(the user-profile `.codex` directory), selected with `codex exec --profile <name>`.
 Full model ids are pinned deliberately - alias drift burned the predecessor project.
 
 | Profile | Model (full id) | Effort | Sandbox | Approval | Use |

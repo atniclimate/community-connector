@@ -93,9 +93,8 @@ impl GroupSession {
     // Both caches key on `viewer_cache_key` (the canonical authorization
     // context), NOT the hashed `viewer_fingerprint`: the 32-bit fingerprint
     // admits collisions across viewers, and a collision here would serve one
-    // viewer another viewer's projection (2026-07-17 adversarial round,
-    // Codex session 019f7389-9e32-78a2-94ee-7a1b2827f3d3). The cache key is
-    // in-memory only and never serialized.
+    // viewer another viewer's projection (2026-07-17 adversarial round).
+    // The cache key is in-memory only and never serialized.
     pub(crate) fn projection_for(&mut self, viewer: &ViewerContext) -> Projection {
         let key = viewer_cache_key(&self.state, viewer);
         if let Some(projection) = self.projection_cache.get(&key) {

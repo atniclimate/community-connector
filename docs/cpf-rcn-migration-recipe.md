@@ -34,7 +34,8 @@ tier it, obtain FPIC, and ingest only the result - outside this repository.
    default to excluding anything from the exclusion list. Write the scope down.
 2. **Export a narrow slice (human).** From the predecessor repo, the maintainer exports
    only the scoped records into a working file on a gitignored staging path OUTSIDE
-   this repo (e.g. `H:\pilot-staging\` or a path in `.gitignore`). Agents do not run
+   this repo (e.g. `<external-staging-drive>\pilot-staging\` or a path in
+   `.gitignore`). Agents do not run
    this export and do not read its output.
 3. **Scrub (human).** In staging, remove or pseudonymize every direct identifier
    (names paired with contact info, emails, phone numbers, unreleased affiliations)

@@ -13,6 +13,7 @@ dist-smoke/
 
 # Playwright CLI artifacts (spike measurement runs)
 .playwright-cli/
+app/test-results/
 
 # Env files and secrets
 .env
@@ -23,6 +24,9 @@ source_data/
 research_edges/
 *_partners*
 *participants*
+
+# Machine-local operational content split out by the D-055 pre-publish sweep - never commit
+_private/
 
 # OS noise
 Thumbs.db

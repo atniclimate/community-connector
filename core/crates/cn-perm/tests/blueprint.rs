@@ -1820,7 +1820,7 @@ fn fingerprint_distinguishes_member_facilitator_and_dual_role() {
 #[test]
 fn cache_key_survives_fingerprint_collision() {
     // CRC32 cross-role collision pair engineered by the 2026-07-17
-    // adversarial round (Codex session 019f7389-9e32-78a2-94ee-7a1b2827f3d3):
+    // adversarial round (D-045):
     // in one group state, this member and this facilitator collide at the
     // hashed 32-bit viewer_fingerprint for ANY shared template-version
     // suffix. Caches must therefore key on viewer_cache_key (the canonical

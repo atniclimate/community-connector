@@ -536,7 +536,7 @@ verdict CONDITIONAL NO-GO). Director accepted the findings; the rulings:
 ## D-045 (2026-07-17) - Facilitator adversarial round: findings, fixes, rulings
 
 The mandatory adversarial Codex round on the Lane C permission diff (D-028;
-gpt-5.6-sol review profile, session 019f7389-9e32-78a2-94ee-7a1b2827f3d3;
+gpt-5.6-sol review profile, 2026-07-17 session, receipt in the session log;
 verdict BLOCKING FINDINGS: yes) returned three blockers and one advisory.
 Integrator rulings at Barrier 1:
 
@@ -884,3 +884,78 @@ test strategy), autonomous per CLAUDE.md.
    and ADR critiques are historical records, left as-is. LICENSE.md is already
    tracked with the PolyForm Noncommercial 1.0.0 text, so the D-054
    precondition is satisfied on disk (re-verify at push time).
+
+## D-057 (2026-07-24) - R2 EntityDetail fixes landed; fresh adversarial round PASS-WITH-NOTES
+
+The D-049 queued fixes landed as one unit (commit 73b5656). BLOCK-1: the
+detail tier is now the effective maximum over exactly the viewer-projected
+attribute set, computed in cn-perm. BLOCK-2: own_settings was deleted from
+cn-api; the owner-only visibility/tier disclosure and every other detail
+decision live in cn-perm (DetailAttribute); cn-api is a pure carrier. HIGH-3:
+deterministic custody+tier matrices across anonymous, member,
+facilitator-only, self-owner, trusted non-member, plain non-member,
+inactive-governance, active governance, and dual-role viewers - in cn-perm
+unit tests, in the no-leak property (detail-surface extension), and
+end-to-end through cn-api::entity_detail with a non-empty custody chain.
+LOW-4: the provenance one-liner strips control characters AND U+2028/U+2029.
+
+The mandatory fresh adversarial round (gpt-5.6-sol adversary profile,
+2026-07-24, review artifact 2026-07-24_r2-entitydetail-fix-adversarial.md in
+the out-of-repo review lane) returned PASS-WITH-NOTES: BLOCK-1 and BLOCK-2
+explicitly CLOSED with counterexample attempts defeated; its residual notes
+(missing trusted/dual-role deterministic tier witnesses, missing e2e trusted
+custody case, U+2028/U+2029 surviving normalization) were closed inside the
+same commit before it landed. The reviewer's performance note - the detail
+path re-scans raw attributes per request - is ACCEPTED and documented in a
+doc comment: detail is a single-entity interaction path, and recomputing in
+cn-perm keeps it the sole authority. check-all 11/11 green before commit.
+D-049 is fully discharged.
+
+## D-058 (2026-07-24) - D-055 pre-publish sweep executed: dispositions, _private/ split, root docs tracked
+
+A six-agent world-readability scan covered every tracked file plus the three
+untracked root docs (42 findings), followed by revision passes. Dispositions
+taken autonomously under the D-055 mechanism:
+
+- **Edited in place:** username paths and the machine hostname removed from
+  docs/ENVIRONMENT.md; the staging drive letter genericized in
+  docs/cpf-rcn-migration-recipe.md; stray transcript markup removed from
+  PLAN_1.0.md; the Codex session UUID redacted from cn-api/src/session.rs,
+  cn-perm/tests/blueprint.rs, and the D-045 entry above (tracker metadata
+  stays out of the repo); the stale tracked Playwright artifact
+  app/test-results/.last-run.json untracked and gitignored.
+- **Split:** DEPENDENCIES.md became a world-readable external-dependency
+  audit; all machine-local operational content (backup manifest and robocopy
+  recipe, absolute paths, predecessor PII-fencing specifics and sizes) moved
+  losslessly to gitignored _private/DEPENDENCIES-local.md.
+- **Revised and TRACKED per D-055:** PLAN_1.0.md (v1.1: G-RAT/G-DATE/G1/Q-B/
+  Q-C/P0.6 marked RESOLVED with D-numbers, route resequenced per D-056.3,
+  Phases 6-9 explicitly deferred to the post-convention retrospective, the
+  P5.6 dedup ADR renumbered to ADR-006 since ADR-005 is remote intake);
+  MANIFEST.md (re-dated 2026-07-24, reality-checked against HANDOFF.md);
+  DEPENDENCIES.md (the split revision). docs/PROJECT_PLAN.md received its
+  full D-056.5 revision (reconciled route, gate statuses, risk register).
+- **Ruled acceptable as-is:** convention date and aggregate signup estimates
+  in decision records; .gitignore defensive PII patterns; the license
+  copyright name (required by PolyForm, D-054); the pilot-evidence template
+  (correctly banner-marked DRAFT).
+
+**The "sweep passed" push precondition is NOT yet fully satisfied.** Six
+needs-human dispositions park on the human before the first push:
+
+1. Maintainer emails in D-003/D-011 above and scripts/pii-allowlist.txt
+   (the tenant address is the gratuitous one) - redact or accept.
+2. Public disclosure that the predecessor repo holds real-partner PII with
+   named directories (CLAUDE.md predecessor rules, docs/LAUNCH_PROMPT.md,
+   docs/cpf-rcn-migration-recipe.md) - keep verbatim, generalize, or move
+   specifics to _private/.
+3. docs/THE_STORY.md makes audience-facing claims on behalf of ATNI with no
+   review marker - confirm it is approved for the public repo.
+4. docs/design/pilot-form-and-template-2026-07-06.md Parts A/C (draft form
+   text and consent email, banner-marked DRAFT) - publish as marked draft or
+   move to _private/ until D-023 review completes.
+5. Workspace-layout paths in contract docs and archived handoffs (no
+   usernames; operationally load-bearing) - recommended accept as-is.
+6. The maintainer's mirror recipe does not exclude _private/, so the local
+   mirror will carry it - confirm that is desired (recommended: yes, the
+   content must not be lost; it simply must not be pushed).
