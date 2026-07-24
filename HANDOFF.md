@@ -68,7 +68,10 @@ remote in sync):**
 - **FIRST PUSH executed (D-060):** origin live, `main` tracking, plain `git push`
   works (repo-local gh credential pin as the atniclimate account).
 
-**NOT done - ordered next actions:**
+**NOT done - ordered next actions (NEXT SESSION MANDATE, human-directed 2026-07-24:
+run autonomously; execute items 1 and 2 without waiting for the human; nothing in
+them requires a gate decision - the human's parallel actions are only the D-023
+solo pass and committee timing):**
 1. **ADR-005 adversarial round.** Run via the adversary wrapper (healthy 2026-07-24),
    judge findings, amend, mark ACCEPTED. Gates the relay implementation and deploy.
 2. **P3.5 facilitator wizard + P3.6 entry forms - THE intake pipeline (D-053).**
