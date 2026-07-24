@@ -17,8 +17,9 @@ silent failure), I7 (versioned formats, loud rejection).
 The D-053 remote intake path encrypts every submission in the attendee's
 browser to the facilitator's public key (libsodium sealed box). The relay and
 the static form never hold anything readable. That design concentrates all
-risk in one artifact: the facilitator private key, which exists only on the
-pilot PC.
+risk in one artifact: the facilitator private key, whose ACTIVE copy is used
+only on the pilot PC (two controlled offline recovery copies also exist -
+section 5; ADR-005 D3 carries the exact custody and exposure model).
 
 Two failure modes, from D-056.4:
 
@@ -179,12 +180,15 @@ decrypts, stages into the pending-review queue, then wipes the relay - D-053,
 D-056.1) carries a **pinned fingerprint** in its local, off-repo config,
 written once at the ceremony.
 
-Before trusting ANY pulled ciphertext batch, the puller:
+Before trusting ANY pulled ciphertext batch, the puller (per ADR-005 D8's
+measurement procedure, which extends this check from key-only to the whole
+bundle):
 
-1. Fetches the currently deployed intake form (or its small deploy manifest,
-   which the form build emits beside it) and extracts the embedded public
-   key.
-2. Computes its fingerprint and compares against the pin.
+1. Fetches EVERY file listed in the locally pinned canonical deploy
+   manifest (built from the reviewed commit; never fetched from the served
+   origin) and verifies each file's bytes-hash and length against the pin,
+   then extracts the embedded public key from the verified form.
+2. Computes the key's fingerprint and compares against the key pin.
 3. Also compares the pin against the fingerprint of its own local secret
    key's public half (catches a stale or mismatched local key after a
    rotation).
@@ -198,10 +202,13 @@ a human before any further automated action. There is no override flag; the
 only fix is correcting the deployed form or re-pinning after a verified,
 logged rotation (section 7).
 
-If the form/manifest is unreachable (offline pilot PC, Pages outage), the
+If the deployed origin is unreachable (offline pilot PC, Pages outage), the
 puller may proceed on the local-key-vs-pin check alone but must print a
-WARN that the deployed-form check was skipped; skipping is never silent
-(I3, I12).
+WARN that the deployed-bundle check was skipped; skipping is never silent
+(I3, I12), and NO new solicitation (QR presentation) happens until the
+deployed bundle verifies against the pin (ADR-005 D8 - the bundle check
+protects future submitters; already-sealed ciphertext is not endangered by
+current-bundle state).
 
 ## 7. Public-key distribution and human verification
 
@@ -282,8 +289,13 @@ stands).
 Same steps as 8.1 minus the loss accounting: drain the relay under the old
 key FIRST (pull, decrypt, stage, wipe), then ceremony, redeploy, verify,
 re-pin. Zero submissions are stranded if the relay is drained before the
-form flips. Old backups are destroyed once the last old-key ciphertext is
-confirmed decrypted and staged.
+form flips. Destruction timing follows ADR-005 D3's cutoff rule - NOT
+"as soon as the last visible ciphertext is staged": after the relay
+admission allowlist drops the old fingerprint (a stale open tab then gets
+a visible "reload the form" rejection instead of silently sealing to a
+dead key), the old key and its backups are retained for one further relay
+TTL and destroyed only after ledger reconciliation shows no unaccounted
+old-key receipt.
 
 ## 9. Ceremony checklist
 

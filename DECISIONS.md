@@ -1088,3 +1088,68 @@ append-only log - is now section 7 of the draft and the largest D-023
 question; (b) the single-disk queue-loss acceptance (item 4) is flagged as
 revisitable. Round 2 on the amended ADR is required before ACCEPTED; the
 deploy bar (D-059.8) is unchanged.
+
+## D-062 (2026-07-24) - ADR-005 round 2: FAIL judged valid; second amendment; round 3 required
+
+Round 2 ran on the round-1-amended ADR (review at
+`_reviews/community-connector/2026-07-24_adr-005-remote-intake-round2.md`;
+target HEAD cc20638). Verdict: FAIL. Round-1 blockers 3/5 and findings
+8/11/12/13 CLOSED; the rest partially closed with two NEW blockers, both in
+mechanisms the round-1 amendment itself introduced, both verified against
+the code before judgment: (1) the approval recovery assumed durable op-id
+lookup/idempotent-append semantics cn-store does not have - authz.rs
+reports an already-seen op as Applied and log.rs append_batch serializes
+blindly, so recovery could duplicate audit-log lines; (2) the KV running
+POST counter is unimplementable - no atomic increment under concurrent
+POSTs, eventually consistent lists, and the pulled+deleted+expired equation
+double-counts. Four majors: missing crash-recovery state table, no
+executable bundle-measurement procedure (and ceremony contradictions), no
+sidecar-payload binding + undecided approved-record closeout, unsound
+rotation "proof". All judged valid; none rejected.
+
+Second amendment, autonomous choices logged:
+
+1. **Durable idempotent batch-append seam (D4):** additive cn-store API
+   classifying preassigned op ids against the DURABLE LOG as
+   absent/present-same-digest/present-conflicting-digest; whole-batch
+   authorization before any append; append-absent-only + one fsync;
+   conflicting digest = typed halt, nothing appended. approved_intent
+   added to the versioned sidecar enum; batch failure returns the sidecar
+   to pending with the failure in the decision history.
+2. **Receipt ledger replaces the counter (D6):** per-receipt no-content KV
+   ledger entries with TTL+horizon lifetime; reconciliation over DISJOINT
+   states (staged / deleted-by-me / present / absent-not-mine ->
+   expired-or-alert); hard-cap claim withdrawn - approximate cap + size
+   cap + TTL + billing ceiling are the honest bounds.
+3. **Relay admission cutoff (D3/D6):** the Worker validates the outer
+   fingerprint against an allowlist; rotation removes the old fingerprint
+   after drain, making "no old-key envelope can arrive" enforced, with a
+   stale open tab getting a visible reload rejection; old key destroyed
+   only after cutoff + one TTL + clean ledger reconciliation.
+4. **Crash-state table (D4):** deterministic action for every on-disk
+   state (temp/orphan/corrupt/binding-mismatch/approved_intent/lost
+   history/degraded flush); corrupt/ quarantine retains relay copies.
+5. **Sidecar-payload binding (D4)** (record_id + payload digest, verified
+   on read) and **approved-record closeout DECIDED (D4/D5):** approved
+   queue records are PURGED in the recorded window-close sweep (no
+   archive branch - privacy first); audit residue = sweep manifest +
+   provenance identifiers/digests; D5's "durable link" narrowed to an
+   identifier that outlives its referent.
+6. **Bundle measurement procedure (D8):** canonical manifest built
+   LOCALLY from the reviewed commit (sorted normalized paths, per-file
+   SHA-256+length, no self-hash), pinned off-origin; verification fetches
+   every pinned path (same-origin, no redirects, identity encoding);
+   extra-planted-file residual stated (unreferenced by verified
+   HTML/CSP); unreachable-origin rule: pulls proceed with loud WARN, no
+   new solicitation until verified.
+7. **Ceremony companion amended in-commit** to match: active-key custody
+   phrasing, bundle check in the puller gate, no-solicitation-on-skip,
+   destruction timing per the cutoff rule.
+
+The intake-pipeline blueprint (docs/blueprints/intake-pipeline.md, new
+this session) aligned in the same commit: cn-store seam lands first in its
+sequencing; sidecar binding and recovery classification in cn-ingest;
+approval facade routes through the seam. Round 3 targets: crash points,
+op-log persistence, concurrent POST/cap behavior, bundle verification
+inputs, close-of-window audit continuity (the reviewer's stated round-3
+scope). ADR-005 remains DRAFT until round 3 passes.

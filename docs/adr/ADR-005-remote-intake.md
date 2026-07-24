@@ -1,7 +1,7 @@
 # ADR-005: Remote Intake - Sealed-Envelope Relay and Facilitator Pending-Review Queue
 
-- Status: DRAFT - round 1 FAIL judged and amended 2026-07-24; pending round 2
-- Date: 2026-07-24 (amended same day after adversarial round 1)
+- Status: DRAFT - rounds 1 and 2 FAIL judged and amended 2026-07-24; pending round 3
+- Date: 2026-07-24 (amended twice same day after adversarial rounds 1 and 2)
 - Phase: 3 (intake pipeline P3.5/P3.6 plus the D-053 relay; deploy gated on the
   D-059.8 deploy bar)
 - Drivers: R3 (data entry and ingestion), R5 as amended by D-053 (one remote
@@ -17,7 +17,20 @@
 - Adversarial round 1: FAIL (gpt-5.6-sol, 2026-07-24, review lane) - five
   blockers: browser-bundle trust root, Windows crash/approval transaction
   protocol, relay-to-queue idempotency, consent/audit contract completeness,
-  key-custody claims. All five judged valid and addressed by this amendment.
+  key-custody claims. All five judged valid and addressed by amendment.
+- Adversarial round 2: FAIL (same lane, on the amended text at cc20638) -
+  two new blockers (the approval recovery assumed durable op-id semantics
+  cn-store does not provide; the KV POST-counter/hard-cap reconciliation is
+  not implementable on eventually consistent KV) plus four majors
+  (crash-state table, bundle measurement procedure, sidecar binding and
+  approved-record closeout, rotation cutoff proof). All judged valid and
+  addressed by the second amendment: the durable idempotent batch-append
+  seam (D4), the receipt ledger replacing the counter (D6), the crash-state
+  table (D4), the canonical manifest procedure (D8), sidecar-payload
+  binding and the decided approved-record closeout (D4/D5), and the
+  relay-side fingerprint admission cutoff (D3/D6). The keygen ceremony
+  companion was amended in the same commit to match (bundle check,
+  destruction timing, custody phrasing).
 
 ## Context
 
@@ -210,23 +223,36 @@ mismatch: halt loudly, decrypt nothing, stage nothing, DELETE NOTHING on
 the relay (evidence preservation), no override flag - per the companion
 ceremony design.
 
-**Rotation protocol (drain-before-flip).** Rotation is never a simple form
-flip, because cached pages and open tabs can produce old-key ciphertext
-after a redeploy:
+**Rotation protocol (drain-before-flip, with an enforceable cutoff).**
+Rotation is never a simple form flip, because cached pages and open tabs
+can produce old-key ciphertext after a redeploy. The enforcement point is
+the relay: the Worker validates the outer `recipient_key_fingerprint`
+against its configured admission allowlist (D6) - a cleartext field, so no
+content access is needed - which makes "no more old-key envelopes" a
+provable state rather than an estimate:
 
 1. Pause distribution: stop presenting the QR / announce the pause window.
-2. Drain: pull and reconcile the relay until receipt counts match POSTs
-   observed for the window (D6 reconciliation) or relay TTL has elapsed
-   since pause.
+2. Drain: pull and reconcile the relay via the D6 receipt ledger until
+   every ledger entry is accounted for, or relay TTL has elapsed since
+   pause.
 3. Run the new keygen ceremony; deploy the new form; independently verify
-   the deployed bundle hash and embedded key (D8 post-deploy check).
-4. Retain old-key decrypt capability for the maximum old-form lifetime:
-   relay TTL plus a cache horizon (Pages/CDN cache lifetime plus an
-   open-tab allowance, fixed in the deploy runbook). Envelopes arriving
-   sealed to the old key during this window still decrypt; the queue
-   records `key_used`.
-5. Destroy the old key and its backups only after reconciliation shows no
-   old-key envelope can still be in flight.
+   the deployed bundle against the D8 pinned manifest.
+4. Cutover: add the new fingerprint to the relay admission allowlist;
+   after the drain window, REMOVE the old fingerprint. From that moment
+   the relay rejects old-form POSTs with a typed "form out of date -
+   reload" response: an arbitrarily old open tab gets a VISIBLE failure,
+   never a silently lost submission.
+5. Retain old-key decrypt capability for one relay TTL past the cutover
+   (envelopes admitted before cutover can still be pulled and decrypted;
+   the queue records `key_used`).
+6. Destroy the old key and its backups only after that TTL has elapsed
+   AND ledger reconciliation shows no unaccounted old-key receipt.
+   "No old-key envelope can still arrive" is then enforced by admission,
+   not assumed from an open-tab allowance.
+
+Accepted residual: a submitter on a stale tab after cutover must reload
+and resubmit; their attempted submission is refused visibly, not lost
+silently.
 
 Emergency rotation on suspected key leakage or PC compromise: execute
 immediately from a machine believed clean; do NOT trust the compromised
@@ -291,26 +317,37 @@ modified; it holds:
 - `record_checksum` over the record's own content (torn-write detection).
 
 The sidecar holds mutable review state: `review_state`
-(`pending | approved | rejected`), the full decision history (array of
-`{state, reviewer, decided_at, reason}` - never overwritten, only appended
-to), reviewer notes, validation-report reference, near-duplicate candidates
-surfaced and the facilitator's disposition, and - once approved - the
+(`pending | approved_intent | approved | rejected` - the write-ahead state
+is part of the versioned persisted enum, not an implementation detail),
+the full decision history (array of `{state, reviewer, decided_at,
+reason}` - never overwritten, only appended to), reviewer notes,
+validation-report reference, near-duplicate candidates surfaced and the
+facilitator's disposition, and - in `approved_intent` and beyond - the
 approval transaction fields below. Sidecar updates use the atomic-replace
-protocol below, and the history array means an overwritten sidecar still
+protocol below, and the history array means a rewritten sidecar still
 carries every prior decision.
+
+**Sidecar-payload binding.** Filename adjacency is not an integrity
+binding. The sidecar REQUIRED fields include the `record_id` and the
+payload record's `record_checksum` value (its digest); every reader
+verifies both against the payload record before trusting the pair, so a
+swapped, misnamed, or stale sidecar is a loud typed error (I3), never a
+silent mis-association. The payload record carries its `record_id`; the
+expected sidecar is the one bearing that id and a matching payload digest.
 
 **Windows crash-state protocol (replaces round-0's four verbs).** All queue
 writes follow one primitive: write to a temp file in the queue directory
-(exclusive create, unique name), flush to disk (`FlushFileBuffers` via the
-runtime's fsync), close, then atomically rename onto the final path
-(`MoveFileEx` with `REPLACE_EXISTING | WRITE_THROUGH` semantics), then
-flush the directory handle where the platform allows. Every record and
-sidecar carries an internal checksum; a reader that finds a temp file, a
-missing sidecar, or a checksum mismatch treats it as a torn write and
-follows the recovery rules below. A single-instance lock file at the queue
-root (exclusive create; stale-lock takeover only with process-liveness
-check) forbids concurrent pullers/review processes - two instances is a
-refuse-to-run, not a race.
+(exclusive create, unique name, SAME VOLUME as the final path), flush to
+disk (`FlushFileBuffers` via the runtime's fsync), close, then atomically
+rename onto the final path (`MoveFileEx` with
+`REPLACE_EXISTING | WRITE_THROUGH` semantics - "atomic" here means
+replacement visibility; power-loss durability rests on the file flush plus
+startup recovery), then flush the directory handle where the platform
+allows. Checksums are computed over a canonical serialization (sorted
+keys, defined with the format schema). A single-instance lock file at the
+queue root (exclusive create; stale-lock takeover only with
+process-liveness check) forbids concurrent pullers/review processes - two
+instances is a refuse-to-run, not a race.
 
 Per-receipt staging sequence: stage payload record via the primitive ->
 stage `pending` sidecar via the primitive -> re-read and checksum-verify
@@ -320,37 +357,77 @@ and transport dedup (below) makes re-staging a recorded no-op. A delete
 whose acknowledgement is lost is retried; deleting an already-deleted
 receipt is idempotent at the relay (D6).
 
-**Approval transaction (queue -> op log).** Approval is a small
-write-ahead protocol, because the graph write and the queue update cannot
-crash-atomically happen together:
+**Legal on-disk states and deterministic recovery (round-2 amendment).**
+Startup recovery scans the queue root and resolves every state by rule -
+no state is left to operator judgment:
+
+| Found | Meaning | Action |
+|---|---|---|
+| Temp file | Torn write | Discard. Never promote a temp file; its content, if it mattered, is re-creatable (relay re-pull or in-app re-entry). |
+| Payload record, no sidecar | Crash between the two staging writes | Reconstruct a `pending` sidecar (initial state ONLY - a decision history is never reconstructed). Remote records: the relay receipt still exists (delete is gated on sidecar verify), so re-pull would also heal this; transport dedup absorbs the overlap. |
+| Payload or sidecar failing checksum | Torn/corrupt final | Move the pair to a `corrupt/` subdirectory (retained, never trusted, swept with the window close), loud typed error (I3), and DO NOT delete the relay receipt for that record - local durability is unproven, so the upstream copy is preserved. |
+| Sidecar whose binding fields mismatch its payload | Mis-association | Loud typed error; both files retained for facilitator investigation; no automatic repair. |
+| Sidecar in `approved_intent` | Crash during approval | Run the approval recovery rule (below) before any other queue work. |
+| Sidecar missing where its decision history is known to have existed (payload references it; audit expects it) | Lost decision state | Loud halt for facilitator disposition - a decision history is never silently recreated as `pending`. |
+| Directory-handle flush unavailable | Degraded platform | Staging proceeds with a WARN recorded in the run report (I12); the relay delete remains gated on successful read-back verification, so the weaker namespace durability never orphans the only copy. |
+
+**Approval transaction (queue -> op log) - on a durable idempotent seam
+(round-2 amendment).** Round 2 established that ADR-002's op-id dedup is a
+FOLD property (an in-memory seen-set that makes re-application a state
+no-op), not a durable-log property: today's `append_batch` serializes
+blindly, today's `submit` reports an already-seen op as `Applied`, and
+"exists in the durable log", "is in the fold's seen-set", and "is
+quarantined" are three different facts. Recovery built on fold semantics
+would duplicate audit-log lines. This ADR therefore REQUIRES a new
+additive cn-store seam, which the intake implementation lands before any
+approval code:
+
+*Idempotent durable batch append.* Input: an ops batch with preassigned
+ids and a canonical per-op digest. The store classifies each op id against
+the DURABLE LOG (not the fold seen-set) as
+`absent | present_same_digest | present_conflicting_digest`, then: any
+`present_conflicting_digest` -> typed batch failure, nothing appended
+(evidence retained - this is the dangerous same-id-different-bytes case,
+now detected instead of undefined); otherwise authorize the WHOLE batch
+first (any denial -> typed batch failure, nothing appended); then append
+only the `absent` ops, fsync once, fold, and return a typed per-op durable
+result. Fold-level quarantine of an appended op is reported per ADR-002's
+existing machinery and recorded in the submit report reference (I12);
+authorization-stage failures can never leave a partial batch in the log.
+
+The transaction:
 
 1. Facilitator approves in the review UI. BEFORE any graph write, the
-   sidecar is updated to `review_state: approved-intent` with the complete
-   approval batch: preassigned op ids (UUIDv7, generated now), a
-   `batch_digest` over the ops to be submitted, and the reviewer/timestamp
+   sidecar is updated to `review_state: approved_intent` with the complete
+   approval batch: preassigned op ids (UUIDv7, generated now), the
+   canonical per-op digests, a `batch_digest`, and the reviewer/timestamp
    entry in the decision history.
-2. The ops are submitted through the normal authorized path (cn-api submit
-   with the facilitator viewer) USING those preassigned op ids.
-3. On submit success, the sidecar is updated to `approved` with the
-   submit report reference.
+2. The batch goes through the idempotent durable append seam (authorized
+   by the normal `PermAuthorizer` path - no new write authority).
+3. On batch success, the sidecar is updated to `approved` with the submit
+   report reference. On typed batch failure (authz denial or digest
+   conflict), the sidecar returns to `pending` with the failure recorded
+   in the decision history - loud, reviewable, no partial state.
 
-Recovery: a sidecar found in `approved-intent` at startup means a crash in
-step 2-3. The recovery scan asks the store which of the preassigned op ids
-already exist (op-id dedup is ADR-002's existing contract): all present ->
-complete to `approved`; none present -> resubmit the same batch with the
-SAME ids (idempotent); partial -> resubmit the full batch with the same
-ids, the store's per-op dedup makes already-applied ops no-ops. Duplicate
-entities from retried approvals are impossible because ids are preassigned
-and reused, never regenerated. Rejection is a single sidecar update
-(`rejected` plus history entry); records then persist under D-059.11 until
-the recorded purge sweep.
+Recovery: a sidecar found in `approved_intent` at startup re-runs step 2
+with the SAME ids and digests. The seam's classification makes this
+idempotent BY CONSTRUCTION at the durable-log level: already-appended ops
+classify `present_same_digest` and are not re-appended; missing ops
+append; a conflicting digest halts loudly. Duplicate log lines and
+duplicate entities are both impossible because ids and digests are
+preassigned, persisted in the sidecar, and reused - never regenerated.
+Rejection is a single sidecar update (`rejected` plus history entry);
+records then persist under D-059.11 until the recorded purge sweep.
 
 **Dedup - transport and semantic layers (round-1 amendment).**
 `submission_id` is client-controlled and therefore cannot be the only key:
 
 - *Transport dedup* (re-pull safety): key `(receipt_id, ciphertext_hash)`.
   A re-pulled receipt matching an existing record is a recorded no-op
-  (I12).
+  (I12). The same receipt id with a DIFFERENT ciphertext hash is a loud
+  transport-integrity conflict (I3): both ciphertexts are retained, the
+  relay copy is NOT deleted, and the facilitator is alerted - it means
+  relay-side substitution or a platform fault, never a no-op.
 - *Semantic dedup* (duplicate submissions): key
   `(submission_id, payload_hash)`. Identical pair -> recorded replay,
   no-op. Same `submission_id` with DIFFERENT `payload_hash` -> a loud
@@ -372,17 +449,21 @@ exports escape likewise. A payload failing validation stages as a record
 with a validation-failed marker (reviewable, rejectable) rather than
 rendering raw.
 
-**Retention and lifecycle - all three states.** Rejected: per D-059.11,
-kept in full for the pilot window, then purged in ONE RECORDED SWEEP at
-window close. Pending at window close: reviewed to a decision or purged in
-the same sweep - the queue is never left holding undecided PII after the
-window. Approved: the queue record is the audit trail linking consent to
-ops; it is retained for the pilot window and included in the same
-close-of-window sweep decision (purge or archive is decided at the sweep
-and recorded). The sweep produces a dated, non-PII purge manifest - counts,
-record ids, hashes, sweep operator - which is the D-059.11 "recorded"
-artifact and lives in the facilitator ops log (off-repo), with a one-line
-DECISIONS.md entry referencing it.
+**Retention and lifecycle - all states, decided now (round-2 amendment).**
+Rejected: per D-059.11, kept in full for the pilot window, then purged in
+ONE RECORDED SWEEP at window close. Pending at window close: reviewed to a
+decision or purged in the same sweep - the queue is never left holding
+undecided PII after the window. Approved: PURGED in the same sweep - there
+is no archive branch. Rationale: privacy first - no decrypted PII store
+outlives the window; the data itself lives on as governed graph content,
+and consent interpretability survives via `form_version` and
+`consent_text_digest` carried in op provenance. What survives as audit
+evidence after the sweep: the sweep manifest (dated, non-PII: counts,
+record ids, payload and batch digests, decision summaries
+state/reviewer/timestamp, op-id lists, sweep operator) in the facilitator
+ops log (off-repo), plus the identifiers and digests already stamped into
+graph provenance (D5), with a one-line DECISIONS.md entry referencing the
+manifest. `corrupt/` quarantine content is purged in the same sweep.
 
 **PII containment - honest description (round-1 amendment).** The
 protections here are layered process plus tripwires, with I1 as the human
@@ -426,8 +507,13 @@ rather than merely populated:
   match is evidence (not proof) the shown text was one we deployed.
 - `receipt_id` (relay_observed): the custody-relevant relay hop.
 - `submission_id` (source_asserted): the semantic dedup key.
-- The queue `record_id`: the durable link from graph ops back to the full
-  queue audit record (which holds the decision history and hashes).
+- The queue `record_id` plus the payload and batch digests: during the
+  pilot window these resolve to the full queue audit record (decision
+  history, hashes); after the recorded close-of-window sweep the full
+  record is purged BY DESIGN (D4 lifecycle), and the identifiers/digests
+  here plus the sweep manifest ARE the surviving audit evidence - the
+  link is an identifier that outlives its referent, stated plainly rather
+  than promised as forever-resolvable.
 
 Tier: every pilot entry enters at T1; the tier authority is ATNI Climate
 (D-034). Per-field tier UX is post-pilot work.
@@ -437,12 +523,18 @@ Tier: every pilot entry enters at T1; the tier authority is ATNI Climate
 **API contract (round-1 amendment - previously implicit).**
 
 - `POST /submit` (public, no auth): accepts one outer envelope within the
-  size cap. The Worker GENERATES the receipt id (128-bit random,
-  server-side; the client can neither choose nor predict KV keys, so one
-  POST can never overwrite another). Response: the receipt id and nothing
-  else. The acknowledgement MEANS "the relay stored your sealed envelope";
-  it does not mean staged, reviewed, or approved - the D-023 confirmation
-  wording must say so (see TTL semantics below).
+  size cap, and only if its `recipient_key_fingerprint` is on the Worker's
+  configured admission allowlist (cleartext field; this is also the D3
+  rotation cutoff - an out-of-date form gets a typed "reload the form"
+  rejection, never silent loss). The Worker GENERATES the receipt id
+  (128-bit random, server-side, written with a conditional
+  create-if-absent and retry-on-collision; the client can neither choose
+  nor predict KV keys, and residual collision risk after the conditional
+  create is negligible-by-construction, not assumed impossible). Response:
+  the receipt id and nothing else. The acknowledgement MEANS "the relay
+  stored your sealed envelope"; it does not mean staged, reviewed, or
+  approved - the D-023 confirmation wording must say so (see TTL semantics
+  below).
 - `GET /receipts` + `GET /blob/{id}` + `DELETE /blob/{id}` (authenticated
   control plane, pilot PC only): list is paginated and repeatable; reads
   are repeatable (no destructive read - "fetch-then-delete" from the
@@ -479,17 +571,22 @@ review gate - not per-IP precision. A throttled submitter can retry; the
 deterministic-lockout failure mode (one venue IP exhausted for the day) is
 explicitly designed out by the sizing rule in the deploy runbook.
 
-**Capacity and cost bounds.** Pilot scale is ~150 expected / 300 max
-submissions of single-digit KB each - trivially inside free-tier KV. The
-Worker enforces: per-blob size cap, a total-stored-blobs cap (an order of
-magnitude above pilot scale; POSTs beyond it are refused with a retry-able
-error rather than allowing unbounded storage), and the Cloudflare account
-carries a billing alert plus a spending ceiling per the deploy runbook.
-Overload therefore degrades to "remote intake temporarily refuses; in-app
-entry continues" - it cannot become spend or a crowd-out of the queue's
-review capacity beyond the cap.
+**Capacity and cost bounds - honest about KV consistency (round-2
+amendment).** Pilot scale is ~150 expected / 300 max submissions of
+single-digit KB each - trivially inside free-tier KV. KV offers no atomic
+counter: concurrent POSTs doing read-modify-write lose increments, and
+list counts are eventually consistent. The Worker therefore enforces an
+APPROXIMATE total-blob cap (list-derived count, refusing POSTs with a
+retry-able error when over it) and the claim of a hard cap is withdrawn;
+the actual hard bounds are the per-blob size cap, the TTL (storage
+self-drains), platform quotas, and the billing ceiling plus alerts
+configured on the Cloudflare account per the deploy runbook. Under burst
+abuse the approximate cap may overshoot by the consistency window - that
+overshoot is bounded KB at pilot payload sizes and cannot become
+unbounded spend. Overload degrades to "remote intake temporarily refuses;
+in-app entry continues."
 
-**TTL and loss semantics - honest (round-1 amendment).** Every blob
+**TTL and loss semantics - honest (rounds 1-2 amendments).** Every blob
 carries a TTL. Policy bounds fixed here: TTL is at least twice the
 committed maximum pull interval and at most the pilot-window length;
 concrete values are deploy-runbook configuration inside those bounds.
@@ -500,11 +597,25 @@ oldest remaining receipt age; an age past half the TTL is a loud warning
 (I12) - expiry should never be a surprise. What expiry MEANS: the relay
 cannot identify whose ciphertext expired (by design - no contact fields in
 cleartext); "re-solicited" therefore means a broadcast ask, not recovery.
-Reconciliation: the Worker maintains a running POST counter (a count, no
-content); the puller compares receipts pulled + deleted + expired against
-it each run and investigates gaps - this is also the detection path for
-relay-side deletion, truncation, or withholding (integrity failures that
-ciphertext-only design does not otherwise surface).
+
+**Reconciliation via a receipt ledger - not a counter (round-2
+amendment; the round-1 running-counter design was unimplementable on KV
+and is withdrawn).** On each accepted POST the Worker writes TWO KV
+entries: the ciphertext blob (blob TTL) and a small ledger entry under a
+separate key prefix - receipt id, size, arrival timestamp, claimed
+fingerprint; NO content - with a LONGER TTL (blob TTL plus a
+reconciliation horizon). The ledger is metadata the operator could already
+observe (accepted D6 exposure); it adds no readable personal data. Each
+puller run classifies every ledger entry into DISJOINT states: staged
+locally (transport record exists) / deleted by me (the puller's local
+delete journal) / blob still present (unpulled) / blob absent and not
+deleted by me. The last state, evaluated after the blob TTL plus the
+stated KV consistency horizon, is EXPIRED (counted, drives the broadcast
+re-solicit); evaluated before TTL it is an integrity alert (possible
+relay-side deletion, truncation, or withholding) - re-checked once on the
+next run before alarming, because list/read are eventually consistent.
+Every count in the run report derives from these disjoint states; nothing
+is double-counted and no lost-increment failure mode exists.
 
 **Logging and metadata discipline.** The Worker logs no bodies, no
 ciphertext, and no authorization headers; request metadata logging is
@@ -560,16 +671,41 @@ The build emits a deploy manifest beside the artifact: bundle hash
 fingerprint, form_version, consent_text_digest, source commit SHA, and the
 vendored libsodium identity (version + package integrity hash).
 
-**Full-bundle pin - not key-only (round-1 amendment).** At deploy time the
-facilitator records the bundle hash and manifest in the off-repo ops log
-(deploy provenance: which commit, who deployed, when, what hash). The
-puller's pre-run check (D3) verifies the DEPLOYED bundle hash against this
-off-repo pin - extending the ceremony's key-only pin to the whole
-executable artifact. A served bundle whose hash mismatches the pin halts
-the line exactly like a key mismatch. A hash or manifest served by the
-compromised origin itself proves nothing; the pin's authority is that it
-is held off-origin, on the pilot PC, recorded at a deploy the facilitator
-performed.
+**Full-bundle pin - executable measurement procedure (round-2
+amendment).** The measurement is defined so it can actually be computed
+and compared:
+
+- *Canonical manifest.* The reproducible build, run LOCALLY from the
+  reviewed commit, emits a manifest: an ordered list (sorted, normalized
+  relative paths) of every deployable file with each file's byte length
+  and SHA-256 over its exact bytes. The manifest is NOT part of its own
+  file set (no self-hash). The manifest hash is SHA-256 over the
+  manifest's canonical serialization.
+- *Pin provenance.* The pin is the LOCALLY BUILT manifest, recorded
+  off-origin in the pilot PC ops config and ops log at deploy time
+  (deploy provenance: commit SHA, deployer, time, manifest hash). The pin
+  is never copied from the deployed origin - fetching the file list or
+  expected hashes from the served origin would recreate the same-origin
+  trust hole this section exists to close.
+- *Deploy.* Exactly the built file set is deployed - nothing more; the
+  CSP and the dependency-closed build mean the verified HTML references
+  no file outside the manifest.
+- *Verification.* The puller (and the post-deploy check) fetches EVERY
+  path listed in the PINNED manifest from the deployed origin -
+  same-origin only, redirects refused, content-encoding decoded to
+  identity bytes - and compares each file's bytes-hash and length against
+  the pin. Any mismatch or missing file halts the line exactly like a key
+  mismatch. Stated residual: a static host does not enumerate its files,
+  so an EXTRA planted file is not detectable by fetch - but it is also
+  unreferenced by the verified HTML/CSP, so it cannot execute in the
+  form's page; targeted split-view serving remains the accepted residual
+  below.
+- *Unreachable origin* (offline pilot PC, Pages outage): pulls may
+  proceed on the local-key check alone with a loud WARN in the run report
+  (already-sealed ciphertext is not endangered by current-bundle state),
+  but NO new solicitation (QR presentation) until the deployed bundle
+  verifies - the check protects future submitters, and the ceremony
+  companion carries the same rule.
 
 **Repo/deploy-chain protections.** Pages deploys from the public repo:
 branch protection on the deploying branch, deploys only from reviewed
@@ -656,9 +792,11 @@ Positive:
   path, and the D1 module fence keeps networking out of every core crate.
 - The queue's placement outside the op log AND outside the worktree keeps
   unreviewed data structurally away from both graph history and git.
-- The approval transaction's preassigned-op-id protocol makes facilitator
-  approval crash-safe and duplicate-free on top of ADR-002's existing op-id
-  dedup.
+- The approval transaction's preassigned ids and digests, over the new
+  idempotent durable batch-append seam, make facilitator approval
+  crash-safe and duplicate-free AT THE DURABLE-LOG LEVEL - not merely at
+  fold level (round-2 correction; the seam is an additive cn-store API
+  the implementation must land first).
 
 Negative / accepted:
 
@@ -707,12 +845,15 @@ places; the D-023 solo pass should reconcile (tracked in the draft doc):
 
 ## Open questions (deferred to implementation - none block acceptance)
 
-Resolved into the decision by the round-1 amendment: libsodium distribution
-and bundle integrity (D3/D8); pull/delete credential contract (D6); TTL and
-cadence policy plus loss semantics (D6 - concrete values remain deploy
-runbook configuration inside the fixed bounds); receipt confirmation
-semantics (D6; exact wording is D-023's); bundle-verification model (D8);
-rotation/drain protocol (D3). Remaining, genuinely deferrable:
+Resolved into the decision by the round-1 and round-2 amendments: libsodium
+distribution and bundle integrity incl. the canonical measurement (D3/D8);
+pull/delete credential contract (D6); TTL and cadence policy plus loss
+semantics and the receipt-ledger reconciliation (D6 - concrete values
+remain deploy runbook configuration inside the fixed bounds); receipt
+confirmation semantics (D6; exact wording is D-023's); rotation/drain with
+relay admission cutoff (D3/D6); the durable batch-append seam and crash
+recovery table (D4); sidecar binding and the approved-record closeout
+(D4/D5). Remaining, genuinely deferrable:
 
 - Puller packaging: `cn intake` subcommand (leaning yes) vs separate small
   tool - the D1 module fence and the D5 actor identity hold either way.
