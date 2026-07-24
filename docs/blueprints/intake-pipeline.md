@@ -19,10 +19,11 @@ path. Controlling principles:
 - **The core owns every trust decision** (I2): record validation, dedup,
   near-duplicate candidates, op construction, and write authorization all
   happen in Rust; the app renders and orchestrates.
-- **Least new surface**: the approval write path IS the existing
-  `submit_ops` boundary with the existing `PermAuthorizer`; no new
-  authority, no new op kinds, no facilitator power beyond the accepted
-  authority matrix (facilitator-role blueprint stands unchanged).
+- **Least new surface**: the approval write path is the native
+  `append_batch_idempotent` seam authorized by the existing
+  `PermAuthorizer` (intake never calls `submit_ops`); no new authority,
+  no new op kinds, no facilitator power beyond the accepted authority
+  matrix (facilitator-role blueprint stands unchanged).
 - **Queue formats are ADR-005 D4 verbatim**: immutable payload record +
   append-history sidecar, versioned (I7), checksummed, off-worktree.
 
@@ -71,8 +72,9 @@ network code enters any core crate (ADR-005 D1 fence).
   discipline: unknown-MAJOR loud rejection, unknown-MINOR
   ignore-and-preserve ROUND-TRIPPED through serde (`#[serde(flatten)]`
   extras map, the ADR-002 pattern) - preserved across sidecar rewrites.
-  `review_state` is the four-variant versioned enum
-  (`pending | approved_intent | approved | rejected`). The sidecar
+  `review_state` is the five-variant versioned enum
+  (`pending | approved_intent | approved | rejected | failed` - `failed`
+  is terminal-until-explicit-disposition, ADR-005 D4). The sidecar
   REQUIRED fields carry `record_id` and the payload record's checksum
   value (the ADR-005 sidecar-payload binding); `verify_pair()` checks both
   before any read path trusts the pair. `record_checksum`: SHA-256 over
@@ -107,10 +109,16 @@ network code enters any core crate (ADR-005 D1 fence).
   graph side of the comparison is the FACILITATOR'S projection, so a
   candidate can never reference an entity the facilitator cannot already
   see.
-- `decision.rs`: the decision-file format (record_id, payload digest,
-  decision, reviewer, timestamp; versioned per I7) and its consumption
-  rules (binding verification before any sidecar append; consumed files
-  recorded into the sidecar history).
+- `decision.rs`: the decision-inbox message format per ADR-005 D4
+  (body-carried `decision_id` UUIDv7, record_id, payload digest,
+  `expected_review_state`, decision type incl. `clear_failed`, reviewer,
+  timestamp; versioned per I7) and the ADMISSION TABLE as pure logic:
+  deterministic ordering (timestamp, decision_id), binding verification,
+  dedup by decision_id against sidecar history (every history entry
+  records its decision_id), CAS on expected state (`stale_decision` typed
+  outcome), legal-transition enforcement. Tests: replay -> no-op; stale ->
+  typed, unapplied; two concurrent decisions -> first admits, second
+  stale; replayed approve after intent -> dedup, never a second plan.
 - `approval.rs`: the approval-transaction state machine as pure logic,
   invoked NATIVELY by `cn intake apply`:
   `plan_approval(record, template, group_id, facilitator) ->
@@ -138,11 +146,17 @@ network code enters any core crate (ADR-005 D1 fence).
   nothing appended; partial-presence appends exactly the absent suffix
   without re-authorization; a batch whose preflight quarantines fails
   entirely with nothing appended.
-- **cn-model additive extension (ADR-005 D5):** the optional versioned
-  `intake` block on `ProvenanceEnvelope` (record_id, receipt_id,
-  submission_id, form_version, consent digest/affirmed/affirmed_at,
-  payload_digest, batch_digest; envelope schema minor bump). Fold stamps
-  it from the op's intake context at apply.
+- **cn-model additive extension (ADR-005 D5, round-4 scoping):** the
+  optional `intake` block (own `intake_block_version`) on
+  `ProvenanceEnvelope` (record_id, receipt_id, submission_id,
+  form_version, consent digest/affirmed/affirmed_at, payload_digest,
+  batch_digest). Optional serde-defaulted field + global model PATCH bump
+  (accepts_schema admits same-minor; a minor bump would wrongly reject
+  0.1.x data). `plan_approval` constructs the block inside the modeled
+  values (Entity/AttributeInstance/Edge) it builds - the envelopes ride
+  the op payloads and fold clones them, exactly as today; nothing is
+  stamped at fold time. Tests: old fixtures parse under the new reader;
+  every intake-created modeled value carries the block.
 - **`cn intake apply` (CLI):** the durable owner. Takes the queue lock,
   runs recovery (crash-state table incl. the review-begun marker),
   consumes decision files, executes the transaction, reports (I12).
@@ -258,10 +272,12 @@ property (cn-perm/tests/blueprint.rs pattern, cn-api-level test): for a
 graph containing entities visible to governance but not facilitator, a
 near-dup query for a payload matching the hidden entity returns NO
 candidate for the facilitator viewer and DOES for governance. Second
-boundary assertion: `intake_plan_approval` ops submitted by a
-facilitator viewer produce exactly the authority-matrix outcomes the
-facilitator-role blueprint fixed (unowned creates allowed; nothing
-owner-bypassing) - asserted, not assumed, at the facade level.
+boundary assertion (native, at the seam/CLI integration boundary - the
+facade has no approval export): ops planned by `plan_approval` and pushed
+through `append_batch_idempotent` under a facilitator viewer produce
+exactly the authority-matrix outcomes the facilitator-role blueprint
+fixed (unowned creates allowed; nothing owner-bypassing) - asserted in
+the `cn intake apply` integration tests, not assumed.
 
 ## 7. pii-scan tripwires (ADR-005 D4, defense in depth)
 

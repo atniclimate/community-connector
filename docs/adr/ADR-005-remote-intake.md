@@ -1,7 +1,7 @@
 # ADR-005: Remote Intake - Sealed-Envelope Relay and Facilitator Pending-Review Queue
 
-- Status: DRAFT - rounds 1-3 FAIL judged and amended 2026-07-24; pending round 4
-- Date: 2026-07-24 (amended three times same day after adversarial rounds 1-3)
+- Status: DRAFT - rounds 1-4 FAIL judged and amended 2026-07-24; pending round 5
+- Date: 2026-07-24 (amended four times same day after adversarial rounds 1-4)
 - Phase: 3 (intake pipeline P3.5/P3.6 plus the D-053 relay; deploy gated on the
   D-059.8 deploy bar)
 - Drivers: R3 (data entry and ingestion), R5 as amended by D-053 (one remote
@@ -48,6 +48,24 @@
   durability, canonical manifest grammar + ceremony steps + no-service-
   worker rule, and a versioned structured intake-provenance block carrying
   the consent affirmation with a survival contract for the sweep manifest.
+- Adversarial round 4: FAIL (same lane, at 277c9e2; narrow scope) - one
+  blocker: the decision-file inbox had no idempotent admission protocol
+  (replays could generate fresh plans; stale decisions could contradict
+  completed ones). Five more: non-prefix mixed log patterns and the
+  pending+marker state lacked rules; the provenance "minor bump" claim
+  contradicted actual cn-model version acceptance and the envelope carrier
+  path; the cutoff epoch was unanchored; one "bounded KB" overshoot claim
+  survived; the blueprint retained three obsolete approval contracts. All
+  judged valid. Fourth amendment: the decision-inbox admission protocol
+  (body-carried decision_id, expected-state CAS, history dedup,
+  admit+plan+intent as one sidecar write, retire-after-durable),
+  contiguous-prefix-only marker completion, corrected provenance
+  versioning (additive optional field + patch bump + atomic workspace
+  deployment - no false minor claim) and carrier (the block rides the op
+  payloads' modeled values, not a fold-time stamp), redundant sweep
+  manifest, cutoff anchored to confirmed revision acknowledgement,
+  overshoot honesty, blueprint sweep, and no-deploy rule for the served
+  manifest copy.
 
 ## Context
 
@@ -255,10 +273,12 @@ provable state rather than an estimate:
 3. Run the new keygen ceremony; deploy the new form; independently verify
    the deployed bundle against the D8 pinned manifest.
 4. Cutover: add the new fingerprint to the relay admission allowlist;
-   after the drain window, REMOVE the old fingerprint. From that moment
-   the relay rejects old-form POSTs with a typed "form out of date -
-   reload" response: an arbitrarily old open tab gets a VISIBLE failure,
-   never a silently lost submission.
+   after the drain window, REMOVE the old fingerprint. From the COMPLETED
+   cutoff epoch (D6: confirmed revision acknowledgement + propagation
+   bound + request deadline - removal is not globally instantaneous) the
+   relay rejects old-form POSTs with a typed "form out of date - reload"
+   response: an arbitrarily old open tab gets a VISIBLE failure, never a
+   silently lost submission.
 5. Retain old-key decrypt capability for one relay TTL past the cutover
    (envelopes admitted before cutover can still be pulled and decrypted;
    the queue records `key_used`).
@@ -356,29 +376,59 @@ durable store. The write-authority split is therefore:
 
 - *The app (browser, FSA) is CREATE-ONLY.* It may create new files with
   unique names - in-app payload records, their initial `pending` sidecars,
-  and DECISION FILES (`decisions/<record_id>.<uuid>.json`: record id,
-  payload digest, the facilitator's decision, reviewer, timestamp) - and
-  never rewrites any existing file. A lost or torn created file is
-  re-creatable by the supervising facilitator and is loudly visible
-  (read-back verification), and a create-only writer cannot corrupt
-  authoritative state.
-- *Native `cn intake` owns every mutation.* The puller stages remote
-  records; `cn intake apply`, run under the queue-root single-instance
-  lock, consumes decision files: appends each decision to its record's
-  sidecar (verifying the sidecar-payload binding and the decision file's
-  payload digest first), executes approvals through the transaction below
-  against the real `OpLog`, and completes sidecars. Sidecar rewrites, op
-  appends, fsync, and fold all happen inside this one native critical
-  section - the seam is invoked only where the durable store exists.
+  and DECISION FILES - and never rewrites any existing file. A lost or
+  torn created file is re-creatable by the supervising facilitator and is
+  loudly visible (read-back verification), and a create-only writer cannot
+  corrupt authoritative state. Create-only prevents FILE conflicts, not
+  SEMANTIC ones (a stale wizard view can still author a decision that no
+  longer applies) - semantic admission is the native owner's job, below.
+- *The decision inbox is a message protocol, not loose files (round-4
+  amendment).* A decision file (`decisions/<record_id>.<uuid>.json`)
+  REQUIRED body: `decision_id` (UUIDv7, body-carried - filename is not
+  identity), `record_id`, the payload record's digest (binding),
+  `expected_review_state` (the sidecar state the wizard observed when the
+  facilitator decided - the compare-and-set premise), the decision type
+  (`approve | reject | set_aside_note | clear_failed`), reviewer, and
+  timestamp. Versioned per I7.
+- *Native `cn intake apply` owns every mutation, admitting decisions
+  through one table.* Under the queue-root single-instance lock, apply
+  processes decision files in deterministic order (timestamp, then
+  decision_id): (a) verify the sidecar-payload binding and the decision's
+  payload-digest binding; (b) DEDUP: if this `decision_id` already
+  appears in the sidecar's history, the file is a replay - recorded
+  no-op, retire it; (c) CAS: if `expected_review_state` differs from the
+  sidecar's current state, the decision is STALE - a typed
+  `stale_decision` outcome in the run report (I12), retired unapplied,
+  surfaced in the wizard (this is also how the second of two concurrent
+  decisions for one record resolves: the first admitted decision changes
+  the state, the second fails CAS); (d) TRANSITION: only legal
+  transitions admit (`pending -> approve/reject/set_aside`;
+  `failed -> pending` only via an explicit `clear_failed` disposition);
+  anything else is a typed error. For an admitted APPROVE, the plan
+  (preassigned op ids, digests) is generated and written into the sidecar
+  in the SAME atomic sidecar replace that records the decision_id in
+  history and sets `approved_intent` - admission, plan, and intent are
+  one durable write, so a replayed decision can NEVER generate a second
+  plan (it hits the dedup rule instead). Every history entry records the
+  `decision_id` that caused it.
+- *Retire-after-durable.* A decision file is retired (atomic rename into
+  `decisions/consumed/`, a tombstone kept until the window-close sweep)
+  only AFTER the sidecar write that admitted or rejected it is durable.
+  A crash between the sidecar write and retirement replays the file into
+  the dedup or CAS rule - a recorded no-op. Sidecar rewrites, op appends,
+  fsync, and fold all happen inside this one native critical section -
+  the seam is invoked only where the durable store exists.
 - *The app renders; it does not fold authority.* After an apply run the
   facilitator reloads the group in the app (the existing load path) to see
   approved entries; the wizard surfaces staged-but-unapplied decisions and
   prompts for the apply step. The in-memory WASM `submit_ops` path is NOT
   used for intake approval.
 
-Concurrency collapses to one rule: the lock serializes the two native
-writers (puller, apply); the app's create-only writes cannot conflict with
-either by construction (unique names, no rewrites).
+Concurrency: the lock serializes the two native writers (puller, apply);
+the app's create-only writes cannot FILE-conflict with either (unique
+names, no rewrites), and semantic conflicts from stale or duplicate
+decisions are resolved deterministically by the admission table's dedup
+and CAS rules - never silently.
 
 **Sidecar-payload binding.** Filename adjacency is not an integrity
 binding. The sidecar REQUIRED fields include the `record_id` and the
@@ -419,15 +469,18 @@ was lost" needs a durable fact, because the payload file alone is
 observationally identical in both cases (round-3 amendment): before the
 FIRST decision beyond initial `pending` is written for a record, the
 mutating writer creates a write-once REVIEW-BEGUN MARKER
-(`<record_id>.reviewed`, empty content, atomic primitive). The marker is
-never deleted while the record lives; its presence without a readable
-sidecar proves lost decision state.
+(`<record_id>.reviewed`, empty content, atomic primitive,
+create-if-absent - idempotent, so a crash-and-retry recreating it is
+harmless). The marker is never deleted while the record lives; its
+presence without a readable sidecar proves lost decision state.
 
 | Found | Meaning | Action |
 |---|---|---|
 | Temp file | Torn write | Discard. Never promote a temp file; its content, if it mattered, is re-creatable (relay re-pull or in-app re-entry). |
 | Payload record, no sidecar, NO review-begun marker | Crash between the two staging writes | Reconstruct a `pending` sidecar (initial state ONLY). Remote records: the relay receipt still exists (delete is gated on sidecar verify), so re-pull would also heal this; transport dedup absorbs the overlap. |
 | Payload record, no readable sidecar, review-begun marker PRESENT | Lost decision state | Loud halt for facilitator disposition - a decision history is never silently recreated as `pending`. |
+| Payload record, readable `pending` sidecar, marker PRESENT, unconsumed decision file(s) exist | Crash between marker create and the admitting sidecar write | Benign transient: normal admission (dedup/CAS/transition) processes the decision file(s); the marker's earlier creation is idempotent and meaningless without a history entry. |
+| Payload record, readable `pending` sidecar, marker PRESENT, NO decision file | Crash after marker create, before sidecar write, with the decision file also unretired-then-lost, OR a decision retired without effect | Record remains `pending`; the run report notes the marker-without-history anomaly (I12); the facilitator re-decides in the wizard if a decision was intended - nothing is guessed. |
 | Payload or sidecar failing checksum | Torn/corrupt final | Move the pair to a `corrupt/` subdirectory (retained, never trusted, swept with the window close), loud typed error (I3), and DO NOT delete the relay receipt for that record - local durability is unproven, so the upstream copy is preserved. |
 | Sidecar whose binding fields mismatch its payload | Mis-association | Loud typed error; both files retained for facilitator investigation; no automatic repair. |
 | Sidecar in `approved_intent` | Crash during approval | Run the approval recovery rule (above) before any other queue work. |
@@ -490,11 +543,16 @@ any other queue work): classify the plan's op ids against the durable log.
   pending, which is the round-3 blocker this rule closes.
 - ALL `absent`: nothing was appended. Re-run step 2 under the intent's
   existing plan (same ids and digests - never regenerated).
-- MIXED absent / present_same_digest: a durable prefix exists (the log
-  writes lines sequentially and recovery-truncates only a torn final
-  line). The intent marker authorizes COMPLETION: append exactly the
-  absent suffix, fsync, fold, complete to `approved`. No
-  re-authorization - the marker, not post-crash authority, governs.
+- MIXED absent / present_same_digest, where the present ops are EXACTLY a
+  contiguous prefix of the plan's order and the absent ops exactly its
+  suffix (the only pattern sequential append can legally produce): the
+  intent marker authorizes COMPLETION - append exactly the absent suffix,
+  fsync, fold, complete to `approved`. No re-authorization - the marker,
+  not post-crash authority, governs.
+- MIXED in ANY other pattern (a hole, out-of-order presence): this is
+  inconsistency, not a recoverable prefix - sidecar to `failed`, loud
+  typed error, facilitator investigation. Classification by id does not
+  prove a prefix; the prefix check is explicit.
 - ANY `present_conflicting_digest`: sidecar to `failed`, loud typed error,
   facilitator investigation. Nothing appended, nothing deleted.
 - If the sidecar itself cannot be rewritten (I/O failure), the apply run
@@ -557,10 +615,14 @@ decision summary (state/reviewer/timestamp), consent digest + affirmation
 loss-detection: the manifest's SHA-256 and record count go INTO the
 repo-committed DECISIONS.md sweep entry - a public, version-controlled
 anchor - so a lost or altered off-repo manifest is detectable against a
-durable record. Retention: the manifest is kept as long as the graph data
-it evidences exists, under the facilitator ops log's ACLs; it contains no
-PII, so indefinite retention violates nothing. `corrupt/` quarantine
-content is purged in the same sweep.
+durable record. A digest detects loss; it does not recover it (round-4
+amendment): the manifest is therefore stored REDUNDANTLY - the primary in
+the facilitator ops log, plus a second copy in a separate controlled
+location (the ceremony's second storage site serves; the manifest is
+non-PII, so this multiplies no personal data), with both copies
+restore-checked against the anchored hash as a sweep checklist item.
+Retention: as long as the graph data it evidences exists, under the ops
+log's ACLs. `corrupt/` quarantine content is purged in the same sweep.
 
 **PII containment - honest description (round-1 amendment).** The
 protections here are layered process plus tripwires, with I1 as the human
@@ -582,21 +644,38 @@ boundary - not a mechanical guarantee:
 ### D5. Intake provenance envelope (I6) - with trust status, in a schema
 that can actually carry it
 
-**The carrier (round-3 amendment).** The current `ProvenanceEnvelope`
-(origin, actor, responsible human, recorded time, custody, schema version)
-has no fields for intake linkage, so this ADR mandates an ADDITIVE,
-VERSIONED extension in cn-model: an optional `intake` block on the
-provenance envelope (present exactly on intake-produced entities/edges;
-absent everywhere else; unknown-minor tolerated per I7; envelope schema
-minor bump, no breaking change). The block carries: queue `record_id`,
+**The carrier and its compatibility - stated against the actual code
+(rounds 3-4 amendments).** The current `ProvenanceEnvelope` (origin,
+actor, responsible human, recorded time, custody, schema version) has no
+fields for intake linkage, so this ADR mandates an ADDITIVE extension in
+cn-model: an optional `intake` block on the envelope, carrying its own
+`intake_block_version` (semver, I7). The block holds: queue `record_id`,
 relay `receipt_id` (remote only), `submission_id`, `form_version`,
 `consent_text_digest`, `consent_affirmed` and `consent_affirmed_at` (both
 explicitly `source_asserted` - the individual consent instrument's
 affirmative assertion and its claimed time survive into graph provenance,
 not merely the instrument's version), `payload_digest`, and
-`batch_digest`. The intake blueprint implements this cn-model change; it
-is intake scope, not a change to ADR-002's op format (the envelope is
-built at fold time as today).
+`batch_digest`.
+
+*Compatibility, honestly scoped.* cn-model's `accepts_schema` requires the
+SAME MINOR at major zero, so a global model minor bump would reject
+existing 0.1.x data - this change is therefore NOT a minor bump. It is:
+an optional field (absent in all existing data, serde-defaulted on read,
+omitted-when-absent on write) plus a global model PATCH bump, which
+`accepts_schema` already admits. Old persisted data parses unchanged
+under the new reader. The reverse path (new data under an old reader,
+which would drop the field) does not occur in v0.1.0: every component
+ships from one workspace commit and the pilot is a single machine -
+stated as the deployment assumption it is, not as an
+ignore-and-preserve property the envelope does not have.
+
+*The carrier path.* Provenance envelopes live INSIDE op payloads: the
+modeled values (`Entity`, `AttributeInstance`, `Edge`) own their
+envelopes, which fold clones into state. The intake block is therefore
+constructed by `plan_approval` when it builds those modeled values for
+the approval batch's ops - NOT stamped at fold time (round-4 correction
+of a factually wrong claim). Every intake-created modeled value that
+owns an envelope carries the block; ADR-002's op format is untouched.
 
 Every entity and edge produced by an approved submission carries the full
 provenance envelope. Round-1 amendment: values are recorded WITH their
@@ -697,10 +776,13 @@ retry-able error when over it) and the claim of a hard cap is withdrawn;
 the actual hard bounds are the per-blob size cap, the TTL (storage
 self-drains), platform quotas, and the billing ceiling plus alerts
 configured on the Cloudflare account per the deploy runbook. Under burst
-abuse the approximate cap may overshoot by the consistency window - that
-overshoot is bounded KB at pilot payload sizes and cannot become
-unbounded spend. Overload degrades to "remote intake temporarily refuses;
-in-app entry continues."
+abuse the approximate cap's overshoot is UNQUANTIFIED within the
+consistency window (per-blob size bounds bytes per request, not how many
+concurrent requests the stale count admits - round-4 correction); total
+storage and spend are bounded only by the configured platform quota and
+billing ceiling, whose numeric values are recorded in the deploy runbook
+as a deploy gate. Overload degrades to "remote intake temporarily
+refuses; in-app entry continues."
 
 **TTL and loss semantics - honest (rounds 1-2 amendments).** Every blob
 carries a TTL. Policy bounds fixed here: TTL is at least twice the
@@ -751,13 +833,19 @@ absent after TTL + margin -> EXPIRED (counted, drives the broadcast
 re-solicit). Evaluated in that order the states are disjoint; nothing is
 double-counted and no lost-increment failure mode exists.
 
-**Cutoff epoch (round-3 amendment).** An allowlist edit is not an instant.
-The rotation cutoff (D3) is COMPLETE only at: config-change time + the
-Worker configuration propagation horizon (a stated deploy-runbook value
-for Cloudflare's global propagation) + the maximum request duration
-(bounding an in-flight POST that passed the old check before the edit).
-The final old-key TTL and the destruction clock start from that completed
-epoch, never from the moment the edit was requested.
+**Cutoff epoch (rounds 3-4 amendments).** An allowlist edit is not an
+instant, and a requested edit is not a fact. The rotation cutoff (D3) is
+COMPLETE only at: the timestamp of the platform's SUCCESSFUL
+ACKNOWLEDGEMENT of the exact allowlist revision (the deploy API's success
+response for that config version - a submitted, failed, delayed, or
+rolled-back edit starts no clock) + a documented propagation bound (the
+provider's documented propagation guarantee where one exists; where the
+provider documents none, a stated observed-bound-times-safety-factor
+recorded in the runbook AS AN ASSUMPTION, not a proof) + the enforced
+maximum request duration (the Workers platform's hard request limit, an
+actual enforced bound). The final old-key TTL and the destruction clock
+start from that completed epoch, never from the moment the edit was
+requested.
 
 **Logging and metadata discipline.** The Worker logs no bodies, no
 ciphertext, and no authorization headers; request metadata logging is
@@ -827,11 +915,13 @@ and compared:
   SHA-256 over the file's exact bytes. Serialization: JSON, sorted keys,
   LF newlines, UTF-8 without BOM. The manifest is NOT part of its own
   file set; the manifest hash is SHA-256 over the manifest FILE's exact
-  stored bytes (not reconstructed fields). A copy of the manifest MAY be
-  deployed beside the bundle for human inspection, but it is
-  NON-AUTHORITATIVE: no verifier ever reads the served manifest as an
-  authority - the locally pinned copy is the only authority, and the
-  served copy is itself just another file to hash-check if listed.
+  stored bytes (not reconstructed fields). The manifest is NOT deployed
+  (round-4 amendment - the smallest safe rule): a self-excluded manifest
+  cannot list its own bytes, so a served copy would be an unmeasured
+  file; the deployed set is exactly the manifest's listed files and
+  nothing else. Human inspection uses the local build of the reviewed
+  commit, never the served origin; the locally pinned copy is the only
+  authority.
 - *Pin provenance.* The pin is the LOCALLY BUILT manifest, recorded
   off-origin in the pilot PC ops config and ops log at deploy time
   (deploy provenance: commit SHA, deployer, time, manifest hash). The pin

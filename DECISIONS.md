@@ -1215,3 +1215,58 @@ Third amendment, the load-bearing design change first:
 Round 4 (narrow, per the reviewer's own scope): durable owner, marker
 recovery, atomic relay admission, ledger observation intervals, versioned
 post-sweep provenance. ADR-005 remains DRAFT until it passes.
+
+## D-064 (2026-07-24) - ADR-005 round 4: FAIL judged valid; fourth amendment - decision-inbox protocol
+
+Round 4 (narrow; review at
+`_reviews/community-connector/2026-07-24_adr-005-remote-intake-round4.md`,
+target HEAD 277c9e2) returned FAIL: one blocker (the round-3 decision-file
+inbox had no idempotent admission - a crash could replay an approval into
+a FRESH plan with new op ids; stale wizard decisions could contradict
+completed ones), plus: non-prefix mixed log patterns and pending+marker
+states unruled; the provenance "minor bump" contradicted cn-model's
+accepts_schema (same-minor required at major zero) and the actual carrier
+path (envelopes ride op payloads' modeled values, not fold-time
+stamping); cutoff epoch unanchored to a confirmed config revision; one
+"bounded KB" overshoot claim survived the sweep; three stale approval
+contracts in the blueprint. All judged valid. The ledger mechanics and
+bundle measurement were declared substantially closed.
+
+Fourth amendment choices:
+
+1. **Decision-inbox admission protocol (D4):** decisions are versioned
+   messages (body-carried decision_id, payload binding,
+   expected_review_state CAS premise, typed decision incl. clear_failed).
+   Native apply admits via one table: deterministic order, binding
+   check, decision_id dedup against history (every history entry records
+   its decision_id), CAS staleness (typed stale_decision, retired
+   unapplied), legal transitions only. Admission + plan + approved_intent
+   are ONE atomic sidecar write, so a replay can never mint a second
+   plan. Retire-after-durable into decisions/consumed/ tombstones.
+2. **Contiguous-prefix rule (D4):** marker completion only when present
+   ops are exactly a plan-order prefix and absent exactly its suffix;
+   any hole/out-of-order -> terminal failed. Two new crash-table rows for
+   pending+marker (with/without decision files); marker create-if-absent
+   idempotent.
+3. **Provenance scoping corrected (D5):** optional serde-defaulted field
+   + global model PATCH bump (a minor bump would reject 0.1.x data);
+   single-workspace atomic deployment stated as the assumption; the
+   block is constructed by plan_approval inside the modeled values -
+   fold-time-stamp claim withdrawn. Sweep manifest now stored
+   REDUNDANTLY (two controlled locations, restore-checked at the sweep).
+4. **Cutoff epoch (D6/D3):** anchored to the platform's successful
+   acknowledgement of the exact revision + documented propagation bound
+   (or stated assumption) + the enforced Workers request limit; D3's
+   "from that moment" corrected.
+5. **Overshoot honesty (D6):** "bounded KB" removed; overshoot is
+   unquantified within the consistency window; quota + billing ceiling
+   numeric values are a deploy gate.
+6. **Blueprint sweep:** submit_ops design-intent line, four-state enum,
+   and facade-level plan assertions replaced with the native-owner
+   equivalents; decision.rs now carries the admission table.
+7. **Served manifest NOT deployed** (smallest safe rule; ceremony
+   aligned).
+
+Round 5 (narrow, per the reviewer): decision-inbox crash/idempotency,
+prefix validation, provenance-version migration, manifest recovery,
+cutoff receipt semantics, corrected blueprint. ADR-005 remains DRAFT.

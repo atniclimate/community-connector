@@ -220,12 +220,11 @@ Distribution at deploy time:
 - The form build embeds the key and stamps the fingerprint into a visible
   diagnostic on the form itself - a small footer line such as
   "intake key: 3f9a-1c02-..." - and emits the canonical deploy manifest
-  (ADR-005 D8 grammar). A copy of the manifest may be deployed for human
-  inspection, but it is NON-AUTHORITATIVE: the puller verifies only
-  against the locally pinned manifest recorded at deploy; nothing ever
-  treats the served manifest as an authority. Rendering the fingerprint
-  where any submitter could in principle compare it costs nothing and
-  makes the out-of-band check trivial.
+  (ADR-005 D8 grammar). The manifest is NOT deployed (ADR-005 D8): the
+  deployed set is exactly the manifest's listed files; the puller
+  verifies only against the locally pinned manifest recorded at deploy.
+  Rendering the fingerprint where any submitter could in principle
+  compare it costs nothing and makes the out-of-band check trivial.
 
 Out-of-band human verification (after every deploy that touches the form):
 
