@@ -1024,3 +1024,67 @@ account via the GitHub CLI keyring. Repo-local config now pins this
 lands in public history on push - the pre-commit PII scan and the I1 prime
 directive are now also the publication boundary. The deploy bar (Pages form
 + Workers relay) remains unmet and separate (D-059.8).
+
+## D-061 (2026-07-24) - ADR-005 round 1: FAIL judged valid; ADR amended; round 2 required
+
+Ladder rung 3 (research/design). The ADR-005 adversarial round ran per the
+D-056.1 mandate (gpt-5.6-sol via the adversary wrapper; review at
+`_reviews/community-connector/2026-07-24_adr-005-remote-intake.md`; target
+HEAD b182fc1). Verdict: FAIL - five blockers (browser-bundle trust root,
+Windows crash/approval transaction protocol, relay-to-queue idempotency,
+consent/audit contract completeness, false key-custody claims), six majors,
+two minors. Load-bearing claims verified against the actual files before
+judgment: the keygen ceremony's printed+USB backups do contradict the ADR's
+"only on the pilot PC"; the consent draft's active-confirmation requirement
+had no corresponding payload field; pii-scan has no content-marker rule; the
+approve-then-crash window between queue and op log is real. All five
+blockers judged VALID; no finding was rejected outright.
+
+The ADR was amended in place (same file, status now "round 1 FAIL judged
+and amended; pending round 2"). Autonomous design choices made in the
+amendment, logged here:
+
+1. **D8 browser trust model (new):** deterministic dependency-closed build,
+   deploy manifest, full-bundle SHA-256 pin held OFF-REPO on the pilot PC
+   (extends the ceremony's key-only pin), deploy provenance via reviewed
+   commits, CSP with single connect destination, no analytics. Residual
+   split-view delivery risk stated and accepted for v0.1.0; absolute
+   "nothing readable ever transits" claims withdrawn.
+2. **D4 crash-state protocol:** temp-file + flush + atomic-rename primitive
+   with checksums; single-instance lock; immutable payload record +
+   append-history sidecar; approval as a write-ahead transaction with
+   PREASSIGNED op ids reused on recovery (rides ADR-002 op-id dedup).
+3. **Dedup split:** transport key (receipt_id, ciphertext_hash); semantic
+   key (submission_id, payload_hash); same id + different hash = loud
+   facilitator-disposed conflict, never a silent drop.
+4. **Queue placement hardened:** repo-local gitignored staging REMOVED as
+   an option; canonical root is the off-worktree facilitator ops dir; the
+   puller refuses worktree/cloud-sync paths; at-rest preconditions (disk
+   encryption, ACL, no indexing/sync) checked at startup. No queue backup:
+   single-disk loss between pull and approval ACCEPTED over multiplying
+   PII copies (revisitable in one line).
+5. **Consent attestation added to the inner payload** (consent_text_digest,
+   consent_affirmed, consent_affirmed_at) with all client fields recorded
+   as source_asserted; provenance carries trust-status labels
+   (source_asserted / relay_observed / facilitator_observed).
+6. **D6 relay API contract:** server-generated 128-bit receipt ids; no
+   public read/status oracle; verifier-model bearer credential
+   (Worker-side hash only); NAT-safe rate sizing; total-capacity cap +
+   billing ceiling; TTL policy bounds (>= 2x max pull interval) with pull
+   service objectives (daily in August, hourly at convention) and
+   POST-counter reconciliation; no-body/no-secret logging.
+7. **Rotation rewritten drain-before-flip** with cache-horizon old-key
+   retention, per the ceremony companion; emergency path assumes
+   compromised-host artifacts are untrusted.
+8. **PII tripwire claim downgraded** from enforcement to defense in depth;
+   queue/secret marker rules with positive-fixture tests to be added to
+   pii-scan; I1 process remains the boundary.
+9. **Right-sizing:** signed-manifest second ceremony, encrypted queue
+   backup, and any database/distributed queue REJECTED (options 9-11).
+
+Parked for the human (no gate crossed autonomously): (a) the consent
+draft's removal-semantics wording - "taken out of the network" vs the
+append-only log - is now section 7 of the draft and the largest D-023
+question; (b) the single-disk queue-loss acceptance (item 4) is flagged as
+revisitable. Round 2 on the amended ADR is required before ACCEPTED; the
+deploy bar (D-059.8) is unchanged.

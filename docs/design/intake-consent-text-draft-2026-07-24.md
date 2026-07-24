@@ -332,3 +332,37 @@ post-stability language pass (D-051).
   `docs/design/pilot-form-and-template-2026-07-06.md`; that text needs its own
   D-023 pass before the P3.6 entry forms render it. This package covers the
   D-053 remote field set and the shared consent statement only.
+
+## 7. ADR-005 round-1 findings affecting this draft (added 2026-07-24, for the D-023 pass)
+
+The ADR-005 adversarial round (round 1, gpt-5.6-sol) found four places where
+this draft's community-facing claims conflict with the accepted architecture.
+The reviewer should reconcile each during the D-023 pass; the ADR's
+"Consent-text implications" section carries the same list:
+
+1. **"Nothing else is collected" (section 2, What we collect).** The relay
+   operator (Cloudflare) necessarily observes traffic metadata: submission
+   counts, sizes, timing, and source addresses (ADR-005 D6, accepted
+   residual). The sentence is true of form CONTENT but overclaims as
+   written. Suggested direction: scope the claim to "we collect only what
+   you typed"; the metadata reality can live in the explainer if the
+   reviewer wants it surfaced at all.
+2. **"Only the facilitator's computer holds the key" (section 2, sealed
+   paragraph).** The keygen ceremony creates two offline recovery copies
+   (printed sheet in a sealed envelope; encrypted USB). Accurate wording:
+   the key is USED only on the facilitator's computer; locked-away recovery
+   copies exist. The reviewer decides how much of that belongs in
+   community-facing text, but the current sentence is not literally true.
+3. **Removal promise ("your information will be taken out of the
+   network").** The underlying change log is append-only (ADR-002): today
+   "removal" means the information is no longer shown to anyone, not that
+   every stored trace is erased. HUMAN DECISION REQUIRED: either word the
+   promise as "no longer appears in the network," or direct a true-erasure
+   design (which is new architecture work). This is the largest consent
+   question the round surfaced.
+4. **Confirmation screen wording (remote path).** A successful send means
+   "the relay accepted your sealed envelope" - not that the facilitator has
+   it yet; unpulled envelopes expire after a bounded window (ADR-005 D6).
+   The confirmation text should promise only what is guaranteed, e.g. "Your
+   sealed answers were accepted for delivery to the facilitator," avoiding
+   "the facilitator has received it."
