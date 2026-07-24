@@ -54,10 +54,27 @@ pub struct ProjectedStoryStep {
 }
 
 /// Permission-shaped metadata for an entity detail response (D-032/D-033).
+/// `tier` is the effective tier of what this viewer actually sees: the
+/// maximum of the entity tier and the effective tiers of exactly the
+/// projected attribute set. Computing over raw attributes instead would
+/// either under-report (entity tier alone) or reveal the existence of
+/// hidden higher-tier attributes.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct EntityDetailMetadata {
     pub tier: SensitivityTier,
     pub provenance: DetailProvenance,
+    pub attributes: BTreeMap<AttrId, DetailAttribute>,
+}
+
+/// One attribute of the viewer's projected detail: the value plus the
+/// owner-only disclosure of its visibility and effective tier. The
+/// disclosure decision is made here, at the permission boundary (I2);
+/// carriers serialize these fields without reshaping them.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct DetailAttribute {
+    pub value: AttributeValue,
+    pub visibility: Option<Circle>,
+    pub tier: Option<SensitivityTier>,
 }
 
 /// The one-line provenance summary visible to every projected viewer, with
@@ -69,7 +86,17 @@ pub struct DetailProvenance {
     pub custody: Option<Vec<CustodyEvent>>,
 }
 
-/// Supplies entity-detail tier and provenance at the permission boundary.
+/// Supplies the complete entity-detail projection at the permission
+/// boundary: effective tier over the projected attribute set, the
+/// owner-only attribute settings disclosure, and provenance with
+/// governance-only custody depth (D-032/D-033; I2).
+///
+/// Deliberate cost note (2026-07-24 adversarial round): this re-applies the
+/// projection predicate over the raw attribute map and clones each visible
+/// value, an O(attributes) pass per single-entity detail request. Accepted:
+/// detail is a one-entity interaction path, not a bulk path, and recomputing
+/// from raw state under the same mutable API call keeps this function the
+/// sole authority instead of trusting a caller-supplied projected set.
 pub fn entity_detail_metadata(
     state: &GroupState,
     viewer: &ViewerContext,
@@ -82,18 +109,47 @@ pub fn entity_detail_metadata(
         }
         _ => None,
     };
+    let disclose_settings = owner_is_viewer(viewer, &entity.owner);
+    let mut tier = entity.tier;
+    let mut attributes = BTreeMap::new();
+    for (attr, instance) in &entity.attributes {
+        if !attr_visible(state, viewer, entity.owner.as_ref(), entity.tier, instance) {
+            continue;
+        }
+        let effective = instance.effective_tier(entity.tier);
+        tier = SensitivityTier::most_restrictive(tier, effective);
+        attributes.insert(
+            attr.clone(),
+            DetailAttribute {
+                value: instance.value.clone(),
+                visibility: disclose_settings.then_some(instance.visibility),
+                tier: disclose_settings.then_some(effective),
+            },
+        );
+    }
     EntityDetailMetadata {
-        tier: entity.tier,
+        tier,
         provenance: DetailProvenance {
-            line: format!(
+            line: one_line(&format!(
                 "Added by {} from {} (timestamp {})",
                 actor_summary(provenance.recorded_by()),
                 origin_summary(provenance.origin()),
                 provenance.recorded_at().0,
-            ),
+            )),
             custody,
         },
+        attributes,
     }
+}
+
+/// Collapses control characters and Unicode line/paragraph separators
+/// (U+2028/U+2029) so the D-033 summary is structurally a single line even
+/// when an agent id or ingested source carries line-breaking text.
+fn one_line(text: &str) -> String {
+    text.split(|c: char| c.is_control() || c == '\u{2028}' || c == '\u{2029}')
+        .filter(|fragment| !fragment.is_empty())
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 fn actor_summary(actor: &ActorRef) -> String {

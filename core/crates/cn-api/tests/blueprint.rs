@@ -172,6 +172,10 @@ fn t3_attr_entity(n: u128, owner: PersonId) -> Entity {
     entity
 }
 
+fn membership(n: u128, who: PersonId, role: GroupRole) -> Membership {
+    Membership::new(id(500 + n), group_id(), who, role, envelope(who))
+}
+
 fn edge(n: u128, from: u128, to: u128) -> Edge {
     let mut edge = Edge::new(
         edge_id(n),
@@ -498,6 +502,127 @@ fn entity_detail_settings_only_for_owner_viewer() {
     ));
     assert!(other["attributes"]["display_name"]["visibility"].is_null());
     assert!(other["attributes"]["display_name"]["tier"].is_null());
+}
+
+/// D-049 HIGH-3 end-to-end: through the full `entity_detail` API path with a
+/// non-empty custody chain, active governance receives the exact chain while
+/// every other viewer class (self-owner, member, facilitator-only, trusted
+/// non-member, inactive-governance, plain non-member, anonymous) omits the
+/// custody key; the reported tier is the effective tier of that viewer's
+/// projected attribute set (D-049 BLOCK-1).
+#[test]
+fn entity_detail_custody_and_tier_end_to_end() {
+    let custody_event = CustodyEvent {
+        id: id(900),
+        action: CustodyAction::Corrected,
+        at: ts(5),
+        actor: ActorRef::Human(person(1)),
+        note: Some("synthetic correction".to_string()),
+    };
+    let mut record = entity(1, Some(person(1)), Circle::Public);
+    let mut group_only = AttributeInstance::new(
+        AttributeValue::Text("Synthetic group-only".to_string()),
+        Circle::Public,
+        envelope(person(1)),
+    );
+    group_only
+        .tighten_tier(SensitivityTier::T0, SensitivityTier::T2)
+        .expect("tier tightens");
+    record.attributes.insert(attr_id("secret"), group_only);
+    record.provenance.append_custody(custody_event.clone());
+
+    let ops = vec![
+        op(
+            group_id(),
+            2,
+            person(3),
+            OpKind::MembershipAdd {
+                membership: membership(1, person(3), GroupRole::Governance),
+            },
+        ),
+        op(
+            group_id(),
+            3,
+            person(4),
+            OpKind::MembershipAdd {
+                membership: membership(2, person(4), GroupRole::Member),
+            },
+        ),
+        op(
+            group_id(),
+            4,
+            person(5),
+            OpKind::MembershipAdd {
+                membership: membership(3, person(5), GroupRole::Facilitator),
+            },
+        ),
+        op(
+            group_id(),
+            5,
+            person(6),
+            OpKind::MembershipAdd {
+                membership: membership(4, person(6), GroupRole::Governance),
+            },
+        ),
+        op(
+            group_id(),
+            6,
+            person(6),
+            OpKind::MembershipLifecycleSet {
+                membership: id(500 + 4),
+                lifecycle: Lifecycle::Archived,
+            },
+        ),
+        op(
+            group_id(),
+            7,
+            person(1),
+            OpKind::EntityCreate { entity: record },
+        ),
+        op(
+            group_id(),
+            8,
+            person(1),
+            OpKind::TrustGrantCreate {
+                grant: TrustGrant::new(
+                    id(600),
+                    person(1),
+                    person(7),
+                    TrustScope::All,
+                    ts(8),
+                    envelope(person(1)),
+                ),
+            },
+        ),
+    ];
+    let mut api = load_api(&ops);
+
+    let governance = ok(&api.entity_detail(
+        &group_id().to_string(),
+        &viewer_person(3),
+        &entity_id(1).to_string(),
+    ));
+    let expected_custody = serde_json::to_value(vec![custody_event]).expect("custody json");
+    assert_eq!(governance["provenance"]["custody"], expected_custody);
+    assert_eq!(governance["tier"], "T2");
+
+    for (label, viewer, expected_tier) in [
+        ("self-owner", viewer_person(1), "T2"),
+        ("member", viewer_person(4), "T2"),
+        ("facilitator-only", viewer_person(5), "T2"),
+        ("trusted non-member", viewer_person(7), "T2"),
+        ("inactive governance", viewer_person(6), "T0"),
+        ("plain non-member", viewer_person(2), "T0"),
+        ("anonymous", viewer_anon(), "T0"),
+    ] {
+        let detail =
+            ok(&api.entity_detail(&group_id().to_string(), &viewer, &entity_id(1).to_string()));
+        assert!(
+            detail["provenance"].get("custody").is_none(),
+            "custody leaked to {label}",
+        );
+        assert_eq!(detail["tier"], expected_tier, "tier for {label}");
+    }
 }
 
 #[test]

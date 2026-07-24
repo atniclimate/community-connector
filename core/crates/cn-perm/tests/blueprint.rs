@@ -124,11 +124,40 @@ fn entity(n: u128, owner: Option<PersonId>, visibility: Circle, tier: Sensitivit
     entity
 }
 
+/// D-049 HIGH-3: custody depth across every viewer class. Only an ACTIVE
+/// governance role (alone or in a dual-role holding) constructs the full
+/// chain; anonymous, member, facilitator-only, self-owner, trusted
+/// non-member, plain non-member, and inactive-governance viewers get the
+/// one-line summary only (D-033).
 #[test]
 fn entity_detail_metadata_limits_custody_to_governance() {
     let mut state = base_state();
     member(&mut state, 1, GroupRole::Governance, Lifecycle::Active);
     member(&mut state, 2, GroupRole::Member, Lifecycle::Active);
+    member(&mut state, 3, GroupRole::Facilitator, Lifecycle::Active);
+    member(&mut state, 4, GroupRole::Governance, Lifecycle::Archived);
+    member(&mut state, 5, GroupRole::Member, Lifecycle::Active);
+    // Dual-role: person(5) also holds active governance.
+    let mut dual = Membership::new(
+        membership_id(6),
+        group_id(),
+        person(5),
+        GroupRole::Governance,
+        envelope_for(person(5)),
+    );
+    dual.lifecycle = Lifecycle::Active;
+    state.memberships.insert(dual.id, dual);
+    // Trusted non-member: owner person(2) trusts person(6).
+    let grant = TrustGrant::new(
+        grant_id(1),
+        person(2),
+        person(6),
+        TrustScope::All,
+        ts(1),
+        envelope_for(person(2)),
+    );
+    state.trust_grants.insert(grant.id, grant);
+
     let mut record = entity(1, Some(person(2)), Circle::Public, SensitivityTier::T2);
     record.provenance.append_custody(CustodyEvent {
         id: id(900),
@@ -138,24 +167,252 @@ fn entity_detail_metadata_limits_custody_to_governance() {
         note: Some("synthetic correction".to_string()),
     });
 
-    let member_detail = entity_detail_metadata(
-        &state,
-        &ViewerContext::Person { person: person(2) },
-        &record,
-    );
-    assert_eq!(member_detail.tier, SensitivityTier::T2);
-    assert!(member_detail.provenance.line.contains("Added by person"));
-    assert_eq!(member_detail.provenance.custody, None);
+    let detail_for = |viewer: &ViewerContext| entity_detail_metadata(&state, viewer, &record);
+    let person_viewer = |n: u128| ViewerContext::Person { person: person(n) };
 
-    let governance_detail = entity_detail_metadata(
-        &state,
-        &ViewerContext::Person { person: person(1) },
-        &record,
+    for (label, viewer) in [
+        ("anonymous", ViewerContext::Anonymous),
+        ("member self-owner", person_viewer(2)),
+        ("facilitator-only", person_viewer(3)),
+        ("inactive governance", person_viewer(4)),
+        ("trusted non-member", person_viewer(6)),
+        ("plain non-member", person_viewer(7)),
+    ] {
+        let detail = detail_for(&viewer);
+        assert_eq!(detail.provenance.custody, None, "custody leaked to {label}");
+        assert!(detail.provenance.line.contains("Added by person"));
+        assert_eq!(detail.tier, SensitivityTier::T2);
+    }
+
+    for (label, viewer) in [
+        ("active governance", person_viewer(1)),
+        ("dual-role member+governance", person_viewer(5)),
+    ] {
+        let detail = detail_for(&viewer);
+        assert_eq!(
+            detail.provenance.custody.as_deref(),
+            Some(record.provenance.custody()),
+            "governance chain wrong for {label}",
+        );
+        assert_eq!(detail.tier, SensitivityTier::T2, "tier for {label}");
+    }
+}
+
+/// 2026-07-24 adversarial round: deterministic tier witnesses for the two
+/// classes the focused tier test missed. A trusted non-member's reported
+/// tier is raised by a stricter Trusted-visible attribute; a member never
+/// infers that hidden attribute; a dual-role member+governance holder gets
+/// the correct tier for its admissible circle alongside custody depth.
+#[test]
+fn entity_detail_tier_trusted_and_dual_role() {
+    let mut state = base_state();
+    member(&mut state, 2, GroupRole::Member, Lifecycle::Active);
+    member(&mut state, 5, GroupRole::Member, Lifecycle::Active);
+    let mut dual = Membership::new(
+        membership_id(6),
+        group_id(),
+        person(5),
+        GroupRole::Governance,
+        envelope_for(person(5)),
     );
-    assert_eq!(
-        governance_detail.provenance.custody.as_deref(),
-        Some(record.provenance.custody()),
+    dual.lifecycle = Lifecycle::Active;
+    state.memberships.insert(dual.id, dual);
+    let grant = TrustGrant::new(
+        grant_id(1),
+        person(1),
+        person(4),
+        TrustScope::All,
+        ts(1),
+        envelope_for(person(1)),
     );
+    state.trust_grants.insert(grant.id, grant);
+
+    let mut record = entity(1, Some(person(1)), Circle::Public, SensitivityTier::T0);
+    record.attributes.insert(
+        AttrId::new("t2_trusted").expect("attr id"),
+        attr_with_tier(
+            "Synthetic trusted-only",
+            Circle::Trusted,
+            SensitivityTier::T0,
+            SensitivityTier::T2,
+        ),
+    );
+    record
+        .attributes
+        .insert(attr_id(0), attr("Synthetic T0", Circle::Public));
+    state.entities.insert(record.id, record.clone());
+
+    let t2_trusted = AttrId::new("t2_trusted").expect("attr id");
+    for cases_entry in [
+        // (label, viewer, expected tier, sees trusted attr, expects custody)
+        (
+            "trusted non-member",
+            ViewerContext::Person { person: person(4) },
+            SensitivityTier::T2,
+            true,
+            false,
+        ),
+        (
+            "member",
+            ViewerContext::Person { person: person(2) },
+            SensitivityTier::T0,
+            false,
+            false,
+        ),
+        (
+            "dual-role member+governance",
+            ViewerContext::Person { person: person(5) },
+            SensitivityTier::T0,
+            false,
+            true,
+        ),
+        (
+            "anonymous",
+            ViewerContext::Anonymous,
+            SensitivityTier::T0,
+            false,
+            false,
+        ),
+    ] {
+        let (label, viewer, expected_tier, sees_trusted, expects_custody) = cases_entry;
+        let detail = entity_detail_metadata(&state, &viewer, &record);
+        assert_eq!(detail.tier, expected_tier, "tier for {label}");
+        assert_eq!(
+            detail.attributes.contains_key(&t2_trusted),
+            sees_trusted,
+            "trusted-attr presence for {label}",
+        );
+        assert!(detail.attributes.contains_key(&attr_id(0)), "{label}");
+        assert_eq!(
+            detail.provenance.custody.is_some(),
+            expects_custody,
+            "custody presence for {label}",
+        );
+    }
+}
+
+/// D-049 BLOCK-1: the reported tier is the effective tier of exactly the
+/// viewer-projected attribute set - never the raw entity tier alone (which
+/// under-reports beside viewer-visible stricter data) and never over raw
+/// attributes (which would reveal hidden stricter attributes).
+#[test]
+fn entity_detail_metadata_reports_projected_effective_tier() {
+    let mut state = base_state();
+    member(&mut state, 2, GroupRole::Member, Lifecycle::Active);
+    let owner = person(1);
+    let mut record = entity(1, Some(owner), Circle::Public, SensitivityTier::T0);
+    for (name, tier) in [
+        ("t3_public", SensitivityTier::T3),
+        ("t2_public", SensitivityTier::T2),
+        ("t1_public", SensitivityTier::T1),
+    ] {
+        record.attributes.insert(
+            AttrId::new(name).expect("attr id"),
+            attr_with_tier("Synthetic", Circle::Public, SensitivityTier::T0, tier),
+        );
+    }
+    record
+        .attributes
+        .insert(attr_id(0), attr("Synthetic T0", Circle::Public));
+    state.entities.insert(record.id, record.clone());
+
+    let cases = [
+        // (viewer, expected tier, expected attribute count)
+        (
+            ViewerContext::Person { person: owner },
+            SensitivityTier::T3,
+            4,
+        ),
+        (
+            ViewerContext::Person { person: person(2) },
+            SensitivityTier::T2,
+            3,
+        ),
+        (
+            ViewerContext::Person { person: person(3) },
+            SensitivityTier::T1,
+            2,
+        ),
+        (ViewerContext::Anonymous, SensitivityTier::T0, 1),
+    ];
+    for (viewer, expected_tier, expected_count) in cases {
+        let detail = entity_detail_metadata(&state, &viewer, &record);
+        assert_eq!(detail.tier, expected_tier, "tier for {viewer:?}");
+        assert_eq!(
+            detail.attributes.len(),
+            expected_count,
+            "attribute count for {viewer:?}",
+        );
+        let owner_is_viewer =
+            matches!(&viewer, ViewerContext::Person { person } if *person == owner);
+        for (attr, attribute) in &detail.attributes {
+            let instance = record.attributes.get(attr).expect("attr exists");
+            assert_eq!(&attribute.value, &instance.value);
+            if owner_is_viewer {
+                assert_eq!(attribute.visibility, Some(instance.visibility));
+                assert_eq!(attribute.tier, Some(instance.effective_tier(record.tier)),);
+            } else {
+                assert_eq!(attribute.visibility, None, "settings leaked to {viewer:?}");
+                assert_eq!(attribute.tier, None, "settings leaked to {viewer:?}");
+            }
+        }
+    }
+}
+
+/// D-049 LOW-4 (tightened by the 2026-07-24 adversarial round): control
+/// characters AND Unicode line/paragraph separators (U+2028/U+2029) in
+/// unvalidated provenance text never break the D-033 one-line shape -
+/// including leading, trailing, consecutive, and all-normalized-away
+/// fragments.
+#[test]
+fn entity_detail_provenance_line_is_single_line() {
+    fn line_for(agent_id: &str, source: &str) -> String {
+        let state = base_state();
+        let envelope = ProvenanceEnvelope::new(
+            Origin::Ingested {
+                source: source.to_string(),
+            },
+            ActorRef::Agent {
+                agent_id: agent_id.to_string(),
+            },
+            person(1),
+            ts(1),
+        )
+        .expect("valid provenance");
+        let record = Entity::new(
+            entity_id(1),
+            group_id(),
+            kind_id(),
+            Circle::Public,
+            envelope,
+            SensitivityTier::T0,
+        );
+        entity_detail_metadata(&state, &ViewerContext::Anonymous, &record)
+            .provenance
+            .line
+    }
+
+    let is_line_breaking = |c: char| c.is_control() || c == '\u{2028}' || c == '\u{2029}';
+    for (agent_id, source) in [
+        ("agent\r\nid", "multi\nline\tsource"),
+        (
+            "\u{2028}sep\u{2029}agent",
+            "line\u{2028}separated\u{2029}source",
+        ),
+        ("\n\nleading", "trailing\r\r"),
+        ("consec\n\r\t\nutive", "\u{0007}\u{0000}"),
+        ("\u{0000}", " "),
+    ] {
+        let line = line_for(agent_id, source);
+        assert!(
+            !line.chars().any(is_line_breaking),
+            "line-breaking characters survived for {agent_id:?}/{source:?}: {line:?}",
+        );
+        assert!(line.starts_with("Added by agent"), "framing lost: {line:?}");
+        assert!(line.contains("(timestamp 1)"), "framing lost: {line:?}");
+    }
+    assert!(line_for("agent\r\nid", "x").contains("agent agent id"));
+    assert!(line_for("a", "multi\nline\tsource").contains("from multi line source"));
 }
 
 fn attr(value: &str, visibility: Circle) -> AttributeInstance {
@@ -640,6 +897,55 @@ proptest! {
             for entry in &redacted.quarantined {
                 prop_assert!(entry.findings.is_empty());
                 prop_assert_eq!(Some(entry.responsible_human), viewer_person);
+            }
+        }
+
+        // Detail-surface extension (D-049 R2 fixes): entity_detail_metadata
+        // is permission-complete for every viewer class the strategy
+        // generates (anonymous, member, facilitator, self, governance,
+        // inactive-role, and dual-role holders). Custody depth appears iff
+        // the viewer holds active governance; the detail attribute set is
+        // exactly the projected set; the reported tier is the effective
+        // maximum over that set; owner-only settings disclose iff the viewer
+        // owns the record; the provenance summary stays one line.
+        for projected in &projection.entities {
+            let raw = state.entities.get(&projected.id).expect("projected entity exists");
+            let metadata = entity_detail_metadata(&state, &viewer, raw);
+            prop_assert_eq!(metadata.provenance.custody.is_some(), viewer_is_governance);
+            if let Some(custody) = &metadata.provenance.custody {
+                prop_assert_eq!(custody.as_slice(), raw.provenance.custody());
+            }
+            let line_breaks = metadata
+                .provenance
+                .line
+                .chars()
+                .any(|c: char| c.is_control() || c == '\u{2028}' || c == '\u{2029}');
+            prop_assert!(!line_breaks);
+            let metadata_attrs: BTreeSet<_> = metadata.attributes.keys().collect();
+            let projected_attrs: BTreeSet<_> = projected.attributes.keys().collect();
+            prop_assert_eq!(metadata_attrs, projected_attrs);
+            let mut expected_tier = raw.tier;
+            for attr in projected.attributes.keys() {
+                let instance = raw.attributes.get(attr).expect("projected attr exists");
+                expected_tier = SensitivityTier::most_restrictive(
+                    expected_tier,
+                    instance.effective_tier(raw.tier),
+                );
+            }
+            prop_assert_eq!(metadata.tier, expected_tier);
+            for (attr, attribute) in &metadata.attributes {
+                let instance = raw.attributes.get(attr).expect("projected attr exists");
+                prop_assert_eq!(&attribute.value, &instance.value);
+                if projected.owner_is_viewer {
+                    prop_assert_eq!(attribute.visibility, Some(instance.visibility));
+                    prop_assert_eq!(
+                        attribute.tier,
+                        Some(instance.effective_tier(raw.tier)),
+                    );
+                } else {
+                    prop_assert!(attribute.visibility.is_none());
+                    prop_assert!(attribute.tier.is_none());
+                }
             }
         }
     }

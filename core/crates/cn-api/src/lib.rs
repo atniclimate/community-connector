@@ -13,7 +13,7 @@ mod wire;
 use std::collections::BTreeMap;
 
 use cn_graph::{GraphError, SearchQuery};
-use cn_model::{AttrId, EntityId, GroupId, SensitivityTier};
+use cn_model::{EntityId, GroupId};
 use cn_perm::{ProjectedEntity, Projection, ViewerContext};
 use cn_store::{Operation, StoreReport};
 use dto::{
@@ -370,29 +370,34 @@ fn projected_entity(
         .ok_or_else(ApiError::not_found)
 }
 
+/// Carries the cn-perm detail projection into the DTO without reshaping it:
+/// every permission, disclosure, and effective-tier decision is already made
+/// inside `entity_detail_metadata` (I2).
 fn detail_from_projection(
     session: &GroupSession,
     viewer: &ViewerContext,
     projected: ProjectedEntity,
 ) -> Result<EntityDetail, ApiError> {
-    let mut attributes = BTreeMap::new();
     let raw = session
         .state
         .entities
         .get(&projected.id)
         .ok_or_else(|| ApiError::internal("projected entity missing from state"))?;
     let metadata = cn_perm::entity_detail_metadata(&session.state, viewer, raw);
-    for (attr, value) in projected.attributes {
-        let settings = own_settings(projected.owner_is_viewer, raw, &attr)?;
-        attributes.insert(
-            attr,
-            DetailValue {
-                value,
-                visibility: settings.map(|settings| settings.0),
-                tier: settings.map(|settings| settings.1),
-            },
-        );
-    }
+    let attributes = metadata
+        .attributes
+        .into_iter()
+        .map(|(attr, detail)| {
+            (
+                attr,
+                DetailValue {
+                    value: detail.value,
+                    visibility: detail.visibility,
+                    tier: detail.tier,
+                },
+            )
+        })
+        .collect();
     Ok(EntityDetail {
         id: projected.id,
         kind: projected.kind,
@@ -401,24 +406,6 @@ fn detail_from_projection(
         provenance: metadata.provenance,
         attributes,
     })
-}
-
-fn own_settings(
-    owner_is_viewer: bool,
-    raw: &cn_model::Entity,
-    attr: &AttrId,
-) -> Result<Option<(cn_model::Circle, SensitivityTier)>, ApiError> {
-    if !owner_is_viewer {
-        return Ok(None);
-    }
-    let instance = raw
-        .attributes
-        .get(attr)
-        .ok_or_else(|| ApiError::internal("projected attribute missing from state"))?;
-    Ok(Some((
-        instance.visibility,
-        instance.effective_tier(raw.tier),
-    )))
 }
 
 fn graph_error(err: GraphError) -> ApiError {
