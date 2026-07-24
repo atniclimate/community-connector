@@ -10,6 +10,14 @@
 > - and ideally by ATNI Climate - before any use. Nothing here is sent or
 > published. No real data is collected by this document.
 >
+> Reconciliation note (2026-07-24): D-053 supersedes this draft's delivery
+> mechanics - there is no external form platform and no CSV export; intake is
+> in-app facilitator entry plus the QR -> static GitHub Pages form ->
+> sealed-envelope -> Cloudflare relay path, and ALL submissions land in the
+> facilitator pending-review queue. The convention is 2026-09-14 with August
+> internal pilots (D-050). The wording here will be revised when the form text
+> is drafted for D-023 review.
+>
 > **Two gates this deliverable deliberately respects:**
 > - **G1 (vocabulary authority).** The capability vocabulary - the actual list
 >   of offer/need/situation terms - is **PARKED**, not filled in. This document

@@ -3,8 +3,8 @@
 > This file is the /pickup target and outranks session memory. Reading order for a
 > fresh session: CLAUDE.md, then this file, then PLAN_1.0.md "Current Position" +
 > "Decision Gates", then current-phase ADRs. DECISIONS.md is the durable judgment
-> record (through D-055; D-050..D-055 are the 2026-07-24 gate-grill rulings).
-> Every path below was verified on disk at true-up (2026-07-18).
+> record (through D-056; D-050..D-056 are the 2026-07-24 gate-grill + look-back
+> rulings). Every path below was verified on disk at true-up (2026-07-24).
 
 ## What this project is
 
@@ -38,8 +38,8 @@ ready"**: a facilitator-run, snapshot-first build for an ATNI Climate convention
 
 ## State of play
 
-**DONE and verified (check-all 11/11 green; HEAD `2601616`; clean tree except the three
-parked root docs):**
+**DONE and verified (check-all 11/11 green, re-verified 2026-07-24; clean tree except
+the three root docs parked pending the D-055 sweep):**
 - Phase 0: `check-all` orchestrator + scoped pre-commit enforcement (D-043); gates recorded.
 - Phase 1 explore surface (COMPLETE except P1.3): troika SDF labels (offline bundled OFL
   font), focus/motion with reduced-motion, legend, search, detail panel, flat reading
@@ -51,9 +51,9 @@ parked root docs):**
 - Phase 5 slice: semantics-free `cn` CLI router + validate/export (P5.4-partial, D-044.2);
   pilot evidence template (P5.10); CPF-RCN migration recipe (P5.7, docs-only).
 
-**NOT done - ordered next actions (reordered 2026-07-24 per D-050..D-055; the
-pilot calendar is now hard: internal pilots mid-to-late August, convention
-2026-09-14):**
+**NOT done - ordered next actions (resequenced 2026-07-24 per D-056 for the August
+pilot window; internal pilots mid-to-late August on the NORMAL app build - the
+snapshot pipeline is a convention deliverable, not a pilot blocker):**
 1. **R2 EntityDetail fixes (FIRST - reviewer-confirmed defects, D-049).** BLOCK-1: report
    the effective tier as max(entity.tier, effective tier over the PROJECTED attribute set),
    in cn-perm (fixes the T0-shown-beside-T2 mislabel). BLOCK-2: relocate `own_settings`
@@ -62,27 +62,39 @@ pilot calendar is now hard: internal pilots mid-to-late August, convention
    inactive-governance + dual-role, plus an end-to-end `cn-api::entity_detail` governance
    test. LOW-4: normalize control whitespace in the provenance one-liner. Gate-blind;
    permission-adjacent -> needs a fresh adversarial round after the fix.
-2. **Snapshot data pipeline (D-048 / P2.3-P2.5).** Add a main-thread `WasmTransport` for
-   snapshot mode so `dist/index.html` needs no external worker (D-046 self-contained);
-   wire `--public-layer` into `build:snapshot` (isolated non-tracked dir); per-artifact
-   size gate in `check-size.mjs`; no-leak acceptance test (3+ above-scope sentinels absent
-   from the HTML, D-047.4); then flip `CN_EMBED_SNAPSHOT` on by default. Hardest piece.
-3. **P3.5 facilitator wizard + P3.6 entry forms - now THE intake pipeline (D-053).**
-   Direct in-app entry is an initial feature, plus the pending-review staging queue:
-   every submission (in-app or remote) lands pending and enters the graph only on
-   facilitator approval. UI over existing cn-api submit/load; validation surfaced from
-   cn-schema; I2/I4.
-4. **Remote intake relay (NEW, D-053).** Static intake form (name, tribe, orgs, roles)
-   for GitHub Pages; client-side sealed-box encryption to the facilitator public key
-   (private key only on the pilot PC); minimal Cloudflare Workers + KV ciphertext relay
-   (human's account, spend approved); pilot-PC puller that decrypts locally and stages
-   into the review queue; wipe relay after pull. Prereqs for any push/deploy: PolyForm
-   Noncommercial 1.0.0 in-repo (D-054), full pre-publish sweep (D-055), and core
-   stability (human directive). Localized offline intake is the later stretch goal.
-5. **Phase 4:** P4.1 story authoring under facilitator authority, P4.2 comprehension primer
-   over the flat projection, P4.3 seeded synthetic stories + reveal-script doc, P4.4
-   snapshot acceptance - all with the mechanics/language split (D-044.4).
-6. **P1.3 benchmark** re-run with labels+halos+motion live; record in ADR-004.
+2. **Long-lead gate-openers (parallel with 1, D-056.3).** The D-055 pre-publish sweep
+   (update + track `PLAN_1.0.md`, `MANIFEST.md`, `DEPENDENCIES.md`; full-repo
+   world-readability pass; full PROJECT_PLAN.md revision); draft **ADR-005** "Remote
+   intake: sealed-envelope relay and facilitator pending-review queue" (required scope
+   in D-056.1) + its adversarial round; draft the intake-form/consent text into D-023
+   human review; design the facilitator keygen ceremony (offline private-key backup,
+   key-fingerprint pinning in the puller). LICENSE.md is already tracked (D-054
+   precondition satisfied; re-verify at push time).
+3. **P3.5 facilitator wizard + P3.6 entry forms - THE intake pipeline (D-053).**
+   Direct in-app entry plus the pending-review staging queue: every submission (in-app
+   or remote) lands pending and enters the graph only on facilitator approval; queue
+   persistence is durable-write-first, gitignored staging, pii-scan covered, with
+   near-duplicate surfacing (D-056.4). UI over existing cn-api submit/load; validation
+   surfaced from cn-schema; I2/I4. Approved remote entries land unowned,
+   facilitator-created (D-056.2).
+4. **Remote intake relay (D-053, per ADR-005).** Static intake form (name, tribe, orgs,
+   roles) for GitHub Pages; client-side sealed-box encryption to the facilitator public
+   key (private key only on the pilot PC); minimal Cloudflare Workers + KV ciphertext
+   relay (human's account, spend approved; payload size caps, rate limits, KV TTL);
+   pilot-PC puller that decrypts locally, stages durably into the review queue, THEN
+   wipes the relay. Push/deploy prereqs: license in-repo (satisfied), D-055 sweep
+   passed, core stability. Localized offline intake stays the later stretch goal.
+5. **Snapshot data pipeline (D-048 / P2.3-P2.5) - resequenced after intake (D-056.3);
+   targets the convention build.** Main-thread `WasmTransport` so `dist/index.html`
+   needs no external worker (D-046); wire `--public-layer` into `build:snapshot`
+   (isolated non-tracked dir); per-artifact size gate in `check-size.mjs`; no-leak
+   acceptance test (3+ above-scope sentinels absent, D-047.4); then flip
+   `CN_EMBED_SNAPSHOT` on by default. Hardest piece.
+6. **Phase 4 slimmed for the window (D-056.3):** minimal P4.1 story authoring under
+   facilitator authority for the pilots; P4.2 primer and the bulk of P4.3 defer; P4.4
+   snapshot acceptance rides item 5 - all with the mechanics/language split (D-044.4).
+7. **P1.3 benchmark** deferred to September (post-pilot); re-run with
+   labels+halos+motion live; record in ADR-004.
 
 ## The human's queue
 

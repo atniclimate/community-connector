@@ -47,7 +47,8 @@ tier it, obtain FPIC, and ingest only the result - outside this repository.
    only; ADR export gates respect tiers, R10).
 5. **FPIC (human, collective + individual).** Obtain the recorded ATNI Climate
    committee approval (collective checkpoint) and per-record individual consent (the
-   intake-form / QR-join consent instrument, D-030). No record without both.
+   intake-form consent instrument - in-app entry or the D-053 sealed-envelope QR
+   relay, D-030). No record without both.
 6. **Validate (agent-safe, synthetic-shaped only).** Once the staged slice is scrubbed
    and consented, it may be validated with `cn validate` / the ingest validator, which
    produces a machine-readable report (I12). If any value still looks like real PII,

@@ -5,6 +5,13 @@
 > when it does). Companion: docs/NEXT_SESSION.md (resume brief + the human
 > interview). Last revised: 2026-07-06, session 2 (decision session;
 > Execution Plan v2 per D-039).
+>
+> Reconciliation note (2026-07-24): DECISIONS.md D-050..D-056 supersede this
+> plan's intake and gate assumptions (form-platform CSV intake, QR-join
+> mechanics, unpinned convention date, closed remote/license gates, the
+> v0.1.0-provisional framing). Where this document and D-050..D-056 or
+> HANDOFF.md disagree, the latter win. Full revision lands with the D-055
+> sweep unit.
 
 ## 1. Where the project stands
 

@@ -47,6 +47,11 @@ synthetic runs.
 - Breaking schema changes after v1.0 formats exist.
 - Anything involving the old repo's git history or its PII remediation.
 
+(2026-07-24 status: the license gate is resolved - PolyForm Noncommercial 1.0.0,
+D-054 - and the remote/vendor/spend gates are conditionally opened for the single
+D-053 intake path with push/deploy preconditions; see CLAUDE.md gate status notes
+and HANDOFF.md. All other gates stand.)
+
 ### 2.4 Model pinning
 Profiles live as `$CODEX_HOME\<name>.config.toml` files, selected with
 `--profile <name>`. Pinned full ids (never aliases; see docs/ENVIRONMENT.md;

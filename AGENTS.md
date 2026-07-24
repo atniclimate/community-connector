@@ -73,7 +73,9 @@ pwsh scripts/pii-scan.ps1    # PII tripwire; staged mode wired into pre-commit
 - Accessibility testing (keyboard walkthrough, reduced-motion, 375px layouts).
 - Convention rehearsal - the full facilitator arc dry run (P5.9).
 - Consent, community-facing text, and community-language review (D-023);
-  vocabulary authority rests with ATNI Climate (G1).
+  vocabulary authority rests with ATNI Climate (G1/D-051: authored in ATNI's own
+  words AFTER the system is functional and stable; standard developer language
+  in the backend meanwhile).
 
 ## Red data (never read, never include in prompts)
 

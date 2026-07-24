@@ -833,3 +833,54 @@ paths, CPF-RCN remediation references, convention logistics, community-facing
 text pending D-023 review). Borderline content moves to a gitignored
 _private/ and is reported. Until the sweep unit runs, the three docs stay
 uncommitted.
+
+## D-056 (2026-07-24) - Look-back reconciliation: ADR-005 required, route resequenced for the August window
+
+A two-agent look-back (doc-staleness sweep + invariant/risk assessment) ran
+after the D-050..D-055 rulings; check-all was re-verified 11/11 green the same
+day. The rulings below are director-level (phase-internal sequencing, ADR and
+test strategy), autonomous per CLAUDE.md.
+
+1. **ADR-005 is required.** D-053 trips the stance-change rule (R5 amendment, a
+   new staging store, new persisted formats). One consolidated ADR-005 "Remote
+   intake: sealed-envelope relay and facilitator pending-review queue" plus one
+   adversarial round covers: R5 amendment scoping (intake is INGEST, not sync -
+   the puller routes through cn-ingest concepts, never the SyncTransport seam;
+   the graph never listens; the relay holds ciphertext only); sealed-envelope
+   payload format + versioning and key pinning/rotation (I7); pending-queue
+   placement outside the op log, persisted versioned format, durable-write
+   BEFORE relay-wipe; the intake provenance envelope (I6: actor = intake
+   tooling, responsible_human = facilitator, capture timestamp, form version,
+   relay receipt id, client-generated submission UUID for dedup); threat model
+   for the unauthenticated endpoint (payload size caps, rate limits, KV TTL).
+2. **Ownership-at-approval default.** Approved remote submissions land as
+   UNOWNED, facilitator-created entities (authority-matrix-clean). Owner-binding
+   a record to its submitter is deferred; doing it later is an authority-matrix
+   change and triggers its own adversarial round.
+3. **Resequencing.** Internal pilots run the normal app build on the pilot PC -
+   they do NOT need the snapshot pipeline. Snapshot work (D-048) moves after the
+   intake pipeline and targets the convention build. The P1.3 benchmark defers
+   to September; Phase 4 slims to minimal P4.1 story authoring for the pilot
+   window. Long-lead gate-openers start in parallel with the R2 fixes: the
+   D-055 pre-publish sweep, intake-form/consent text drafted into D-023 human
+   review, ADR-005 drafting, and the facilitator keygen ceremony design.
+4. **Risk register (August window).** Facilitator private key is a single point
+   of total loss (needs a keygen ceremony, offline key backup - key backup is
+   not repo data, so no G-BACKUP collision - and key-fingerprint pinning in the
+   puller). Pull-then-wipe requires durable queue writes first. The Pages form
+   is gate-coupled to the repo's publish preconditions, making the D-055 sweep
+   pilot-critical-path. No-auth means dedup via payload UUID + facilitator
+   near-duplicate surfacing. The least compressible items are human-path: D-023
+   text review and the recorded collective checkpoint before the FIRST August
+   ingestion.
+5. **Doc reconciliation dispositions** (staleness sweep): CLAUDE.md gate notes +
+   real-data process, AGENTS.md vocabulary timing, CODEX_GUIDE gate mirror,
+   NEXT_SESSION.md, and cpf-rcn-migration-recipe.md are updated in this
+   true-up. PROJECT_PLAN.md and pilot-form-and-template-2026-07-06.md carry
+   reconciliation banners; their full revisions land with the D-055 sweep unit
+   and the D-023 form-text draft respectively. PLAN_1.0.md, MANIFEST.md, and
+   DEPENDENCIES.md get their updates inside the D-055 sweep unit (untracked
+   until then). LAUNCH_PROMPT.md, the integration plan, research/analysis docs,
+   and ADR critiques are historical records, left as-is. LICENSE.md is already
+   tracked with the PolyForm Noncommercial 1.0.0 text, so the D-054
+   precondition is satisfied on disk (re-verify at push time).
