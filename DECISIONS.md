@@ -1153,3 +1153,65 @@ approval facade routes through the seam. Round 3 targets: crash points,
 op-log persistence, concurrent POST/cap behavior, bundle verification
 inputs, close-of-window audit continuity (the reviewer's stated round-3
 scope). ADR-005 remains DRAFT until round 3 passes.
+
+## D-063 (2026-07-24) - ADR-005 round 3: FAIL judged valid; third amendment - native durable owner
+
+Round 3 (review at
+`_reviews/community-connector/2026-07-24_adr-005-remote-intake-round3.md`,
+target HEAD 3cb0ede) returned FAIL: three blockers, four majors, all
+judged valid after verification (cn-store's log module is
+`#[cfg(not(wasm32))]` - the round-2 seam was unreachable from the
+browser/WASM approval path the blueprint proposed; recovery
+re-authorization could mislabel durable ops; the two-write KV ledger had
+no atomicity, observation window, or cutoff epoch).
+
+Third amendment, the load-bearing design change first:
+
+1. **Native durable owner (D4):** approval moves OUT of the browser
+   entirely. The app is CREATE-ONLY (payload records, initial pending
+   sidecars, decision files - unique names, never rewrites); native
+   `cn intake apply` under the queue lock consumes decision files and owns
+   all sidecar mutation, plan generation, the seam, fsync, and fold. The
+   wizard becomes decide-in-app / apply-natively / reload. This supersedes
+   the blueprint's FSA-rewrite + WASM-approval design (blueprint amended
+   in-commit).
+2. **Seam preflight (D4):** authorization and fold-acceptance preflighted
+   on a shadow clone in batch order (fixes AttributeSet-after-EntityCreate
+   denial; makes post-append quarantine impossible in the critical
+   section).
+3. **Intent-as-authorization-marker recovery (D4):** all-present-same-
+   digest completes WITHOUT re-authorization; partial prefixes complete
+   under the marker; digest conflict -> new terminal `failed` sidecar
+   state (5-state enum) blocking retry until explicit facilitator
+   disposition; sidecar-write failure halts the run (no livelock).
+4. **Ledger (D6):** blob-then-ledger write order with ack-after-both;
+   puller lists BOTH prefixes (orphans observable from either side);
+   local-facts-first classification precedence makes the states a true
+   partition; ledger TTL = blob TTL + consistency margin + one max pull
+   interval (guaranteed observation window); receipt collision stated as
+   negligible-by-randomness (no conditional-create claim); rotation
+   cutoff completed only at config-propagation horizon + max request
+   duration.
+5. **Crash table (D4):** write-once review-begun marker distinguishes
+   initial orphans from lost decision history; degraded namespace
+   durability now RETAINS the relay copy (defers delete) instead of
+   WARN-and-delete.
+6. **Residual hard-cap claims swept** (three spots) to approximate-cap
+   honesty.
+7. **D8:** canonical manifest grammar (path rules, JSON sorted-keys LF
+   UTF-8 no-BOM, hash over stored bytes, no self-hash), served manifest
+   NON-AUTHORITATIVE, cache-bypass/no-redirect/200/identity fetch rules,
+   no-service-worker deploy rule with persistent-client residual folded
+   into the accepted split-view residual. Ceremony checklist rewritten to
+   execute build -> pin -> deploy -> fetch-verify; served-manifest signing
+   question RESOLVED (non-authoritative, no signing).
+8. **D5:** versioned additive `intake` provenance block on
+   ProvenanceEnvelope (cn-model minor) carrying consent affirmation +
+   asserted time + linkage digests - the consent linkage now survives the
+   purge in a schema that can represent it; sweep-manifest survival
+   contract (manifest SHA-256 + count anchored in the repo-committed
+   sweep DECISIONS entry; retained life-of-dataset; non-PII).
+
+Round 4 (narrow, per the reviewer's own scope): durable owner, marker
+recovery, atomic relay admission, ledger observation intervals, versioned
+post-sweep provenance. ADR-005 remains DRAFT until it passes.

@@ -1,7 +1,7 @@
 # ADR-005: Remote Intake - Sealed-Envelope Relay and Facilitator Pending-Review Queue
 
-- Status: DRAFT - rounds 1 and 2 FAIL judged and amended 2026-07-24; pending round 3
-- Date: 2026-07-24 (amended twice same day after adversarial rounds 1 and 2)
+- Status: DRAFT - rounds 1-3 FAIL judged and amended 2026-07-24; pending round 4
+- Date: 2026-07-24 (amended three times same day after adversarial rounds 1-3)
 - Phase: 3 (intake pipeline P3.5/P3.6 plus the D-053 relay; deploy gated on the
   D-059.8 deploy bar)
 - Drivers: R3 (data entry and ingestion), R5 as amended by D-053 (one remote
@@ -31,6 +31,23 @@
   relay-side fingerprint admission cutoff (D3/D6). The keygen ceremony
   companion was amended in the same commit to match (bundle check,
   destruction timing, custody phrasing).
+- Adversarial round 3: FAIL (same lane, at 3cb0ede) - three blockers: the
+  durable seam was unreachable from the browser/WASM approval path (OpLog
+  is native-only), recovery re-authorization could mislabel durable ops as
+  pending (and fold quarantine could partially approve), and the two-write
+  KV ledger had no atomic admission, no observation window, and no cutoff
+  epoch. Four majors: orphan-vs-lost-history indistinguishable plus a
+  degraded path that deleted the only durable copy; residual hard-cap
+  claims; non-executable manifest ceremony plus service-worker gap;
+  post-sweep evidence missing the consent affirmation and unrepresentable
+  in the current provenance schema. All judged valid. Third amendment: the
+  durable approval owner is NATIVE `cn intake apply` (D4 - the app becomes
+  create-only staging), intent-as-authorization-marker recovery with a
+  terminal `failed` state, ledger write-order/precedence/TTL-interval
+  rules and a cutoff epoch, the review-begun marker, retain-on-degraded-
+  durability, canonical manifest grammar + ceremony steps + no-service-
+  worker rule, and a versioned structured intake-provenance block carrying
+  the consent affirmation with a survival contract for the sweep manifest.
 
 ## Context
 
@@ -317,15 +334,51 @@ modified; it holds:
 - `record_checksum` over the record's own content (torn-write detection).
 
 The sidecar holds mutable review state: `review_state`
-(`pending | approved_intent | approved | rejected` - the write-ahead state
-is part of the versioned persisted enum, not an implementation detail),
-the full decision history (array of `{state, reviewer, decided_at,
-reason}` - never overwritten, only appended to), reviewer notes,
-validation-report reference, near-duplicate candidates surfaced and the
-facilitator's disposition, and - in `approved_intent` and beyond - the
-approval transaction fields below. Sidecar updates use the atomic-replace
-protocol below, and the history array means a rewritten sidecar still
-carries every prior decision.
+(`pending | approved_intent | approved | rejected | failed` - the
+write-ahead state AND the terminal investigation state are part of the
+versioned persisted enum, not implementation details), the full decision
+history (array of `{state, reviewer, decided_at, reason}` - never
+overwritten, only appended to), reviewer notes, validation-report
+reference, near-duplicate candidates surfaced and the facilitator's
+disposition, and - in `approved_intent` and beyond - the approval
+transaction fields below. `failed` is terminal-until-investigated: it
+records a digest conflict or partial-inconsistency outcome, blocks any
+retry, and only an explicit facilitator disposition (a history-recorded
+transition) can return the record to `pending` - a retry can therefore
+never sidestep conflict evidence by regenerating fresh op ids. Sidecar
+updates use the atomic-replace protocol below, and the history array means
+a rewritten sidecar still carries every prior decision.
+
+**The durable owner and the create-only app (round-3 amendment - this
+supersedes any browser-side approval write path).** The durable op log
+(`OpLog`) is native-only by design; no browser or WASM component owns a
+durable store. The write-authority split is therefore:
+
+- *The app (browser, FSA) is CREATE-ONLY.* It may create new files with
+  unique names - in-app payload records, their initial `pending` sidecars,
+  and DECISION FILES (`decisions/<record_id>.<uuid>.json`: record id,
+  payload digest, the facilitator's decision, reviewer, timestamp) - and
+  never rewrites any existing file. A lost or torn created file is
+  re-creatable by the supervising facilitator and is loudly visible
+  (read-back verification), and a create-only writer cannot corrupt
+  authoritative state.
+- *Native `cn intake` owns every mutation.* The puller stages remote
+  records; `cn intake apply`, run under the queue-root single-instance
+  lock, consumes decision files: appends each decision to its record's
+  sidecar (verifying the sidecar-payload binding and the decision file's
+  payload digest first), executes approvals through the transaction below
+  against the real `OpLog`, and completes sidecars. Sidecar rewrites, op
+  appends, fsync, and fold all happen inside this one native critical
+  section - the seam is invoked only where the durable store exists.
+- *The app renders; it does not fold authority.* After an apply run the
+  facilitator reloads the group in the app (the existing load path) to see
+  approved entries; the wizard surfaces staged-but-unapplied decisions and
+  prompts for the apply step. The in-memory WASM `submit_ops` path is NOT
+  used for intake approval.
+
+Concurrency collapses to one rule: the lock serializes the two native
+writers (puller, apply); the app's create-only writes cannot conflict with
+either by construction (unique names, no rewrites).
 
 **Sidecar-payload binding.** Filename adjacency is not an integrity
 binding. The sidecar REQUIRED fields include the `record_id` and the
@@ -361,15 +414,24 @@ receipt is idempotent at the relay (D6).
 Startup recovery scans the queue root and resolves every state by rule -
 no state is left to operator judgment:
 
+The distinction between "sidecar never existed" and "sidecar existed and
+was lost" needs a durable fact, because the payload file alone is
+observationally identical in both cases (round-3 amendment): before the
+FIRST decision beyond initial `pending` is written for a record, the
+mutating writer creates a write-once REVIEW-BEGUN MARKER
+(`<record_id>.reviewed`, empty content, atomic primitive). The marker is
+never deleted while the record lives; its presence without a readable
+sidecar proves lost decision state.
+
 | Found | Meaning | Action |
 |---|---|---|
 | Temp file | Torn write | Discard. Never promote a temp file; its content, if it mattered, is re-creatable (relay re-pull or in-app re-entry). |
-| Payload record, no sidecar | Crash between the two staging writes | Reconstruct a `pending` sidecar (initial state ONLY - a decision history is never reconstructed). Remote records: the relay receipt still exists (delete is gated on sidecar verify), so re-pull would also heal this; transport dedup absorbs the overlap. |
+| Payload record, no sidecar, NO review-begun marker | Crash between the two staging writes | Reconstruct a `pending` sidecar (initial state ONLY). Remote records: the relay receipt still exists (delete is gated on sidecar verify), so re-pull would also heal this; transport dedup absorbs the overlap. |
+| Payload record, no readable sidecar, review-begun marker PRESENT | Lost decision state | Loud halt for facilitator disposition - a decision history is never silently recreated as `pending`. |
 | Payload or sidecar failing checksum | Torn/corrupt final | Move the pair to a `corrupt/` subdirectory (retained, never trusted, swept with the window close), loud typed error (I3), and DO NOT delete the relay receipt for that record - local durability is unproven, so the upstream copy is preserved. |
 | Sidecar whose binding fields mismatch its payload | Mis-association | Loud typed error; both files retained for facilitator investigation; no automatic repair. |
-| Sidecar in `approved_intent` | Crash during approval | Run the approval recovery rule (below) before any other queue work. |
-| Sidecar missing where its decision history is known to have existed (payload references it; audit expects it) | Lost decision state | Loud halt for facilitator disposition - a decision history is never silently recreated as `pending`. |
-| Directory-handle flush unavailable | Degraded platform | Staging proceeds with a WARN recorded in the run report (I12); the relay delete remains gated on successful read-back verification, so the weaker namespace durability never orphans the only copy. |
+| Sidecar in `approved_intent` | Crash during approval | Run the approval recovery rule (above) before any other queue work. |
+| Directory-handle flush unavailable | Degraded platform | Staging proceeds for LOCAL purposes with a WARN recorded in the run report (I12), but the relay delete for affected receipts is DEFERRED - read-back proves visibility, not power-loss namespace durability, so the upstream copy is retained until a later run achieves a fully flushed staging of that receipt (re-pull + transport dedup make this cheap); if the platform never allows it, the TTL bounds the retention and the receipt is treated as never-safely-staged. "Durable-write before relay-wipe" is never weakened. |
 
 **Approval transaction (queue -> op log) - on a durable idempotent seam
 (round-2 amendment).** Round 2 established that ADR-002's op-id dedup is a
@@ -385,37 +447,60 @@ approval code:
 *Idempotent durable batch append.* Input: an ops batch with preassigned
 ids and a canonical per-op digest. The store classifies each op id against
 the DURABLE LOG (not the fold seen-set) as
-`absent | present_same_digest | present_conflicting_digest`, then: any
+`absent | present_same_digest | present_conflicting_digest`. Any
 `present_conflicting_digest` -> typed batch failure, nothing appended
-(evidence retained - this is the dangerous same-id-different-bytes case,
-now detected instead of undefined); otherwise authorize the WHOLE batch
-first (any denial -> typed batch failure, nothing appended); then append
-only the `absent` ops, fsync once, fold, and return a typed per-op durable
-result. Fold-level quarantine of an appended op is reported per ADR-002's
-existing machinery and recorded in the submit report reference (I12);
-authorization-stage failures can never leave a partial batch in the log.
+(the dangerous same-id-different-bytes case, detected instead of
+undefined). Authorization and fold-acceptance are PREFLIGHTED on a shadow
+state in batch order (round-3 amendment): the ops are authorized and
+applied sequentially against a CLONE of the current group state - so an
+`AttributeSet` following its `EntityCreate` authorizes correctly, which a
+whole-batch check against the pre-batch state cannot do - and any denial
+OR any would-be quarantine in the preflight is a typed batch failure with
+nothing appended. Only a preflight-clean batch appends (absent ops only),
+fsyncs once, and folds; because append happens inside the same native
+critical section as the preflight, the real fold cannot diverge from the
+preflight fold - post-append quarantine and partial semantic approval are
+impossible by construction, not merely reported.
 
-The transaction:
+The transaction (all steps inside `cn intake apply`'s critical section):
 
-1. Facilitator approves in the review UI. BEFORE any graph write, the
-   sidecar is updated to `review_state: approved_intent` with the complete
-   approval batch: preassigned op ids (UUIDv7, generated now), the
-   canonical per-op digests, a `batch_digest`, and the reviewer/timestamp
-   entry in the decision history.
-2. The batch goes through the idempotent durable append seam (authorized
-   by the normal `PermAuthorizer` path - no new write authority).
-3. On batch success, the sidecar is updated to `approved` with the submit
-   report reference. On typed batch failure (authz denial or digest
-   conflict), the sidecar returns to `pending` with the failure recorded
-   in the decision history - loud, reviewable, no partial state.
+1. On consuming an approve decision, the apply step generates the plan
+   (preassigned UUIDv7 op ids, canonical per-op digests, `batch_digest`)
+   and updates the sidecar to `review_state: approved_intent` carrying the
+   complete plan and the reviewer/timestamp history entry. This durable
+   intent record IS the authorization marker: it certifies that authority
+   was decided at intent time.
+2. The batch goes through the seam (preflight on shadow state, authorized
+   by the normal `PermAuthorizer` - no new write authority; append-absent;
+   fsync; fold).
+3. On success, the sidecar is updated to `approved` with the submit report
+   reference. On FIRST-ATTEMPT typed failure (preflight denial or
+   quarantine - nothing appended), the sidecar returns to `pending` with
+   the failure in the decision history: loud, reviewable, no partial
+   state. On digest conflict, the sidecar goes to `failed` (terminal
+   investigation state) - never `pending`.
 
-Recovery: a sidecar found in `approved_intent` at startup re-runs step 2
-with the SAME ids and digests. The seam's classification makes this
-idempotent BY CONSTRUCTION at the durable-log level: already-appended ops
-classify `present_same_digest` and are not re-appended; missing ops
-append; a conflicting digest halts loudly. Duplicate log lines and
-duplicate entities are both impossible because ids and digests are
-preassigned, persisted in the sidecar, and reused - never regenerated.
+Recovery (a sidecar found in `approved_intent` at startup, handled before
+any other queue work): classify the plan's op ids against the durable log.
+
+- ALL `present_same_digest`: the append completed before the crash.
+  Complete the sidecar to `approved` WITHOUT re-authorization - authority
+  was decided and durably marked at intent time; re-deciding it against
+  post-crash state could mislabel already-durable graph mutations as
+  pending, which is the round-3 blocker this rule closes.
+- ALL `absent`: nothing was appended. Re-run step 2 under the intent's
+  existing plan (same ids and digests - never regenerated).
+- MIXED absent / present_same_digest: a durable prefix exists (the log
+  writes lines sequentially and recovery-truncates only a torn final
+  line). The intent marker authorizes COMPLETION: append exactly the
+  absent suffix, fsync, fold, complete to `approved`. No
+  re-authorization - the marker, not post-crash authority, governs.
+- ANY `present_conflicting_digest`: sidecar to `failed`, loud typed error,
+  facilitator investigation. Nothing appended, nothing deleted.
+- If the sidecar itself cannot be rewritten (I/O failure), the apply run
+  HALTS loudly (I3) rather than proceeding to other work - a repeatedly
+  encountered `approved_intent` is a stop condition, not a loop.
+
 Rejection is a single sidecar update (`rejected` plus history entry);
 records then persist under D-059.11 until the recorded purge sweep.
 
@@ -456,14 +541,26 @@ decision or purged in the same sweep - the queue is never left holding
 undecided PII after the window. Approved: PURGED in the same sweep - there
 is no archive branch. Rationale: privacy first - no decrypted PII store
 outlives the window; the data itself lives on as governed graph content,
-and consent interpretability survives via `form_version` and
-`consent_text_digest` carried in op provenance. What survives as audit
-evidence after the sweep: the sweep manifest (dated, non-PII: counts,
-record ids, payload and batch digests, decision summaries
-state/reviewer/timestamp, op-id lists, sweep operator) in the facilitator
-ops log (off-repo), plus the identifiers and digests already stamped into
-graph provenance (D5), with a one-line DECISIONS.md entry referencing the
-manifest. `corrupt/` quarantine content is purged in the same sweep.
+and consent linkage survives via the D5 intake provenance block - which
+carries the affirmative consent assertion and its asserted time
+(`source_asserted`), the consent-text digest, and the linkage digests,
+not merely the instrument's version. The exact consent text stays
+resolvable because every deployed consent text's digest and full wording
+are recorded at deploy in the ops log and referenced from the D-023
+sign-off record.
+
+**Sweep-manifest survival contract (round-3 amendment).** What survives
+after the sweep is designed evidence, not a leftover: the sweep manifest
+(dated, non-PII) maps each record id to its payload and batch digests,
+decision summary (state/reviewer/timestamp), consent digest + affirmation
++ asserted time, op-id list, and sweep operator. Integrity and
+loss-detection: the manifest's SHA-256 and record count go INTO the
+repo-committed DECISIONS.md sweep entry - a public, version-controlled
+anchor - so a lost or altered off-repo manifest is detectable against a
+durable record. Retention: the manifest is kept as long as the graph data
+it evidences exists, under the facilitator ops log's ACLs; it contains no
+PII, so indefinite retention violates nothing. `corrupt/` quarantine
+content is purged in the same sweep.
 
 **PII containment - honest description (round-1 amendment).** The
 protections here are layered process plus tripwires, with I1 as the human
@@ -482,10 +579,27 @@ boundary - not a mechanical guarantee:
   sessions enforce. The previous draft's claim that a misplaced queue file
   "cannot pass the pre-commit hook" is withdrawn as overclaim.
 
-### D5. Intake provenance envelope (I6) - with trust status
+### D5. Intake provenance envelope (I6) - with trust status, in a schema
+that can actually carry it
 
-Every entity and edge produced by an approved remote submission carries the
-full provenance envelope. Round-1 amendment: values are recorded WITH their
+**The carrier (round-3 amendment).** The current `ProvenanceEnvelope`
+(origin, actor, responsible human, recorded time, custody, schema version)
+has no fields for intake linkage, so this ADR mandates an ADDITIVE,
+VERSIONED extension in cn-model: an optional `intake` block on the
+provenance envelope (present exactly on intake-produced entities/edges;
+absent everywhere else; unknown-minor tolerated per I7; envelope schema
+minor bump, no breaking change). The block carries: queue `record_id`,
+relay `receipt_id` (remote only), `submission_id`, `form_version`,
+`consent_text_digest`, `consent_affirmed` and `consent_affirmed_at` (both
+explicitly `source_asserted` - the individual consent instrument's
+affirmative assertion and its claimed time survive into graph provenance,
+not merely the instrument's version), `payload_digest`, and
+`batch_digest`. The intake blueprint implements this cn-model change; it
+is intake scope, not a change to ADR-002's op format (the envelope is
+built at fold time as today).
+
+Every entity and edge produced by an approved submission carries the full
+provenance envelope. Round-1 amendment: values are recorded WITH their
 trust status - `source_asserted` (client-controlled claims), or locally
 observed (`relay_observed` / `facilitator_observed`) - so I6 is meaningful
 rather than merely populated:
@@ -527,11 +641,12 @@ Tier: every pilot entry enters at T1; the tier authority is ATNI Climate
   configured admission allowlist (cleartext field; this is also the D3
   rotation cutoff - an out-of-date form gets a typed "reload the form"
   rejection, never silent loss). The Worker GENERATES the receipt id
-  (128-bit random, server-side, written with a conditional
-  create-if-absent and retry-on-collision; the client can neither choose
-  nor predict KV keys, and residual collision risk after the conditional
-  create is negligible-by-construction, not assumed impossible). Response:
-  the receipt id and nothing else. The acknowledgement MEANS "the relay
+  (128-bit random, server-side; the client can neither choose nor predict
+  KV keys). KV offers no strongly consistent conditional create, so
+  collision is prevented by ID-SPACE RANDOMNESS, not by a primitive: at
+  pilot scale the overwrite probability is negligible (order 2^-128 per
+  pair) and is stated as negligible, not impossible. Response: the receipt
+  id and nothing else. The acknowledgement MEANS "the relay
   stored your sealed envelope"; it does not mean staged, reviewed, or
   approved - the D-023 confirmation wording must say so (see TTL semantics
   below).
@@ -566,8 +681,9 @@ plus re-solicitation.
 **Rate limiting - NAT-safe.** Per-source throttling must tolerate the
 convention venue: hundreds of legitimate phones behind one NAT source IP.
 Limits are therefore sized generously per-IP (venue-scale bursts pass) and
-the real abuse backstops are the size cap, total-capacity cap, and the
-review gate - not per-IP precision. A throttled submitter can retry; the
+the real abuse backstops are the size cap, the TTL, the billing ceiling,
+and the review gate - not per-IP precision and not the approximate count
+cap. A throttled submitter can retry; the
 deterministic-lockout failure mode (one venue IP exhausted for the day) is
 explicitly designed out by the sizing rule in the deploy runbook.
 
@@ -598,24 +714,50 @@ oldest remaining receipt age; an age past half the TTL is a loud warning
 cannot identify whose ciphertext expired (by design - no contact fields in
 cleartext); "re-solicited" therefore means a broadcast ask, not recovery.
 
-**Reconciliation via a receipt ledger - not a counter (round-2
-amendment; the round-1 running-counter design was unimplementable on KV
+**Reconciliation via a receipt ledger - not a counter (rounds 2-3
+amendments; the round-1 running-counter design was unimplementable on KV
 and is withdrawn).** On each accepted POST the Worker writes TWO KV
-entries: the ciphertext blob (blob TTL) and a small ledger entry under a
-separate key prefix - receipt id, size, arrival timestamp, claimed
-fingerprint; NO content - with a LONGER TTL (blob TTL plus a
-reconciliation horizon). The ledger is metadata the operator could already
-observe (accepted D6 exposure); it adds no readable personal data. Each
-puller run classifies every ledger entry into DISJOINT states: staged
-locally (transport record exists) / deleted by me (the puller's local
-delete journal) / blob still present (unpulled) / blob absent and not
-deleted by me. The last state, evaluated after the blob TTL plus the
-stated KV consistency horizon, is EXPIRED (counted, drives the broadcast
-re-solicit); evaluated before TTL it is an integrity alert (possible
-relay-side deletion, truncation, or withholding) - re-checked once on the
-next run before alarming, because list/read are eventually consistent.
-Every count in the run report derives from these disjoint states; nothing
-is double-counted and no lost-increment failure mode exists.
+entries in a FIXED ORDER with a defined acknowledgement rule: (1) the
+ciphertext blob (blob TTL), then (2) the ledger entry under a separate key
+prefix - receipt id, size, arrival timestamp, claimed fingerprint; NO
+content. The POST is acknowledged ONLY after both writes succeed. The
+crash cases are therefore bounded and named: blob-write failure -> no
+ledger, no ack, the submitter sees an error and retries (a fresh receipt
+id; no orphan state); ledger-write failure after the blob -> no ack (the
+submitter retries), and the orphan BLOB is still found because the puller
+lists BOTH prefixes, stages any blob-without-ledger normally, and flags it
+as an anomaly (an unacknowledged write) in the run report. A missing
+ledger entry is thus observable through the blob, and a missing blob is
+observable through the ledger - single-sided platform loss of both halves
+of the SAME receipt is the accepted residual (stated, not claimed
+detectable).
+
+Ledger entry lifetime (a guaranteed observation window, not a
+coincidence): blob TTL + the stated KV consistency margin + AT LEAST one
+maximum pull interval. Expiry classification only becomes eligible after
+blob TTL + consistency margin, which by construction leaves at least one
+full pull cadence during which the ledger entry still exists to be
+classified.
+
+Classification precedence (what makes the states a partition): LOCAL
+durable facts are strongly consistent and take precedence - a receipt with
+a local transport record is STAGED; else one with a local delete-journal
+entry is DELETED-BY-ME; only for receipts with NO local record are the
+eventually consistent KV observations consulted: blob present -> UNPULLED;
+blob absent before TTL + margin -> integrity alert (possible relay-side
+deletion or a failed-blob-write orphan ledger entry - the ambiguity is
+stated and investigated, re-checked once next run before alarming); blob
+absent after TTL + margin -> EXPIRED (counted, drives the broadcast
+re-solicit). Evaluated in that order the states are disjoint; nothing is
+double-counted and no lost-increment failure mode exists.
+
+**Cutoff epoch (round-3 amendment).** An allowlist edit is not an instant.
+The rotation cutoff (D3) is COMPLETE only at: config-change time + the
+Worker configuration propagation horizon (a stated deploy-runbook value
+for Cloudflare's global propagation) + the maximum request duration
+(bounding an in-flight POST that passed the old check before the edit).
+The final old-key TTL and the destruction clock start from that completed
+epoch, never from the moment the edit was requested.
 
 **Logging and metadata discipline.** The Worker logs no bodies, no
 ciphertext, and no authorization headers; request metadata logging is
@@ -638,8 +780,9 @@ intake - the convention plan never depends solely on the relay.
 **Abuse tolerance via the review gate (D-053).** Anyone can POST garbage
 ciphertext or well-formed spam. Tolerated by design: nothing enters the
 graph without facilitator approval, so the blast radius of abuse is
-facilitator review time plus TTL-bounded, size-capped, count-capped KV
-storage - not graph integrity. Hostile payload CONTENT is neutralized at
+facilitator review time plus TTL-bounded, size-capped KV storage under
+the platform quota and billing ceiling (the count cap is approximate,
+D6) - not graph integrity. Hostile payload CONTENT is neutralized at
 render time by D4's validation-and-escape rules, so the review gate itself
 is not an XSS vector.
 
@@ -675,12 +818,20 @@ vendored libsodium identity (version + package integrity hash).
 amendment).** The measurement is defined so it can actually be computed
 and compared:
 
-- *Canonical manifest.* The reproducible build, run LOCALLY from the
-  reviewed commit, emits a manifest: an ordered list (sorted, normalized
-  relative paths) of every deployable file with each file's byte length
-  and SHA-256 over its exact bytes. The manifest is NOT part of its own
-  file set (no self-hash). The manifest hash is SHA-256 over the
-  manifest's canonical serialization.
+- *Canonical manifest - exact grammar (round-3 amendment).* The
+  reproducible build, run LOCALLY from the reviewed commit, emits a
+  manifest listing every deployable file. Path grammar: UTF-8, NFC
+  normalized, forward slashes only, relative to the deploy root, no `.`
+  or `..` segments, no backslashes, no percent-encoding; entries sorted
+  by byte-wise comparison of the path. Each entry: path, byte length,
+  SHA-256 over the file's exact bytes. Serialization: JSON, sorted keys,
+  LF newlines, UTF-8 without BOM. The manifest is NOT part of its own
+  file set; the manifest hash is SHA-256 over the manifest FILE's exact
+  stored bytes (not reconstructed fields). A copy of the manifest MAY be
+  deployed beside the bundle for human inspection, but it is
+  NON-AUTHORITATIVE: no verifier ever reads the served manifest as an
+  authority - the locally pinned copy is the only authority, and the
+  served copy is itself just another file to hash-check if listed.
 - *Pin provenance.* The pin is the LOCALLY BUILT manifest, recorded
   off-origin in the pilot PC ops config and ops log at deploy time
   (deploy provenance: commit SHA, deployer, time, manifest hash). The pin
@@ -691,15 +842,27 @@ and compared:
   CSP and the dependency-closed build mean the verified HTML references
   no file outside the manifest.
 - *Verification.* The puller (and the post-deploy check) fetches EVERY
-  path listed in the PINNED manifest from the deployed origin -
-  same-origin only, redirects refused, content-encoding decoded to
-  identity bytes - and compares each file's bytes-hash and length against
-  the pin. Any mismatch or missing file halts the line exactly like a key
-  mismatch. Stated residual: a static host does not enumerate its files,
-  so an EXTRA planted file is not detectable by fetch - but it is also
-  unreferenced by the verified HTML/CSP, so it cannot execute in the
-  form's page; targeted split-view serving remains the accepted residual
-  below.
+  path listed in the PINNED manifest from the deployed origin: cache
+  bypassed (no-store request cache mode plus a cache-busting request
+  where the platform honors it - a cached response proves an old
+  representation, not what the origin serves now); redirects refused
+  (final URL must equal the requested same-origin URL); status must be
+  200; content-encoding decoded to identity bytes before hashing. Each
+  file's bytes-hash and length are compared against the pin; any
+  mismatch, missing file, redirect, or non-200 halts the line exactly
+  like a key mismatch.
+- *Service workers and client state (round-3 amendment).* The form
+  registers NO service worker, and the deploy runbook forbids ever
+  introducing one on this origin. A native puller does not execute
+  service workers, so its verification measures served bytes - it cannot
+  see a previously installed hostile service worker controlling an
+  attendee's browser, nor other persistent client state. That is folded
+  into the accepted persistent-client/split-view residual below: the
+  manifest + CSP measure the SERVED artifact, not all executable client
+  state, and the text claims no more than that. Stated residual: a
+  static host does not enumerate its files, so an EXTRA planted file is
+  not detectable by fetch - but it is unreferenced by the verified
+  HTML/CSP and so cannot execute in a clean client's page load.
 - *Unreachable origin* (offline pilot PC, Pages outage): pulls may
   proceed on the local-key check alone with a loud WARN in the run report
   (already-sealed ciphertext is not endangered by current-bundle state),
@@ -818,7 +981,9 @@ Negative / accepted:
   overclaim against it.
 - No submitter auth means dedup rests on transport/semantic hashes plus
   facilitator near-duplicate review; facilitator review load scales with
-  abuse volume (bounded by the capacity cap).
+  abuse volume (bounded in practice by the TTL, the approximate count
+  cap, and the platform quota/billing ceiling - not by a hard count
+  guarantee).
 - New verification surface: the puller, both envelope formats, the queue
   record/sidecar formats, the crash/recovery protocol, and the pii-scan
   tripwires all need tests (including fault-injection at each protocol

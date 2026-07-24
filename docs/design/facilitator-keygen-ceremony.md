@@ -219,9 +219,13 @@ Distribution at deploy time:
   fingerprint doubles as the human-auditable identity in code review).
 - The form build embeds the key and stamps the fingerprint into a visible
   diagnostic on the form itself - a small footer line such as
-  "intake key: 3f9a-1c02-..." - plus the deploy manifest the puller reads.
-  Rendering the fingerprint where any submitter could in principle compare
-  it costs nothing and makes the out-of-band check trivial.
+  "intake key: 3f9a-1c02-..." - and emits the canonical deploy manifest
+  (ADR-005 D8 grammar). A copy of the manifest may be deployed for human
+  inspection, but it is NON-AUTHORITATIVE: the puller verifies only
+  against the locally pinned manifest recorded at deploy; nothing ever
+  treats the served manifest as an authority. Rendering the fingerprint
+  where any submitter could in principle compare it costs nothing and
+  makes the out-of-band check trivial.
 
 Out-of-band human verification (after every deploy that touches the form):
 
@@ -346,19 +350,30 @@ PIN AND PUBLISH
         config (off-repo). VERIFY: puller startup check passes against the
         local key.
 [ ] 19. Re-enable networking.
-[ ] 20. Commit the public-key constant; build + deploy the intake form
-        (only if D-053/D-055 publish preconditions currently hold;
-        otherwise stop here and park - the ceremony through line 19 is
-        complete and valid).
-[ ] 21. VERIFY (out-of-band): on a different device and network, load the
+[ ] 20. Commit the public-key constant. BUILD LOCALLY from that reviewed
+        commit (reproducible build); the build emits the canonical deploy
+        manifest (ADR-005 D8 grammar). Inspect it (file list sane, key
+        constant present, no unexpected entries).
+[ ] 21. PIN: record the manifest's exact bytes and its SHA-256, plus
+        provenance (commit SHA, operator, time), in the off-repo ops
+        config and ops log. The pinned copy is the sole verification
+        authority.
+[ ] 22. Deploy EXACTLY the built file set (only if D-053/D-055 publish
+        preconditions currently hold; otherwise stop here and park - the
+        ceremony through line 21 is complete and valid).
+[ ] 23. VERIFY: fetch every path listed in the PINNED manifest from the
+        deployed origin (cache bypassed, no redirects, status 200,
+        identity bytes) and match each hash and length; then the embedded
+        key fingerprint against the pin. Any mismatch stops the line.
+[ ] 24. VERIFY (out-of-band): on a different device and network, load the
         deployed form; its footer fingerprint matches line 8, all groups.
-[ ] 22. VERIFY: puller run against the live form/manifest passes the pin
-        check end to end.
+[ ] 25. VERIFY: full puller pre-run gate (bundle + key + local-key pins)
+        passes end to end.
 
 CLOSE
-[ ] 23. File this sheet + backup locations + verifier initials in the
+[ ] 26. File this sheet + backup locations + verifier initials in the
         off-repo ops log.
-[ ] 24. Schedule the mid-window repeat restore drill (steps 11 and 15)
+[ ] 27. Schedule the mid-window repeat restore drill (steps 11 and 15)
         for: ____________ (date roughly halfway to the convention).
 ```
 
@@ -367,10 +382,11 @@ CLOSE
 - Rust sealed-box binding choice (RustCrypto `crypto_box` vs `dryoc` vs
   libsodium-sys) - decided by the cross-implementation test vectors, not by
   preference.
-- Whether the deploy manifest the puller reads should be signed with a
-  second (signing) key, or whether the fingerprint pin alone is enough for
-  v0.1.0. Current stance: pin alone; a signing key doubles the ceremony
-  surface for marginal gain at pilot scale.
+- ~~Whether the deploy manifest should be signed with a second key~~
+  RESOLVED by ADR-005 rounds 1-3: the served manifest is non-authoritative
+  and never read as an authority, so signing it protects nothing; the
+  locally built, off-origin pinned manifest is the trust root (ADR-005 D8,
+  rejected option 9).
 - Exact placement and format of the puller's pinned-fingerprint config
   within the off-repo facilitator ops directory (belongs with the pending-
   review queue persistence design, D-056.1).

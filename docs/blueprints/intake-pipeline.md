@@ -26,44 +26,39 @@ path. Controlling principles:
 - **Queue formats are ADR-005 D4 verbatim**: immutable payload record +
   append-history sidecar, versioned (I7), checksummed, off-worktree.
 
-## 1. The browser/disk decision (the one new architectural call)
+## 1. The durable owner: native `cn intake apply`; the app is create-only
+(per ADR-005 D4, round-3 amendment)
 
-The queue root lives OUTSIDE any git worktree (ADR-005 D4), but entry and
-review live in the browser app. Decision: the app reaches the queue through
-the **File System Access API** - the facilitator grants the ops-directory
-handle once at wizard start (Chromium on the pilot PC is a recorded
-environment requirement; the pilot environment is controlled, D-050).
+The durable op log (`OpLog`) is native-only - `cn-store`'s `log` module is
+compiled out of wasm32, and the browser has no durable store. ADR-005 D4
+therefore fixes the split this blueprint implements:
 
-Durability contract, stated honestly: FSA `createWritable()` writes to a
-swap file and atomically replaces the target on `close()` - the atomic-
-replace half of ADR-005 D4's write primitive - but exposes no explicit
-fsync. This WEAKER contract is acceptable for the in-app path and for
-sidecar updates because (a) every record and sidecar carries the D4
-checksum, so torn state is detected, never trusted; (b) an in-app write
-failure or post-write verification failure is surfaced loudly to the
-facilitator WHILE THE SOURCE IS STILL PRESENT (the person or paper form in
-front of them - re-entry is cheap), unlike a remote submission whose relay
-copy is deleted; and (c) the strict native protocol (temp + FlushFileBuffers
-+ atomic rename) remains normative for the puller, which is the only
-component that deletes upstream copies. Every in-app write is followed by a
-read-back checksum verification before the UI reports success. Proposed
-one-paragraph clarification to fold into ADR-005 D4 at acceptance: "the
-native puller implements the strict primitive; supervised in-app writers may
-substitute FSA atomic-replace-on-close plus mandatory read-back
-verification, because no upstream copy is ever deleted on the in-app path."
-
-**Concurrency without locks - writer-disjoint by construction.** The app
-cannot atomically create a lock file, so the design removes shared-file
-writes instead: the puller (future) only CREATES remote payload records and
-their initial `pending` sidecars; the app only CREATES `in_app` records and
-UPDATES sidecars. Record ids are UUIDv7 (collision-free), so no two writers
-ever target the same file, except sidecars of remote records - which the
-puller never touches again after initial creation. The single-instance rule
-in ADR-005 D4 therefore binds the puller only; the app needs no queue lock.
-The review UI re-reads a sidecar immediately before writing it and aborts on
-unexpected state (optimistic check; single facilitator makes real races
-operationally absent, and the append-only decision history makes even a
-lost-update recoverable by inspection).
+- **The app (browser, FSA) is CREATE-ONLY.** The facilitator grants the
+  ops-directory handle once at wizard start (Chromium on the pilot PC is a
+  recorded environment requirement; the environment is controlled, D-050).
+  The app creates new uniquely named files only - in-app payload records,
+  their initial `pending` sidecars, and decision files
+  (`decisions/<record_id>.<uuid>.json`) - and NEVER rewrites an existing
+  file. FSA `createWritable()` gives atomic-replace-on-close; every create
+  is followed by read-back checksum verification before the UI reports
+  success. A lost create is loudly visible and cheaply re-creatable by the
+  supervising facilitator; a create-only writer cannot corrupt
+  authoritative state.
+- **Native `cn intake apply` owns every mutation.** Under the queue-root
+  single-instance lock it consumes decision files: verifies each against
+  its record's sidecar-payload binding, appends the decision to the
+  sidecar (strict write primitive), and executes approvals through the
+  ADR-005 D4 transaction (plan generation, `approved_intent`, the durable
+  seam with shadow-state preflight, completion) against the real `OpLog`.
+  The puller (mandate item 3, later) runs under the same lock. Two native
+  writers serialized by the lock; app creates can conflict with neither.
+- **The app renders; it does not fold authority.** After an apply run the
+  wizard prompts the facilitator to reload the group (existing load path)
+  to see approved entries. The in-memory WASM `submit_ops` is NOT used for
+  intake approval. The wizard surfaces staged-but-unapplied decisions and
+  the apply instruction; at pilot scale this
+  decide-in-app / apply-natively / reload rhythm is an acceptable and
+  honest workflow.
 
 ## 2. cn-ingest becomes real (queue record model, pure logic)
 
@@ -86,10 +81,11 @@ network code enters any core crate (ADR-005 D1 fence).
 - `recovery.rs`: the ADR-005 D4 legal-on-disk-states table as pure logic:
   `classify(entries) -> Vec<RecoveryAction>` (discard temp, reconstruct
   pending-only sidecar, quarantine checksum failures to `corrupt/`,
-  loud-halt on binding mismatch or lost decision history, run approval
-  recovery on `approved_intent`). Callers (the app now, the puller later)
-  execute actions through their own I/O; the classification and its
-  invariants (never promote a temp, never reconstruct a decision history)
+  loud-halt on binding mismatch or on a review-begun marker without a
+  readable sidecar, run approval recovery on `approved_intent`). The
+  caller is native `cn intake apply` (the app never mutates, so it never
+  recovers); the classification and its invariants (never promote a temp,
+  never reconstruct a decision history, marker-before-first-decision)
   live here, tested exhaustively.
 - `source.rs`: `SubmissionSource::Remote { receipt_id, ciphertext_hash,
   pulled_at, key_used, envelope_meta, relay_received_at }` vs `InApp {}` -
@@ -111,28 +107,45 @@ network code enters any core crate (ADR-005 D1 fence).
   graph side of the comparison is the FACILITATOR'S projection, so a
   candidate can never reference an entity the facilitator cannot already
   see.
-- `approval.rs`: the approval-transaction state machine as pure logic:
+- `decision.rs`: the decision-file format (record_id, payload digest,
+  decision, reviewer, timestamp; versioned per I7) and its consumption
+  rules (binding verification before any sidecar append; consumed files
+  recorded into the sidecar history).
+- `approval.rs`: the approval-transaction state machine as pure logic,
+  invoked NATIVELY by `cn intake apply`:
   `plan_approval(record, template, group_id, facilitator) ->
   ApprovalPlan { preassigned_op_ids, per_op_digests, ops, batch_digest }`
-  (UUIDv7 ids and canonical per-op digests generated HERE, once; ops are
-  ordinary `Operation` values - EntityCreate unowned + AttributeSets +
-  EdgeCreates per the template mapping, actor = `cn-intake/<version>`,
-  responsible_human = facilitator, D-056.2/ADR-005 D5/D7). Recovery
-  re-runs the same plan through the cn-store seam below; no separate
-  recovery matrix is needed because the seam is idempotent by
-  construction.
-- **cn-store additive seam (ADR-005 D4, round-2 mandate - lands FIRST):**
-  `append_batch_idempotent(batch) -> per-op
-  {absent_appended | present_same_digest | present_conflicting_digest}`
-  classifying each preassigned op id against the DURABLE LOG (not the
-  fold seen-set), authorizing the whole batch before any append
-  (all-or-nothing at the authz stage; typed batch failure on any denial
-  or digest conflict, nothing appended), appending only absent ops with
-  one fsync, then folding. This is the only cn-store change; ADR-002's
-  formats and fold semantics are untouched (additive API, log major
-  unchanged). Tests: crash-simulated double-submit produces zero
-  duplicate log lines; conflicting-digest halts with nothing appended;
-  partial-presence appends exactly the absent ops.
+  (UUIDv7 ids and canonical per-op digests generated HERE, once, at apply
+  time; ops are ordinary `Operation` values - EntityCreate unowned +
+  AttributeSets + EdgeCreates per the template mapping, actor =
+  `cn-intake/<version>`, responsible_human = facilitator, D-056.2/ADR-005
+  D5/D7). Recovery follows the ADR-005 intent-as-authorization-marker
+  rules: all-present completes WITHOUT re-authorization; partial appends
+  the absent suffix under the marker; conflict -> terminal `failed`.
+- **cn-store additive seam (ADR-005 D4 - lands FIRST, native-only like
+  the log module):** `append_batch_idempotent(log, state, batch) ->
+  per-op {absent_appended | present_same_digest |
+  present_conflicting_digest}` classifying each preassigned op id against
+  the DURABLE LOG (not the fold seen-set); authorization AND
+  fold-acceptance are preflighted on a SHADOW CLONE of the group state in
+  batch order (so AttributeSet-after-EntityCreate authorizes; any denial
+  or would-be quarantine fails the batch pre-append, typed, nothing
+  appended); then append-absent-only, one fsync, fold - all inside the
+  apply critical section, so the real fold cannot diverge from the
+  preflight. Additive API; ADR-002's formats and fold semantics
+  untouched; log major unchanged. Tests: crash-simulated double-submit
+  produces zero duplicate log lines; conflicting digest halts with
+  nothing appended; partial-presence appends exactly the absent suffix
+  without re-authorization; a batch whose preflight quarantines fails
+  entirely with nothing appended.
+- **cn-model additive extension (ADR-005 D5):** the optional versioned
+  `intake` block on `ProvenanceEnvelope` (record_id, receipt_id,
+  submission_id, form_version, consent digest/affirmed/affirmed_at,
+  payload_digest, batch_digest; envelope schema minor bump). Fold stamps
+  it from the op's intake context at apply.
+- **`cn intake apply` (CLI):** the durable owner. Takes the queue lock,
+  runs recovery (crash-state table incl. the review-begun marker),
+  consumes decision files, executes the transaction, reports (I12).
 - Validation: payload field allowlist against the group template
   (types, required, enum values, length caps, Unicode normalization) via
   existing cn-model attribute validation; failures produce a typed
@@ -158,19 +171,19 @@ String-in/string-out like everything else on the boundary (ADR-003);
 - `intake_near_duplicates(payload_json, queue_payloads_json, viewer) ->
   candidates` - projects the graph for the viewer INSIDE the core, then
   scores; the app never receives unfiltered graph data (I2).
-- `intake_plan_approval(record_json, viewer) -> ApprovalPlan` - refuses
-  (typed, I3) unless the viewer resolves to an active facilitator-or-
-  governance role; this is a UX-affordance check only - the REAL
-  enforcement remains `PermAuthorizer` at the append seam.
-- `intake_submit_approval(plan_json, viewer) -> BatchReport` - the facade
-  over `append_batch_idempotent` (the ONE approval write path; the
-  general `submit_ops` stays as-is for non-intake mutations). Same
-  authorizer, no new authority (I2, I4).
+- NO approval-write export exists in WASM (round-3 correction: the
+  in-memory WASM boundary has no durable store, so a browser approval
+  path would be unsound). The WASM surface is read-only compute for the
+  review UI - validation, dedup classification, near-duplicate
+  candidates. Plan generation, the seam, and sidecar mutation live only
+  in native `cn intake apply` (section 2). The existing `submit_ops`
+  stays untouched for non-intake use; intake never calls it.
 
-Facade tests: plan->submit->report happy path; plan under a non-facilitator
-viewer refused; resubmit-same-ids idempotency against the store (asserts
-the ADR-002 dedup contract carries the recovery rule); redaction of
-outcomes unchanged for the facilitator viewer class (no-leak, section 6).
+Facade tests: validation/dedup/near-dup exports return correct typed
+results for each viewer class; near-dup candidates projection-bounded
+(no-leak, section 6). The native-side tests (seam, transaction, recovery)
+live with cn-store/cn-ingest and the `cn intake apply` integration tests -
+including the full decide -> apply -> reload round trip on synthetic data.
 
 ## 4. P3.6 - template-driven entry forms (app, greenfield)
 
@@ -218,12 +231,16 @@ enforces regardless):
 - **Review view**: payload fields with trust-status labels
   (`source_asserted` vs local, ADR-005 D5), validation report, dedup
   verdict, near-dup candidates with reasons and side-by-side compare,
-  conflict disposition for `Conflict` verdicts; approve (with the
-  section-3 transaction: sidecar `approved-intent` -> `submit_ops` ->
-  sidecar `approved`) / reject (reason required; record persists per
-  D-059.11) / set-aside note. Recovery: on wizard start, any
-  `approved-intent` sidecar triggers the `verify_recovery` flow before
-  anything else is offered.
+  conflict disposition for `Conflict` verdicts; approve / reject (reason
+  required; record persists per D-059.11) / set-aside note. Every
+  decision is a CREATE-ONLY decision file (section 1); the wizard then
+  shows it as staged-awaiting-apply. The dashboard surfaces staged
+  decisions with the `cn intake apply` instruction and, after an apply,
+  prompts a group reload. Records whose sidecar shows `failed` render as
+  investigation items (terminal until the facilitator's explicit
+  disposition, ADR-005 D4). Recovery is native-only (`cn intake apply`);
+  the wizard merely refuses to stage new decisions for a record whose
+  sidecar is `approved_intent` or unreadable.
 - All state flows through `app/src/state` (I4): new actions
   (`intakeQueueLoaded`, `intakeRecordStaged`, `intakeReviewDecided`, ...),
   new effects module `app/src/state/intake.ts` owning FSA I/O + wasm
@@ -269,17 +286,22 @@ authoring, per-field tiers, owner-binding (D-056.2 deferral) - unchanged.
 
 ## 9. Sequencing (small verified commits, check-all green at each)
 
-1. cn-store `append_batch_idempotent` seam + crash-simulation tests.
-2. cn-ingest record/sidecar model + binding + versioning + checksums +
-   recovery classification + tests.
-3. cn-ingest source/dedup/near-dup/approval logic + tests.
-4. cn-api/cn-wasm intake facade + boundary tests + no-leak extension.
-5. app: template->form renderer (P3.6) + tests.
-6. app: FSA queue adapter + state module + reducer/action tests.
-7. app: wizard panel + review/approval flow + recovery flow + smoke.
-8. pii-scan tripwires + self-test member.
-9. fixtures: synthetic intake demo records for both demo groups; docs
-   true-up (HANDOFF, MANIFEST).
+1. cn-store `append_batch_idempotent` seam (native, shadow-state
+   preflight) + crash-simulation tests.
+2. cn-model `intake` provenance block (additive, versioned) + tests.
+3. cn-ingest record/sidecar/decision model + binding + review-begun
+   marker + versioning + checksums + recovery classification + tests.
+4. cn-ingest source/dedup/near-dup/approval logic + tests.
+5. `cn intake apply` CLI (lock, recovery, decision consumption,
+   transaction) + integration tests.
+6. cn-api/cn-wasm read-only intake facade + no-leak extension tests.
+7. app: template->form renderer (P3.6) + tests.
+8. app: FSA create-only queue adapter + state module + tests.
+9. app: wizard panel + review flow + decision files + smoke (full
+   decide -> apply -> reload round trip on synthetic data).
+10. pii-scan tripwires + self-test member.
+11. fixtures: synthetic intake demo records for both demo groups; docs
+    true-up (HANDOFF, MANIFEST).
 
 Then the mandatory adversarial round on the implementation diff, judgment,
 and acceptance.
