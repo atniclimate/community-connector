@@ -125,7 +125,9 @@ fn template_reader_rejects_unknown_schema_major_loudly() {
 #[test]
 fn template_reader_accepts_current_schema_version() {
     let (template, report) = parse_template(RESEARCH).expect("fixture parses");
-    assert_eq!(template.schema_version, cn_model::model_schema_version());
+    // The template declares its own version (a distinct version space from
+    // the model schema); the reader's contract is acceptance, not equality.
+    assert!(cn_model::accepts_schema(&template.schema_version));
     assert!(
         report
             .errors

@@ -396,3 +396,81 @@ fn ids_are_distinct_and_string_round_trip() {
     let parsed = EntityId::from_str(&first.to_string()).expect("parse");
     assert_eq!(first, parsed);
 }
+
+// ADR-005 D5: intake provenance block (added at model schema 0.1.1).
+
+#[test]
+fn envelope_without_intake_field_still_parses() {
+    // A pre-0.1.1 envelope: no `intake` key at all.
+    let json = r#"{
+        "origin": "authored",
+        "recorded_by": { "human": "00000000-0000-0000-0000-000000000001" },
+        "responsible_human": "00000000-0000-0000-0000-000000000001",
+        "recorded_at": 1,
+        "custody": [],
+        "schema_version": "0.1.0"
+    }"#;
+    let envelope: ProvenanceEnvelope = serde_json::from_str(json).expect("old data parses");
+    assert!(envelope.intake().is_none());
+}
+
+#[test]
+fn intake_block_round_trips_and_is_omitted_when_absent() {
+    let person: PersonId = "00000000-0000-0000-0000-000000000001".parse().expect("id");
+    let mut envelope = ProvenanceEnvelope::new(
+        Origin::Authored,
+        ActorRef::Human(person),
+        person,
+        Timestamp(1),
+    )
+    .expect("envelope");
+    let plain = serde_json::to_string(&envelope).expect("serialize");
+    assert!(
+        !plain.contains("intake"),
+        "absent block is omitted on the wire"
+    );
+    envelope.set_intake(IntakeProvenance {
+        intake_block_version: semver::Version::parse(INTAKE_BLOCK_VERSION).expect("version"),
+        record_id: "rec-1".to_string(),
+        receipt_id: Some("receipt-1".to_string()),
+        submission_id: "sub-1".to_string(),
+        form_version: "form-0.1".to_string(),
+        consent_text_digest: "digest-consent".to_string(),
+        consent_affirmed: true,
+        consent_affirmed_at: Timestamp(2),
+        payload_digest: "digest-payload".to_string(),
+        batch_digest: "digest-batch".to_string(),
+    });
+    let json = serde_json::to_string(&envelope).expect("serialize");
+    let back: ProvenanceEnvelope = serde_json::from_str(&json).expect("round trip");
+    let intake = back.intake().expect("intake present");
+    assert!(intake.consent_affirmed);
+    assert_eq!(intake.record_id, "rec-1");
+    assert_eq!(back, envelope);
+}
+
+#[test]
+fn unknown_intake_block_major_is_rejected() {
+    let json = r#"{
+        "origin": "authored",
+        "recorded_by": { "human": "00000000-0000-0000-0000-000000000001" },
+        "responsible_human": "00000000-0000-0000-0000-000000000001",
+        "recorded_at": 1,
+        "custody": [],
+        "intake": {
+            "intake_block_version": "9.0.0",
+            "record_id": "rec-1",
+            "receipt_id": null,
+            "submission_id": "sub-1",
+            "form_version": "form-0.1",
+            "consent_text_digest": "d",
+            "consent_affirmed": true,
+            "consent_affirmed_at": 2,
+            "payload_digest": "d",
+            "batch_digest": "d"
+        },
+        "schema_version": "0.1.1"
+    }"#;
+    let result = serde_json::from_str::<ProvenanceEnvelope>(json);
+    assert!(result.is_err(), "unknown intake major must be rejected");
+}

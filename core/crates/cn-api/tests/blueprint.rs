@@ -130,7 +130,9 @@ fn op(group_id: GroupId, sort: i64, submitter: PersonId, kind: OpKind) -> Operat
             &actor,
             op_id,
         ),
-        template_version: cn_model::model_schema_version(),
+        // The TEMPLATE's declared version (template_json says 0.1.0), which
+        // is a different version space than the model schema version.
+        template_version: semver::Version::new(0, 1, 0),
         kind,
         schema_version: cn_model::model_schema_version(),
     }

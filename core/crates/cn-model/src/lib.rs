@@ -30,12 +30,15 @@ pub use tier::SensitivityTier;
 pub use time::Timestamp;
 pub use trust::{TrustGrant, TrustScope};
 
-/// Current persisted model schema version.
-pub const MODEL_SCHEMA_VERSION: &str = "0.1.0";
+/// Current persisted model schema version. 0.1.1 added the optional
+/// intake provenance block (ADR-005 D5) - a PATCH bump because
+/// `accepts_schema` requires the same minor at major zero, so 0.1.0 data
+/// stays accepted (D-064 scoping).
+pub const MODEL_SCHEMA_VERSION: &str = "0.1.1";
 
 /// Returns the current model schema version.
 pub fn model_schema_version() -> semver::Version {
-    semver::Version::new(0, 1, 0)
+    semver::Version::new(0, 1, 1)
 }
 
 /// Returns true when the supplied schema version is accepted by this model.
