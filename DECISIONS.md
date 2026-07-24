@@ -1307,3 +1307,32 @@ no longer destroys recovery copies early); blueprint carry-through
 prefix-only + negative tests, pending+marker rows, file-conflict
 narrowing); ceremony open-question manifest sentence fixed. Round 6
 (narrow) pending; ADR-005 remains DRAFT.
+
+## D-066 (2026-07-24) - ADR-005 round 6: findings 2-5 closed; two defects fixed; sixth amendment
+
+Round 6 (narrow; review at
+`_reviews/community-connector/2026-07-24_adr-005-remote-intake-round6.md`,
+target HEAD e7728a6) CLOSED round-5 findings 2-5 (pre-link batch digest,
+cutoff honesty + ceremony destruction unification, blueprint
+carry-through, manifest sentence). Two valid defects remained in the
+fifth amendment itself: (1) BLOCKER - replay/stale/illegal audit writes
+advanced the same revision the decision CAS reads, so a crash retry (the
+reviewer supplied the exact sequence) could invalidate and retire a
+decision that was current when authored - non-idempotent; (2) MAJOR -
+the single history schema could not encode the approval transaction's
+own required events (preflight failure back to pending, completion,
+digest conflict).
+
+Sixth amendment: (a) two counters - physical `sidecar_revision` (every
+rewrite, bookkeeping only) vs semantic `decision_generation` (the CAS
+authority; advances on admitted decisions incl. note-only/clear_failed
+and on state-changing transaction events; NEVER on stale/illegal audit
+entries); (b) same-digest replays retire against their already-durable
+original decision event with NO new write; (c) history gains
+`event_kind`: decision events (outcome admitted|stale|illegal; dedup
+target) vs transaction events (intent_completed | preflight_failed |
+durable_conflict, linked by admitting decision_id, never dedup targets);
+(d) both reviewer-supplied failure sequences are mandatory pure
+admission tests in the blueprint. Round 7 is scoped by the reviewer to
+ONLY these two defects, with the four closures not to be reopened.
+ADR-005 remains DRAFT.

@@ -52,10 +52,14 @@ therefore fixes the split this blueprint implements:
   admission + history entry + plan + `approved_intent` are ONE atomic
   sidecar replace (never an append-then-plan sequence); the durable seam
   (shadow-state preflight) and completion follow against the real
-  `OpLog`. EVERY outcome (`admitted | stale | illegal | replay`) gets a
-  durable history entry BEFORE the decision file is retired into
-  `decisions/consumed/` tombstones (retire-after-durable); startup
-  reconciles tombstones against history and reports orphans (I12). The
+  `OpLog`, with post-admission outcomes recorded as TRANSACTION events
+  (intent_completed / preflight_failed / durable_conflict) linked to the
+  admitting decision_id. Outcomes `admitted | stale | illegal` get a
+  durable decision event BEFORE the file is retired into
+  `decisions/consumed/` tombstones; a same-digest REPLAY retires against
+  its already-durable original event with NO new write (round 6 - retry
+  bookkeeping must not move any counter); startup reconciles tombstones
+  against decision events and reports orphans (I12). The
   puller (mandate item 3, later) runs under the same lock. Two native
   writers serialized by the lock; app creates cannot FILE-conflict with
   either - semantic staleness is resolved by the admission table, never
@@ -121,22 +125,31 @@ network code enters any core crate (ADR-005 D1 fence).
   see.
 - `decision.rs`: the decision-inbox message format per ADR-005 D4
   (body-carried `decision_id` UUIDv7, record_id, payload digest,
-  `expected_review_state` AND `expected_sidecar_revision`, decision type
-  incl. `clear_failed`, reviewer, timestamp; versioned per I7) and the
-  ADMISSION TABLE as pure logic: deterministic ordering (timestamp,
+  `expected_review_state` AND `expected_decision_generation`, decision
+  type incl. `clear_failed`, reviewer, timestamp; versioned per I7) and
+  the ADMISSION TABLE as pure logic: deterministic ordering (timestamp,
   decision_id), binding verification, dedup by decision_id + message
-  digest (same id + different digest = loud conflict), CAS on
-  revision+state, legal-transition enforcement, and each decision type's
-  exact state/revision effect (`set_aside_note` keeps state `pending`
-  but increments revision). History entries follow THE authoritative
-  ADR-005 schema (decision_id, message digest, type, prior/resulting
-  state+revision, reviewer, time, reason, outcome). Tests: replay ->
-  recorded no-op; same-id-different-digest -> conflict; stale (state OR
-  revision mismatch, incl. the pending->failed->clear_failed->pending
-  ABA cycle) -> durable `stale` entry, unapplied; two concurrent
-  decisions -> first admits and bumps revision, second stale - including
-  when the first is note-only; replayed approve after intent -> dedup,
-  never a second plan.
+  digest against DECISION events (same id + different digest = loud
+  conflict; same digest = writeless replay retiring against the original
+  event), CAS on generation+state, legal-transition enforcement, each
+  decision type's exact effect (`set_aside_note` keeps state `pending`
+  but advances the generation), and the two-counter rule: physical
+  `sidecar_revision` on every rewrite; semantic `decision_generation`
+  only on admitted decisions and state-changing transaction events,
+  never on stale/illegal audit entries. History follows THE
+  authoritative ADR-005 two-kind schema (decision events vs transaction
+  events; dedup indexes decision events only). MANDATORY tests include
+  the two round-6 sequences: (a) note admitted at generation G, crash
+  before retirement, approve authored against G+1, replay of the note
+  retires writeless, the approve STILL ADMITS; (b) an older stale
+  message processed before a current decision leaves that current
+  decision admissible. Plus: same-id-different-digest -> conflict; stale
+  (generation OR state mismatch, incl. the ABA cycle) -> durable `stale`
+  decision event, generation unchanged, unapplied; two concurrent
+  decisions -> first admits and advances the generation, second stale -
+  including when the first is note-only; replayed approve after intent
+  -> dedup, never a second plan; preflight failure -> `preflight_failed`
+  transaction event back to pending, representable and serialized.
 - `approval.rs`: the approval-transaction state machine as pure logic,
   invoked NATIVELY by `cn intake apply`:
   `plan_approval(record, template, group_id, facilitator) ->

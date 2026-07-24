@@ -1,7 +1,7 @@
 # ADR-005: Remote Intake - Sealed-Envelope Relay and Facilitator Pending-Review Queue
 
-- Status: DRAFT - rounds 1-5 FAIL judged and amended 2026-07-24; pending round 6
-- Date: 2026-07-24 (amended five times same day after adversarial rounds 1-5)
+- Status: DRAFT - rounds 1-6 FAIL judged and amended 2026-07-24; pending round 7
+- Date: 2026-07-24 (amended six times same day after adversarial rounds 1-6)
 - Phase: 3 (intake pipeline P3.5/P3.6 plus the D-053 relay; deploy gated on the
   D-059.8 deploy bar)
 - Drivers: R3 (data entry and ingestion), R5 as amended by D-053 (one remote
@@ -81,6 +81,21 @@
   pre-link batch-digest projection, two-branch cutoff honesty with a
   revision-currency recheck, ceremony destruction-timing unification, and
   the blueprint carry-through.
+- Adversarial round 6: FAIL (same lane, at e7728a6; narrow) - round-5
+  findings 2-5 CLOSED; finding 1 partial with two defects in the fifth
+  amendment itself: replay/stale/illegal audit writes advanced the same
+  revision the decision CAS reads (a crash retry could invalidate and
+  retire a decision that was current when authored - non-idempotent), and
+  the single history schema could not encode the approval transaction's
+  own events (preflight failure back to pending, completion, digest
+  conflict). Sixth amendment: the CAS domain splits into a semantic
+  `decision_generation` (advances only on admitted decisions and
+  state-changing transaction events, never on audit recordings) separate
+  from the physical `sidecar_revision`; same-digest replays retire
+  against their existing durable entry with NO new write; history gains
+  an `event_kind` discriminant (decision vs transaction events, dedup
+  indexing decision events only). Both reviewer-supplied failure
+  sequences become mandatory admission tests in the blueprint.
 
 ## Context
 
@@ -382,11 +397,19 @@ modified; it holds:
 The sidecar holds mutable review state: `review_state`
 (`pending | approved_intent | approved | rejected | failed` - the
 write-ahead state AND the terminal investigation state are part of the
-versioned persisted enum, not implementation details), a monotonic
-`sidecar_revision` (round-5 amendment: incremented by EVERY sidecar
-rewrite, including note-only and disposition writes - the compare-and-set
-authority that state equality alone cannot provide), the full decision
-history (append-only), reviewer notes, validation-report reference,
+versioned persisted enum, not implementation details), TWO counters with
+distinct jobs (round-6 amendment): a physical `sidecar_revision`
+(incremented by EVERY rewrite - lost-update bookkeeping only, never a CAS
+target) and a semantic `decision_generation` - the decision CAS
+authority - which advances EXACTLY when review authority changes: on
+every ADMITTED decision (including note-only `set_aside_note` and
+`clear_failed`) and on every state-changing TRANSACTION event
+(completion, preflight failure, digest conflict), and NEVER on audit
+recordings of stale or illegal decisions (replays write nothing at all).
+Audit bookkeeping therefore cannot invalidate a decision that was current
+when authored - the round-6 crash-replay defect is closed by
+construction. Also: the full decision history (append-only), reviewer
+notes, validation-report reference,
 near-duplicate candidates surfaced and the facilitator's disposition,
 and - in `approved_intent` and beyond - the approval transaction fields
 below. `failed` is terminal-until-investigated: it records a digest
@@ -397,15 +420,29 @@ conflict evidence by regenerating fresh op ids. Sidecar updates use the
 atomic-replace protocol below, and the history array means a rewritten
 sidecar still carries every prior decision.
 
-**One authoritative history-entry schema (round-5 amendment - this is THE
-history shape; any shorter description elsewhere is superseded).** Every
-history entry records: `decision_id`, the canonical decision-MESSAGE
-digest (so a reused id with different bytes is detectable), the decision
-type, `prior_state`/`prior_revision`, `resulting_state`/
-`resulting_revision`, reviewer, `decided_at`, reason, and `outcome`
-(`admitted | stale | illegal | replay`). The same `decision_id` with a
-DIFFERENT message digest is a loud typed conflict (I3), never conflated
-with a replay.
+**One authoritative history schema with two event kinds (rounds 5-6
+amendments - this is THE history shape; any shorter description elsewhere
+is superseded).** Every history entry carries an `event_kind`:
+
+- `decision` events record a decision message's disposition:
+  `decision_id`, the canonical decision-MESSAGE digest (so a reused id
+  with different bytes is detectable), the decision type,
+  `prior_state`/`prior_generation`, `resulting_state`/
+  `resulting_generation`, reviewer, `decided_at`, reason, and `outcome`
+  (`admitted | stale | illegal`). Replays get NO new entry - the original
+  durable entry is their proof (below). The same `decision_id` with a
+  DIFFERENT message digest is a loud typed conflict (I3), never conflated
+  with a replay.
+- `transaction` events record what happened to an admitted approval
+  AFTER admission, linked by the admitting `decision_id`:
+  `intent_completed` (`approved_intent -> approved`, with the submit
+  report reference), `preflight_failed`
+  (`approved_intent -> pending`, with the typed failure), or
+  `durable_conflict` (`approved_intent -> failed`). A transaction event
+  is not a decision and is never a dedup target.
+
+Decision-id dedup indexes DECISION events only; a transaction event can
+never be mistaken for a second decision message.
 
 **The durable owner and the create-only app (round-3 amendment - this
 supersedes any browser-side approval write path).** The durable op log
@@ -424,13 +461,14 @@ durable store. The write-authority split is therefore:
   amendments).* A decision file (`decisions/<record_id>.<uuid>.json`)
   REQUIRED body: `decision_id` (UUIDv7, body-carried - filename is not
   identity), `record_id`, the payload record's digest (binding),
-  `expected_review_state` AND `expected_sidecar_revision` (the state and
-  revision the wizard observed when the facilitator decided - the
-  compare-and-set premise; revision is what makes the CAS causally
-  stable: a `pending -> failed -> clear_failed -> pending` cycle changes
-  the revision even though the state returns, so a decision authored
-  against the old view fails CAS instead of admitting - the ABA hole is
-  closed), the decision type
+  `expected_review_state` AND `expected_decision_generation` (the state
+  and semantic generation the wizard observed when the facilitator
+  decided - the compare-and-set premise; the generation makes the CAS
+  causally stable: a `pending -> failed -> clear_failed -> pending`
+  cycle advances it even though the state returns, so a decision
+  authored against the old view fails CAS instead of admitting - while
+  audit-only recordings never advance it, so retry bookkeeping cannot
+  invalidate a current decision), the decision type
   (`approve | reject | set_aside_note | clear_failed`), reviewer, and
   timestamp. Versioned per I7.
 - *Native `cn intake apply` owns every mutation, admitting decisions
@@ -438,39 +476,48 @@ durable store. The write-authority split is therefore:
   processes decision files in deterministic order (timestamp, then
   decision_id): (a) verify the sidecar-payload binding and the decision's
   payload-digest binding; (b) DEDUP: if this `decision_id` already
-  appears in the history - same message digest -> `replay`, recorded
-  no-op; DIFFERENT message digest -> loud typed conflict (I3); (c) CAS:
-  if `expected_sidecar_revision` differs from the current
-  `sidecar_revision` (or the state differs), the decision is STALE - a
-  durable history entry with outcome `stale` is appended (revision
-  increments), it is reported (I12), retired unapplied, and surfaced in
-  the wizard (this also serializes two concurrent decisions: the first
-  admitted write increments the revision, so the second fails CAS - and
-  because EVERY admitted decision increments the revision, this holds
-  for note-only decisions too); (d) TRANSITION: only legal transitions
-  admit; anything else appends a durable `illegal` history entry and is
-  retired unapplied. Every decision type's exact effect (all increment
-  `sidecar_revision`): `approve`: `pending -> approved_intent` (with the
-  plan, below); `reject`: `pending -> rejected`; `set_aside_note`:
-  appends the note to history, `review_state` REMAINS `pending`
-  (revision CAS, not state change, is what invalidates older views);
-  `clear_failed`: `failed -> pending`, explicit disposition recorded.
-  For an admitted APPROVE, the plan (preassigned op ids, digests) is
-  generated and written in the SAME atomic sidecar replace that appends
-  the history entry and sets `approved_intent` - admission, history,
-  plan, and intent are ONE durable write, so a replayed decision can
-  NEVER generate a second plan (it hits the dedup rule instead).
+  appears in a DECISION event - same message digest -> replay: retire
+  the file against that existing durable entry, write NOTHING (round-6
+  amendment: the original entry is the retirement proof, so retry
+  bookkeeping cannot advance any counter); DIFFERENT message digest ->
+  loud typed conflict (I3); (c) CAS: if `expected_decision_generation`
+  differs from the current `decision_generation` (or the state differs),
+  the decision is STALE - a durable decision event with outcome `stale`
+  is appended (physical revision increments; the GENERATION does not, so
+  recording staleness can never invalidate a decision authored against
+  the current generation), reported (I12), retired unapplied, surfaced
+  in the wizard (two concurrent decisions serialize because the first
+  ADMITTED decision advances the generation, so the second fails CAS -
+  and every admitted decision advances it, note-only included); (d)
+  TRANSITION: only legal transitions admit; anything else appends a
+  durable `illegal` decision event (generation unchanged) and is retired
+  unapplied. Every decision type's exact effect (all ADMITTED decisions
+  advance `decision_generation`): `approve`:
+  `pending -> approved_intent` (with the plan, below); `reject`:
+  `pending -> rejected`; `set_aside_note`: appends the note,
+  `review_state` REMAINS `pending` (the generation advance, not a state
+  change, is what invalidates older views); `clear_failed`:
+  `failed -> pending`, explicit disposition recorded. For an admitted
+  APPROVE, the plan (preassigned op ids, digests) is generated and
+  written in the SAME atomic sidecar replace that appends the decision
+  event and sets `approved_intent` - admission, history, plan, and
+  intent are ONE durable write, so a replayed decision can NEVER
+  generate a second plan (it hits the dedup rule instead).
 - *Retire-after-durable, for every outcome.* A decision file is retired
   (atomic rename into `decisions/consumed/`, a tombstone kept until the
-  window-close sweep) only AFTER the sidecar write recording its outcome
-  - `admitted`, `stale`, `illegal`, or `replay` - is durable; stale and
-  illegal decisions get durable history entries too, not just run-report
-  lines. A crash between the sidecar write and retirement replays the
-  file into the dedup rule - a recorded no-op. Startup reconciliation of
-  the tombstone directory: a consumed tombstone whose `decision_id`
-  appears in no history entry of its record is an anomaly (it should be
-  impossible under the ordering rule) - reported loudly (I12), never
-  silently deleted. Sidecar rewrites, op appends, fsync, and fold all
+  window-close sweep) only AFTER a durable decision event records it -
+  `admitted`, `stale`, or `illegal` - or, for a same-digest replay,
+  against its ALREADY-durable original event (no new write). A crash
+  between the sidecar write and retirement replays the file into the
+  dedup rule - retired with no effect and no counter movement, which is
+  what makes crash retry transparent to later decisions (the round-6
+  sequence: note admitted at generation G -> crash before retirement ->
+  facilitator authors an approve against G+1 -> the replayed note
+  retires writeless -> the approve still admits). Startup reconciliation
+  of the tombstone directory: a consumed tombstone whose `decision_id`
+  appears in no decision event of its record is an anomaly (impossible
+  under the ordering rule) - reported loudly (I12), never silently
+  deleted. Sidecar rewrites, op appends, fsync, and fold all
   happen inside this one native critical section - the seam is invoked
   only where the durable store exists.
 - *The app renders; it does not fold authority.* After an apply run the
@@ -581,18 +628,23 @@ The transaction (all steps inside `cn intake apply`'s critical section):
 2. The batch goes through the seam (preflight on shadow state, authorized
    by the normal `PermAuthorizer` - no new write authority; append-absent;
    fsync; fold).
-3. On success, the sidecar is updated to `approved` with the submit report
-   reference. On FIRST-ATTEMPT typed failure (preflight denial or
-   quarantine - nothing appended), the sidecar returns to `pending` with
-   the failure in the decision history: loud, reviewable, no partial
-   state. On digest conflict, the sidecar goes to `failed` (terminal
-   investigation state) - never `pending`.
+3. The outcome is recorded as a TRANSACTION event linked to the admitting
+   decision_id (round-6 amendment - these are not decision events and are
+   never dedup targets; each is a state change, so each advances
+   `decision_generation`): on success, `intent_completed`
+   (`approved_intent -> approved`, with the submit report reference); on
+   FIRST-ATTEMPT typed failure (preflight denial or quarantine - nothing
+   appended), `preflight_failed` (`approved_intent -> pending`, the
+   failure recorded, loud, reviewable, no partial state); on digest
+   conflict, `durable_conflict` (`approved_intent -> failed`, terminal) -
+   never `pending`.
 
 Recovery (a sidecar found in `approved_intent` at startup, handled before
 any other queue work): classify the plan's op ids against the durable log.
 
 - ALL `present_same_digest`: the append completed before the crash.
-  Complete the sidecar to `approved` WITHOUT re-authorization - authority
+  Complete the sidecar to `approved` (recorded as the `intent_completed`
+  transaction event) WITHOUT re-authorization - authority
   was decided and durably marked at intent time; re-deciding it against
   post-crash state could mislabel already-durable graph mutations as
   pending, which is the round-3 blocker this rule closes.
@@ -608,8 +660,9 @@ any other queue work): classify the plan's op ids against the durable log.
   inconsistency, not a recoverable prefix - sidecar to `failed`, loud
   typed error, facilitator investigation. Classification by id does not
   prove a prefix; the prefix check is explicit.
-- ANY `present_conflicting_digest`: sidecar to `failed`, loud typed error,
-  facilitator investigation. Nothing appended, nothing deleted.
+- ANY `present_conflicting_digest`: sidecar to `failed` (the
+  `durable_conflict` transaction event), loud typed error, facilitator
+  investigation. Nothing appended, nothing deleted.
 - If the sidecar itself cannot be rewritten (I/O failure), the apply run
   HALTS loudly (I3) rather than proceeding to other work - a repeatedly
   encountered `approved_intent` is a stop condition, not a loop.
