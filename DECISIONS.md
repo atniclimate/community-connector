@@ -1336,3 +1336,22 @@ durable_conflict, linked by admitting decision_id, never dedup targets);
 admission tests in the blueprint. Round 7 is scoped by the reviewer to
 ONLY these two defects, with the four closures not to be reopened.
 ADR-005 remains DRAFT.
+
+## D-067 (2026-07-24) - ADR-005 round 7: both round-6 defects closed; seventh (surgical) amendment
+
+Round 7 (two-defect scope; review at
+`_reviews/community-connector/2026-07-24_adr-005-remote-intake-round7.md`,
+target HEAD 7892227) walked both mandated sequences CLEAN: the crash
+replay is transparent (writeless same-digest retirement; generation
+stable across audit writes) and stale-before-current admits correctly;
+the writeless-replay rule creates no new hole (stale/illegal originals
+are valid dedup targets). Remaining: one MAJOR - recovery's
+hole/out-of-order `approved_intent -> failed` transition had no
+transaction event in the tagged union - and one MINOR stale
+`revision+state CAS` phrase in the blueprint. Seventh amendment: fourth
+transaction variant `durable_inconsistency` (generation-advancing,
+serialization-tested, carried through blueprint approval.rs/seam
+tests/recovery), and the blueprint wording fix. Implementation gates
+noted by the reviewer (digest-bound tombstone reconciliation,
+fault-testing all decision outcomes) are recorded in the blueprint's
+test lists. Round 8 is verification-only on these two edits.

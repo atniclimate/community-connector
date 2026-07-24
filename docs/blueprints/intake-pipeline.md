@@ -48,13 +48,16 @@ therefore fixes the split this blueprint implements:
 - **Native `cn intake apply` owns every mutation.** Under the queue-root
   single-instance lock it consumes decision files through the ADR-005 D4
   admission table (binding checks, decision_id dedup by message digest,
-  revision+state CAS, legal transitions). For an admitted approve,
+  decision-generation+state CAS, legal transitions). For an admitted approve,
   admission + history entry + plan + `approved_intent` are ONE atomic
   sidecar replace (never an append-then-plan sequence); the durable seam
   (shadow-state preflight) and completion follow against the real
   `OpLog`, with post-admission outcomes recorded as TRANSACTION events
-  (intent_completed / preflight_failed / durable_conflict) linked to the
-  admitting decision_id. Outcomes `admitted | stale | illegal` get a
+  (intent_completed / preflight_failed / durable_conflict /
+  durable_inconsistency - the last for hole/out-of-order recovery
+  patterns) linked to the admitting decision_id, each advancing the
+  decision generation; the tagged union's serialization is tested for
+  all four. Outcomes `admitted | stale | illegal` get a
   durable decision event BEFORE the file is retired into
   `decisions/consumed/` tombstones; a same-digest REPLAY retires against
   its already-durable original event with NO new write (round 6 - retry
@@ -164,8 +167,8 @@ network code enters any core crate (ADR-005 D1 fence).
   population. Recovery follows the ADR-005 intent-as-authorization-marker
   rules: all-present completes WITHOUT re-authorization; a mixed pattern
   completes ONLY as exact contiguous prefix + absent suffix; any hole or
-  out-of-order presence -> terminal `failed`; digest conflict -> terminal
-  `failed`.
+  out-of-order presence -> terminal `failed` via `durable_inconsistency`;
+  digest conflict -> terminal `failed` via `durable_conflict`.
 - **cn-store additive seam (ADR-005 D4 - lands FIRST, native-only like
   the log module):** `append_batch_idempotent(log, state, batch) ->
   per-op {absent_appended | present_same_digest |
@@ -181,9 +184,9 @@ network code enters any core crate (ADR-005 D1 fence).
   produces zero duplicate log lines; conflicting digest halts with
   nothing appended; a contiguous-prefix presence appends exactly the
   absent suffix without re-authorization; a HOLE or out-of-order
-  presence goes terminal `failed` with nothing appended (negative case
-  required); a batch whose preflight quarantines fails entirely with
-  nothing appended.
+  presence goes terminal `failed` as `durable_inconsistency` with
+  nothing appended (negative case required); a batch whose preflight
+  quarantines fails entirely with nothing appended.
 - **cn-model additive extension (ADR-005 D5, round-4 scoping):** the
   optional `intake` block (own `intake_block_version`) on
   `ProvenanceEnvelope` (record_id, receipt_id, submission_id,

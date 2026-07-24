@@ -1,7 +1,7 @@
 # ADR-005: Remote Intake - Sealed-Envelope Relay and Facilitator Pending-Review Queue
 
-- Status: DRAFT - rounds 1-6 FAIL judged and amended 2026-07-24; pending round 7
-- Date: 2026-07-24 (amended six times same day after adversarial rounds 1-6)
+- Status: DRAFT - rounds 1-7 FAIL judged and amended 2026-07-24; pending round 8
+- Date: 2026-07-24 (amended seven times same day after adversarial rounds 1-7)
 - Phase: 3 (intake pipeline P3.5/P3.6 plus the D-053 relay; deploy gated on the
   D-059.8 deploy bar)
 - Drivers: R3 (data entry and ingestion), R5 as amended by D-053 (one remote
@@ -96,6 +96,15 @@
   an `event_kind` discriminant (decision vs transaction events, dedup
   indexing decision events only). Both reviewer-supplied failure
   sequences become mandatory admission tests in the blueprint.
+- Adversarial round 7: FAIL (same lane, at 7892227; two-defect scope) -
+  both round-6 defects closed (the crash and stale-before-current
+  sequences walk clean; the writeless-replay rule creates no new hole),
+  leaving one MAJOR (the hole/out-of-order recovery transition
+  `approved_intent -> failed` had no transaction event) and one MINOR
+  (a stale `revision+state CAS` phrase in the blueprint). Seventh
+  amendment: the `durable_inconsistency` transaction event (fourth
+  variant, generation-advancing, serialization-tested) and the blueprint
+  wording fix.
 
 ## Context
 
@@ -437,9 +446,13 @@ is superseded).** Every history entry carries an `event_kind`:
   AFTER admission, linked by the admitting `decision_id`:
   `intent_completed` (`approved_intent -> approved`, with the submit
   report reference), `preflight_failed`
-  (`approved_intent -> pending`, with the typed failure), or
-  `durable_conflict` (`approved_intent -> failed`). A transaction event
-  is not a decision and is never a dedup target.
+  (`approved_intent -> pending`, with the typed failure),
+  `durable_conflict` (`approved_intent -> failed`, conflicting bytes for
+  a preassigned op id), or `durable_inconsistency`
+  (`approved_intent -> failed`, an impossible hole or out-of-order
+  durable-log presence found by recovery - round-7 amendment; each of
+  these is a state change and advances `decision_generation`). A
+  transaction event is not a decision and is never a dedup target.
 
 Decision-id dedup indexes DECISION events only; a transaction event can
 never be mistaken for a second decision message.
@@ -657,9 +670,10 @@ any other queue work): classify the plan's op ids against the durable log.
   fsync, fold, complete to `approved`. No re-authorization - the marker,
   not post-crash authority, governs.
 - MIXED in ANY other pattern (a hole, out-of-order presence): this is
-  inconsistency, not a recoverable prefix - sidecar to `failed`, loud
-  typed error, facilitator investigation. Classification by id does not
-  prove a prefix; the prefix check is explicit.
+  inconsistency, not a recoverable prefix - sidecar to `failed`,
+  recorded as the `durable_inconsistency` transaction event, loud typed
+  error, facilitator investigation. Classification by id does not prove
+  a prefix; the prefix check is explicit.
 - ANY `present_conflicting_digest`: sidecar to `failed` (the
   `durable_conflict` transaction event), loud typed error, facilitator
   investigation. Nothing appended, nothing deleted.
