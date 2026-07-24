@@ -274,9 +274,17 @@ stands).
 
 1. Immediately pull and durably stage everything currently on the relay,
    then wipe it (normal pull path - this shrinks the exposed set).
-2. Take the form down / pause QR distribution.
-3. Run the full ceremony again on a machine believed clean; destroy the old
-   key's printed sheet and wipe the old USB.
+2. Take the form down / pause QR distribution; remove the leaked key's
+   fingerprint from the relay admission allowlist (the emergency cutoff).
+3. Run the full ceremony again on a machine believed clean. Do NOT
+   destroy the old key's recovery copies yet: destruction follows the
+   same rule as every rotation (ADR-005 D3) - completed cutoff epoch +
+   one relay TTL + clean ledger reconciliation - because envelopes
+   admitted under the old key before cutoff completion must remain
+   decryptable; destroying the only recovery copies during the drain
+   interval could strand consented submissions. (The leaked key is a
+   CONFIDENTIALITY loss either way; early destruction adds an
+   AVAILABILITY loss for nothing.)
 4. Redeploy the form with the new key, out-of-band verify, re-pin the
    puller.
 5. Treat every submission from the suspected exposure window through the
@@ -293,12 +301,15 @@ Same steps as 8.1 minus the loss accounting: drain the relay under the old
 key FIRST (pull, decrypt, stage, wipe), then ceremony, redeploy, verify,
 re-pin. Zero submissions are stranded if the relay is drained before the
 form flips. Destruction timing follows ADR-005 D3's cutoff rule - NOT
-"as soon as the last visible ciphertext is staged": after the relay
-admission allowlist drops the old fingerprint (a stale open tab then gets
-a visible "reload the form" rejection instead of silently sealing to a
-dead key), the old key and its backups are retained for one further relay
-TTL and destroyed only after ledger reconciliation shows no unaccounted
-old-key receipt.
+"as soon as the last visible ciphertext is staged": from the COMPLETED
+cutoff epoch (D6: confirmed revision acknowledgement + propagation bound
++ request deadline, re-verified current at completion - not the moment
+the allowlist edit was requested), a stale open tab gets a visible
+"reload the form" rejection instead of silently sealing to a dead key,
+and the old key and ALL its recovery copies are retained for one further
+relay TTL past that epoch, destroyed only after ledger reconciliation
+shows no unaccounted old-key receipt. This same rule governs planned
+(8.3) and emergency (8.2) rotations alike.
 
 ## 9. Ceremony checklist
 
@@ -382,10 +393,10 @@ CLOSE
   libsodium-sys) - decided by the cross-implementation test vectors, not by
   preference.
 - ~~Whether the deploy manifest should be signed with a second key~~
-  RESOLVED by ADR-005 rounds 1-3: the served manifest is non-authoritative
-  and never read as an authority, so signing it protects nothing; the
-  locally built, off-origin pinned manifest is the trust root (ADR-005 D8,
-  rejected option 9).
+  RESOLVED by ADR-005 rounds 1-5: the manifest is NOT deployed at all
+  (D8's no-deploy rule - the deployed set is exactly its listed files),
+  so there is nothing served to sign; the locally built, off-origin
+  pinned manifest is the trust root (ADR-005 D8, rejected option 9).
 - Exact placement and format of the puller's pinned-fingerprint config
   within the off-repo facilitator ops directory (belongs with the pending-
   review queue persistence design, D-056.1).

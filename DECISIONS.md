@@ -1270,3 +1270,40 @@ Fourth amendment choices:
 Round 5 (narrow, per the reviewer): decision-inbox crash/idempotency,
 prefix validation, provenance-version migration, manifest recovery,
 cutoff receipt semantics, corrected blueprint. ADR-005 remains DRAFT.
+
+## D-065 (2026-07-24) - ADR-005 round 5: FAIL judged valid; fifth amendment - revision CAS, digest projection
+
+Round 5 (narrow; review at
+`_reviews/community-connector/2026-07-24_adr-005-remote-intake-round5.md`,
+target HEAD e19f7bf) confirmed closed: prefix rule (in the ADR), hard-cap
+sweep, provenance patch-bump direction and modeled-value carrier (checked
+against accepts_schema/op.rs/fold.rs), redundant sweep manifest. Still
+FAIL on: (1) state-only CAS has an ABA hole through legal
+failed->clear_failed->pending and the history schema contradicted the
+dedup rule; set_aside_note had no defined state effect; stale decisions
+had no durable disposition; (2) in-payload batch_digest was circular;
+(3) D3 claimed "provable/enforced" beyond the cutoff's assumption branch;
+the ceremony destroyed old-key recovery copies before the drain in the
+leakage path and used pre-amendment timing in the planned path; (4) the
+blueprint had not carried atomic admission or prefix-only recovery
+through. All judged valid.
+
+Fifth amendment: monotonic `sidecar_revision` on every rewrite +
+`expected_sidecar_revision` in every decision (revision+state CAS closes
+the ABA); ONE authoritative history-entry schema (decision_id, canonical
+message digest, type, prior/resulting state+revision, outcome
+admitted|stale|illegal|replay; same id + different digest = loud
+conflict); every decision type's exact effect defined (set_aside_note
+keeps pending, bumps revision); durable stale/illegal history entries
+BEFORE retirement + tombstone/history startup reconciliation;
+`batch_digest` = SHA-256 over the pre-link projection (planned ops with
+intake.batch_digest omitted), per-op durable-log digests after
+population, consumers named; two-branch cutoff honesty (documented bound
+= enforced; observed-bound assumption = stated accepted residual or
+defer destruction) + revision-currency recheck at epoch completion +
+one destruction rule for planned AND emergency rotations (ceremony 8.2
+no longer destroys recovery copies early); blueprint carry-through
+(atomic admission+history+plan+intent, retire-after-durable tombstones,
+prefix-only + negative tests, pending+marker rows, file-conflict
+narrowing); ceremony open-question manifest sentence fixed. Round 6
+(narrow) pending; ADR-005 remains DRAFT.

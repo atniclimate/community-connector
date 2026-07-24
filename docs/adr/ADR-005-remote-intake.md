@@ -1,7 +1,7 @@
 # ADR-005: Remote Intake - Sealed-Envelope Relay and Facilitator Pending-Review Queue
 
-- Status: DRAFT - rounds 1-4 FAIL judged and amended 2026-07-24; pending round 5
-- Date: 2026-07-24 (amended four times same day after adversarial rounds 1-4)
+- Status: DRAFT - rounds 1-5 FAIL judged and amended 2026-07-24; pending round 6
+- Date: 2026-07-24 (amended five times same day after adversarial rounds 1-5)
 - Phase: 3 (intake pipeline P3.5/P3.6 plus the D-053 relay; deploy gated on the
   D-059.8 deploy bar)
 - Drivers: R3 (data entry and ingestion), R5 as amended by D-053 (one remote
@@ -66,6 +66,21 @@
   manifest, cutoff anchored to confirmed revision acknowledgement,
   overshoot honesty, blueprint sweep, and no-deploy rule for the served
   manifest copy.
+- Adversarial round 5: FAIL (same lane, at e19f7bf; narrow) - the state-only
+  CAS had an ABA hole through the legal `failed -> pending` cycle and the
+  history schema contradicted the dedup rule; the in-payload `batch_digest`
+  was circular; D3's "provable/enforced" language exceeded the cutoff's
+  assumption branch and the ceremony destroyed old-key recovery copies too
+  early; the blueprint had not carried the atomic-admission and prefix
+  rules through. Closed as valid: prefix rule (in the ADR), hard-cap sweep,
+  provenance direction and carrier, manifest survival. Fifth amendment:
+  monotonic `sidecar_revision` CAS, one authoritative history-entry schema
+  (decision_id + message digest + prior/resulting revision/state +
+  outcome), defined `set_aside_note` effect, durable stale/illegal
+  disposition before retirement with tombstone reconciliation, the
+  pre-link batch-digest projection, two-branch cutoff honesty with a
+  revision-currency recheck, ceremony destruction-timing unification, and
+  the blueprint carry-through.
 
 ## Context
 
@@ -263,8 +278,15 @@ Rotation is never a simple form flip, because cached pages and open tabs
 can produce old-key ciphertext after a redeploy. The enforcement point is
 the relay: the Worker validates the outer `recipient_key_fingerprint`
 against its configured admission allowlist (D6) - a cleartext field, so no
-content access is needed - which makes "no more old-key envelopes" a
-provable state rather than an estimate:
+content access is needed. How strong that makes "no more old-key
+envelopes" depends on which D6 cutoff branch applies (round-5 honesty):
+with a provider-DOCUMENTED propagation bound, the state is enforced; on
+the observed-bound-assumption branch, old-key destruction proceeds only
+under that stated, accepted residual (late propagation could admit an
+old-key envelope after the assumed epoch; it would then decrypt with a
+destroyed key's absence - i.e., be lost like an expired submission,
+visibly reconciled via the ledger), or the facilitator may choose to
+defer destruction until a documented bound exists:
 
 1. Pause distribution: stop presenting the QR / announce the pause window.
 2. Drain: pull and reconcile the relay via the D6 receipt ledger until
@@ -283,9 +305,13 @@ provable state rather than an estimate:
    (envelopes admitted before cutover can still be pulled and decrypted;
    the queue records `key_used`).
 6. Destroy the old key and its backups only after that TTL has elapsed
-   AND ledger reconciliation shows no unaccounted old-key receipt.
-   "No old-key envelope can still arrive" is then enforced by admission,
-   not assumed from an open-tab allowance.
+   AND ledger reconciliation shows no unaccounted old-key receipt. On the
+   documented-bound branch this is enforced by admission; on the
+   assumption branch it is conditional on the stated propagation residual
+   (above) - the text claims no more than the branch supports. This
+   destruction rule applies to EVERY rotation, planned or emergency: no
+   recovery copy of a key is destroyed before its completed cutoff epoch
+   + TTL + clean reconciliation (the ceremony carries the same rule).
 
 Accepted residual: a submitter on a stale tab after cutover must reload
 and resubmit; their attempted submission is refused visibly, not lost
@@ -356,18 +382,30 @@ modified; it holds:
 The sidecar holds mutable review state: `review_state`
 (`pending | approved_intent | approved | rejected | failed` - the
 write-ahead state AND the terminal investigation state are part of the
-versioned persisted enum, not implementation details), the full decision
-history (array of `{state, reviewer, decided_at, reason}` - never
-overwritten, only appended to), reviewer notes, validation-report
-reference, near-duplicate candidates surfaced and the facilitator's
-disposition, and - in `approved_intent` and beyond - the approval
-transaction fields below. `failed` is terminal-until-investigated: it
-records a digest conflict or partial-inconsistency outcome, blocks any
-retry, and only an explicit facilitator disposition (a history-recorded
-transition) can return the record to `pending` - a retry can therefore
-never sidestep conflict evidence by regenerating fresh op ids. Sidecar
-updates use the atomic-replace protocol below, and the history array means
-a rewritten sidecar still carries every prior decision.
+versioned persisted enum, not implementation details), a monotonic
+`sidecar_revision` (round-5 amendment: incremented by EVERY sidecar
+rewrite, including note-only and disposition writes - the compare-and-set
+authority that state equality alone cannot provide), the full decision
+history (append-only), reviewer notes, validation-report reference,
+near-duplicate candidates surfaced and the facilitator's disposition,
+and - in `approved_intent` and beyond - the approval transaction fields
+below. `failed` is terminal-until-investigated: it records a digest
+conflict or partial-inconsistency outcome, blocks any retry, and only an
+explicit facilitator disposition (a history-recorded transition) can
+return the record to `pending` - a retry can therefore never sidestep
+conflict evidence by regenerating fresh op ids. Sidecar updates use the
+atomic-replace protocol below, and the history array means a rewritten
+sidecar still carries every prior decision.
+
+**One authoritative history-entry schema (round-5 amendment - this is THE
+history shape; any shorter description elsewhere is superseded).** Every
+history entry records: `decision_id`, the canonical decision-MESSAGE
+digest (so a reused id with different bytes is detectable), the decision
+type, `prior_state`/`prior_revision`, `resulting_state`/
+`resulting_revision`, reviewer, `decided_at`, reason, and `outcome`
+(`admitted | stale | illegal | replay`). The same `decision_id` with a
+DIFFERENT message digest is a loud typed conflict (I3), never conflated
+with a replay.
 
 **The durable owner and the create-only app (round-3 amendment - this
 supersedes any browser-side approval write path).** The durable op log
@@ -382,12 +420,17 @@ durable store. The write-authority split is therefore:
   corrupt authoritative state. Create-only prevents FILE conflicts, not
   SEMANTIC ones (a stale wizard view can still author a decision that no
   longer applies) - semantic admission is the native owner's job, below.
-- *The decision inbox is a message protocol, not loose files (round-4
-  amendment).* A decision file (`decisions/<record_id>.<uuid>.json`)
+- *The decision inbox is a message protocol, not loose files (rounds 4-5
+  amendments).* A decision file (`decisions/<record_id>.<uuid>.json`)
   REQUIRED body: `decision_id` (UUIDv7, body-carried - filename is not
   identity), `record_id`, the payload record's digest (binding),
-  `expected_review_state` (the sidecar state the wizard observed when the
-  facilitator decided - the compare-and-set premise), the decision type
+  `expected_review_state` AND `expected_sidecar_revision` (the state and
+  revision the wizard observed when the facilitator decided - the
+  compare-and-set premise; revision is what makes the CAS causally
+  stable: a `pending -> failed -> clear_failed -> pending` cycle changes
+  the revision even though the state returns, so a decision authored
+  against the old view fails CAS instead of admitting - the ABA hole is
+  closed), the decision type
   (`approve | reject | set_aside_note | clear_failed`), reviewer, and
   timestamp. Versioned per I7.
 - *Native `cn intake apply` owns every mutation, admitting decisions
@@ -395,29 +438,41 @@ durable store. The write-authority split is therefore:
   processes decision files in deterministic order (timestamp, then
   decision_id): (a) verify the sidecar-payload binding and the decision's
   payload-digest binding; (b) DEDUP: if this `decision_id` already
-  appears in the sidecar's history, the file is a replay - recorded
-  no-op, retire it; (c) CAS: if `expected_review_state` differs from the
-  sidecar's current state, the decision is STALE - a typed
-  `stale_decision` outcome in the run report (I12), retired unapplied,
-  surfaced in the wizard (this is also how the second of two concurrent
-  decisions for one record resolves: the first admitted decision changes
-  the state, the second fails CAS); (d) TRANSITION: only legal
-  transitions admit (`pending -> approve/reject/set_aside`;
-  `failed -> pending` only via an explicit `clear_failed` disposition);
-  anything else is a typed error. For an admitted APPROVE, the plan
-  (preassigned op ids, digests) is generated and written into the sidecar
-  in the SAME atomic sidecar replace that records the decision_id in
-  history and sets `approved_intent` - admission, plan, and intent are
-  one durable write, so a replayed decision can NEVER generate a second
-  plan (it hits the dedup rule instead). Every history entry records the
-  `decision_id` that caused it.
-- *Retire-after-durable.* A decision file is retired (atomic rename into
-  `decisions/consumed/`, a tombstone kept until the window-close sweep)
-  only AFTER the sidecar write that admitted or rejected it is durable.
-  A crash between the sidecar write and retirement replays the file into
-  the dedup or CAS rule - a recorded no-op. Sidecar rewrites, op appends,
-  fsync, and fold all happen inside this one native critical section -
-  the seam is invoked only where the durable store exists.
+  appears in the history - same message digest -> `replay`, recorded
+  no-op; DIFFERENT message digest -> loud typed conflict (I3); (c) CAS:
+  if `expected_sidecar_revision` differs from the current
+  `sidecar_revision` (or the state differs), the decision is STALE - a
+  durable history entry with outcome `stale` is appended (revision
+  increments), it is reported (I12), retired unapplied, and surfaced in
+  the wizard (this also serializes two concurrent decisions: the first
+  admitted write increments the revision, so the second fails CAS - and
+  because EVERY admitted decision increments the revision, this holds
+  for note-only decisions too); (d) TRANSITION: only legal transitions
+  admit; anything else appends a durable `illegal` history entry and is
+  retired unapplied. Every decision type's exact effect (all increment
+  `sidecar_revision`): `approve`: `pending -> approved_intent` (with the
+  plan, below); `reject`: `pending -> rejected`; `set_aside_note`:
+  appends the note to history, `review_state` REMAINS `pending`
+  (revision CAS, not state change, is what invalidates older views);
+  `clear_failed`: `failed -> pending`, explicit disposition recorded.
+  For an admitted APPROVE, the plan (preassigned op ids, digests) is
+  generated and written in the SAME atomic sidecar replace that appends
+  the history entry and sets `approved_intent` - admission, history,
+  plan, and intent are ONE durable write, so a replayed decision can
+  NEVER generate a second plan (it hits the dedup rule instead).
+- *Retire-after-durable, for every outcome.* A decision file is retired
+  (atomic rename into `decisions/consumed/`, a tombstone kept until the
+  window-close sweep) only AFTER the sidecar write recording its outcome
+  - `admitted`, `stale`, `illegal`, or `replay` - is durable; stale and
+  illegal decisions get durable history entries too, not just run-report
+  lines. A crash between the sidecar write and retirement replays the
+  file into the dedup rule - a recorded no-op. Startup reconciliation of
+  the tombstone directory: a consumed tombstone whose `decision_id`
+  appears in no history entry of its record is an anomaly (it should be
+  impossible under the ordering rule) - reported loudly (I12), never
+  silently deleted. Sidecar rewrites, op appends, fsync, and fold all
+  happen inside this one native critical section - the seam is invoked
+  only where the durable store exists.
 - *The app renders; it does not fold authority.* After an apply run the
   facilitator reloads the group in the app (the existing load path) to see
   approved entries; the wizard surfaces staged-but-unapplied decisions and
@@ -677,6 +732,19 @@ the approval batch's ops - NOT stamped at fold time (round-4 correction
 of a factually wrong claim). Every intake-created modeled value that
 owns an envelope carries the block; ADR-002's op format is untouched.
 
+*The batch digest is non-circular by definition (round-5 amendment).* A
+digest embedded in the bytes it digests is uncomputable, so two digest
+domains are defined explicitly: `batch_digest` is SHA-256 over the
+canonical serialization of the planned ops WITH every
+`intake.batch_digest` field OMITTED (the pre-link projection); that
+value is then populated into the modeled values' intake blocks; the
+per-op canonical digests used by durable-log classification are computed
+AFTER population, over each op's final bytes. Which digest each consumer
+means: the sweep manifest and the provenance `batch_digest` field carry
+the pre-link batch digest; the seam and recovery classification use the
+final per-op digests. Both live in the plan, so recovery and audit never
+guess.
+
 Every entity and edge produced by an approved submission carries the full
 provenance envelope. Round-1 amendment: values are recorded WITH their
 trust status - `source_asserted` (client-controlled claims), or locally
@@ -841,11 +909,15 @@ response for that config version - a submitted, failed, delayed, or
 rolled-back edit starts no clock) + a documented propagation bound (the
 provider's documented propagation guarantee where one exists; where the
 provider documents none, a stated observed-bound-times-safety-factor
-recorded in the runbook AS AN ASSUMPTION, not a proof) + the enforced
+recorded in the runbook AS AN ASSUMPTION, not a proof - D3's rotation
+claims are correspondingly conditional on this branch) + the enforced
 maximum request duration (the Workers platform's hard request limit, an
-actual enforced bound). The final old-key TTL and the destruction clock
-start from that completed epoch, never from the moment the edit was
-requested.
+actual enforced bound). At epoch completion the operator RE-VERIFIES that
+the acknowledged revision is still the current configuration (a
+superseded or rolled-back revision during the interval voids the epoch
+and restarts the clock - round-5 amendment). The final old-key TTL and
+the destruction clock start from that completed, re-verified epoch, never
+from the moment the edit was requested.
 
 **Logging and metadata discipline.** The Worker logs no bodies, no
 ciphertext, and no authorization headers; request metadata logging is
