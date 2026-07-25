@@ -1717,3 +1717,29 @@ production interactive path itself, .rs/.ts/archive content bypasses in
 the tripwire (defense-in-depth disclaimer stands), and the D-068 deploy
 gates (fault-injection breadth, quiescent provenance deployment,
 provider runbook, ceremony rehearsal). Round 4 verification follows.
+
+## D-079 (2026-07-25) - Implementation adversarial round 4: FAIL on one residue, amended
+
+Round 4 (review at _reviews/community-connector/
+2026-07-25_intake-pipeline-impl-round4.md, target HEAD 426bb3c) closed
+F9 outright (full end-to-end value contract incl. geo, NFC, byte caps),
+confirmed persistence visibility, the self-test ordering, and judged
+the step-9 blueprint amendment coherent - and failed on exactly one
+remaining item: `ensure_marker` still used the error-collapsing
+`exists()` and would have accepted a directory or symlink squatting on
+the `.reviewed` name as the durable marker, silently losing the
+lost-decision attention state on a later crash. Amended: the marker
+check is a fallible `symlink_metadata` match - a regular file counts,
+NotFound creates atomically, and any other object or IO error halts
+loudly (I3); a CLI integration test proves a directory squatter halts
+the run with nothing admitted, retired, or appended. Also added per the
+round's recommendations: focused core regressions (geo exact-key and
+range rejection, hostile region names, NFC-normalized storage, the
+warning-only synthetic digest shape) and app advisory byte checks for
+tag members and geo place names (core stays authoritative). The
+reviewer's explicit judgment: with this predicate fixed, the remaining
+open set is exactly the four honestly recorded debts (browser
+IndexedDB/FSA tests, the August-pilot production path per the amended
+step 9, tripwire source/archive bypasses under the defense-in-depth
+disclaimer, and the D-068/D-059.8 deploy gates) and PASS-WITH-NOTES
+becomes warranted. Round 5 verifies.

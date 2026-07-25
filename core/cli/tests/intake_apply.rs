@@ -867,3 +867,45 @@ fn quarantined_durable_plan_is_sticky_failed_across_runs() {
     );
     assert_eq!(ops_line_count(&ops), lines_after_one, "no further appends");
 }
+
+/// Round-4 F3: a directory squatting on the `.reviewed` marker name is
+/// NOT the marker - admission halts loudly with nothing admitted,
+/// nothing retired, and nothing appended.
+#[test]
+fn non_file_marker_object_halts_instead_of_counting_as_the_marker() {
+    let (_dir, queue, ops) = setup();
+    write_ops_log(&ops, true);
+    let record = staged_record(&uuid_string(0xEB));
+    let sidecar_before = stage_pair(&queue, &record);
+    let file = drop_decision(
+        &queue,
+        &decision_message(
+            &record,
+            &uuid_string(0xDC),
+            100,
+            ReviewState::Pending,
+            0,
+            DecisionType::Approve,
+        ),
+    );
+    // A DIRECTORY occupies the marker name.
+    fs::create_dir(queue.join(format!("{}.reviewed", record.record_id))).expect("squatter");
+
+    let outcome = run_apply(&queue, &ops);
+    assert_eq!(outcome.exit, cn::Exit::Failure, "halt required");
+    assert!(
+        outcome
+            .report
+            .map(|r| r["halts"].to_string())
+            .unwrap_or_default()
+            .contains("non-file"),
+        "the malformed marker is named in the halts"
+    );
+    assert!(file.exists(), "decision file not retired");
+    let unchanged = read_sidecar(&queue, &record.record_id);
+    assert_eq!(
+        unchanged.sidecar_revision, sidecar_before.sidecar_revision,
+        "nothing admitted"
+    );
+    assert_eq!(ops_line_count(&ops), 2, "nothing appended");
+}

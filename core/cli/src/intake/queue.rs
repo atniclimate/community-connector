@@ -244,10 +244,24 @@ pub(crate) fn write_atomic(final_path: &Path, bytes: &[u8]) -> Result<(), String
 /// marker-before-first-decision, ADR-005 D4).
 pub(crate) fn ensure_marker(paths: &QueuePaths, record_id: &str) -> Result<(), String> {
     let marker = paths.marker(record_id);
-    if marker.exists() {
-        return Ok(());
+    // Fallible metadata, regular-file-only (round-4 F3): a directory or
+    // symlink squatting on the marker name is NOT the marker - startup
+    // only recognizes regular files, so accepting it here would silently
+    // lose the lost-decision attention state. Only NotFound creates.
+    match fs::symlink_metadata(&marker) {
+        Ok(meta) if meta.is_file() => Ok(()),
+        Ok(meta) => Err(format!(
+            "'{}' is occupied by a non-file object ({:?}); the review-begun marker \
+             must be a regular file - halting for facilitator investigation (I3)",
+            marker.display(),
+            meta.file_type()
+        )),
+        Err(io_err) if io_err.kind() == std::io::ErrorKind::NotFound => write_atomic(&marker, b""),
+        Err(io_err) => Err(format!(
+            "cannot stat marker '{}' ({io_err}); refusing to proceed blind (I3)",
+            marker.display()
+        )),
     }
-    write_atomic(&marker, b"")
 }
 
 /// One record's files as found on disk (paired with cn-ingest's

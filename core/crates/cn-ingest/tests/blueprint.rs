@@ -1314,3 +1314,116 @@ fn nested_extras_survive_on_plan_and_transaction_entries_too() {
     assert_eq!(round_tripped["plan"]["future_plan_field"], "kept");
     assert_eq!(round_tripped["history"][1]["future_tx_field"], "kept");
 }
+
+#[test]
+fn geo_contract_is_deep_and_range_checked() {
+    let template = plan_template();
+
+    let mut extra_keys = payload();
+    extra_keys["fields"]["hq"] = json!({ "lat": 45.0, "lon": -122.0, "note": "x" });
+    // hq is not a template attribute of person; use a template with geo -
+    // reuse the field-allowlist error instead for unknown fields, and
+    // check the geo shape on a synthetic geo AttrDef directly below.
+    assert!(
+        validate_submission(&extra_keys, &template)
+            .errors
+            .iter()
+            .any(|e| e.contains("hq")),
+        "unknown field still rejected"
+    );
+
+    // Direct geo AttrDef checks via a template that carries one.
+    let geo_template_json = r##"{
+        "schema_version": "0.1.0",
+        "template_id": "geo",
+        "name": "Geo",
+        "description": "Synthetic",
+        "kinds": [{
+            "id": "person",
+            "label": "Person",
+            "shape": "sphere",
+            "color_role": "kind-1",
+            "attributes": [
+                { "id": "display_name", "type": "text", "required": true },
+                { "id": "location", "type": "geo" }
+            ]
+        }],
+        "edge_kinds": [],
+        "theme": { "mode": "light", "roles": { "kind-1": "#112233" } }
+    }"##;
+    let (geo_template, report) = cn_schema::parse_template(geo_template_json).expect("template");
+    assert!(report.errors.is_empty());
+
+    let mut extra_geo_key = payload();
+    extra_geo_key["fields"] =
+        json!({ "display_name": "Geo Person", "location": { "lat": 45.0, "lon": -122.0, "z": 1 } });
+    assert!(
+        validate_submission(&extra_geo_key, &geo_template)
+            .errors
+            .iter()
+            .any(|e| e.contains("exactly")),
+        "unknown geo keys rejected"
+    );
+
+    let mut out_of_range = payload();
+    out_of_range["fields"] =
+        json!({ "display_name": "Geo Person", "location": { "lat": 200.0, "lon": 0.0 } });
+    assert!(
+        validate_submission(&out_of_range, &geo_template)
+            .errors
+            .iter()
+            .any(|e| e.contains("location")),
+        "out-of-range point rejected via the shared mapper"
+    );
+
+    let mut hostile_region = payload();
+    hostile_region["fields"] =
+        json!({ "display_name": "Geo Person", "location": { "name": "Bad\u{0007}Water" } });
+    assert!(
+        validate_submission(&hostile_region, &geo_template)
+            .errors
+            .iter()
+            .any(|e| e.contains("location.name")),
+        "region names take the full hazard checks"
+    );
+}
+
+#[test]
+fn stored_text_is_nfc_normalized_and_digest_shape_warns_only() {
+    let template = plan_template();
+    // U+0065 U+0301 (e + combining acute) normalizes to U+00E9 under NFC.
+    let mut decomposed = payload();
+    decomposed["fields"]["display_name"] = json!("Jose\u{0301}");
+    let record = QueueRecord::new(
+        "rec-nfc".to_string(),
+        ts(30),
+        SubmissionSource::InApp {},
+        decomposed,
+    )
+    .expect("record");
+    let plan = plan_approval(
+        &record,
+        &template,
+        &plan_context(),
+        &mut deterministic_ids(),
+    )
+    .expect("plan");
+    let cn_store::OpKind::EntityCreate { entity } = &plan.ops[0].kind else {
+        panic!("expected EntityCreate");
+    };
+    let name_attr = cn_model::AttrId::new("display_name").expect("attr");
+    let Some(cn_model::AttributeValue::Text(stored)) =
+        entity.attributes.get(&name_attr).map(|a| &a.value)
+    else {
+        panic!("expected text value");
+    };
+    assert_eq!(stored, "Jos\u{00e9}", "stored value is NFC-normalized");
+
+    // Synthetic marker digests warn, never reject (D-078.3).
+    let findings = validate_submission(&payload(), &template);
+    assert!(findings.errors.is_empty());
+    assert!(
+        findings.warnings.iter().any(|w| w.contains("sha-256")),
+        "non-hex digest shape is a warning: {findings:?}"
+    );
+}

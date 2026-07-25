@@ -167,8 +167,22 @@ export function advisoryIssues(attr: FormAttr, raw: RawFieldValue): readonly str
   if (typeof value === "string" && utf8Bytes(value) > TEXT_MAX_BYTES) {
     issues.push(`Keep this under ${TEXT_MAX_BYTES} bytes.`);
   }
-  if (Array.isArray(value) && value.length > TAGS_MAX_ITEMS) {
-    issues.push(`List at most ${TAGS_MAX_ITEMS} items.`);
+  if (Array.isArray(value)) {
+    if (value.length > TAGS_MAX_ITEMS) {
+      issues.push(`List at most ${TAGS_MAX_ITEMS} items.`);
+    }
+    if (value.some((item) => typeof item === "string" && utf8Bytes(item) > TEXT_MAX_BYTES)) {
+      issues.push(`Keep each item under ${TEXT_MAX_BYTES} bytes.`);
+    }
+  }
+  if (
+    typeof value === "object" &&
+    value !== null &&
+    !Array.isArray(value) &&
+    typeof (value as { readonly name?: unknown }).name === "string" &&
+    utf8Bytes((value as { readonly name: string }).name) > TEXT_MAX_BYTES
+  ) {
+    issues.push(`Keep the place name under ${TEXT_MAX_BYTES} bytes.`);
   }
   if (
     attr.attrType === "enum" &&
