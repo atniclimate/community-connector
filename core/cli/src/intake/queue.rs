@@ -127,26 +127,55 @@ pub(crate) fn acquire_lock(paths: &QueuePaths) -> Result<QueueLock, String> {
     }
 }
 
-/// True when this platform supports flushing a directory handle. When it
-/// does not (Windows), the run report carries the ADR-005 degraded-platform
-/// WARN instead of a silent downgrade.
-pub(crate) fn dir_sync_supported() -> bool {
-    cfg!(unix)
+/// Directory-handle flush capability (ADR-005 D4 degraded-platform row):
+/// unsupported platforms get ONE recorded WARN per run instead of a
+/// silent downgrade; supported platforms record every flush FAILURE
+/// loudly (round-1 F3 - no swallowed IO).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum DirSyncStatus {
+    Supported,
+    Unsupported,
 }
 
-fn sync_dir(dir: &Path) {
-    #[cfg(unix)]
-    if let Ok(handle) = File::open(dir) {
-        let _ = handle.sync_all();
+pub(crate) fn dir_sync_status() -> DirSyncStatus {
+    if cfg!(unix) {
+        DirSyncStatus::Supported
+    } else {
+        DirSyncStatus::Unsupported
     }
-    #[cfg(not(unix))]
-    let _ = dir;
+}
+
+#[cfg(unix)]
+fn sync_dir(dir: &Path) -> Result<(), String> {
+    File::open(dir)
+        .and_then(|handle| handle.sync_all())
+        .map_err(|io_err| format!("directory flush of '{}' failed: {io_err}", dir.display()))
+}
+
+#[cfg(not(unix))]
+fn sync_dir(_dir: &Path) -> Result<(), String> {
+    // Windows: no directory-handle flush; the per-run WARN comes from
+    // dir_sync_status(). Replacement visibility comes from the rename;
+    // power-loss durability rests on the file flush plus startup
+    // recovery, exactly as ADR-005 D4 states.
+    Ok(())
 }
 
 /// The one write primitive (ADR-005 D4 crash-state protocol): exclusive
-/// temp in the same directory, flush + fsync, close, atomic rename onto the
-/// final path, then a best-effort directory flush where the platform allows.
-pub(crate) fn write_atomic(final_path: &Path, bytes: &[u8]) -> Result<(), String> {
+/// temp in the same directory, flush + fsync, close, atomic rename onto
+/// the final path, then a directory flush where the platform allows.
+///
+/// Platform honesty note (round-1 F3): on Windows this uses
+/// `std::fs::rename`, which maps to MoveFileEx with REPLACE_EXISTING but
+/// WITHOUT WRITE_THROUGH; the ADR's own qualification applies - "atomic"
+/// means replacement visibility, and power-loss durability rests on the
+/// file flush plus startup recovery. A flush failure on a supporting
+/// platform is RECORDED in the run report, never swallowed.
+pub(crate) fn write_atomic(
+    final_path: &Path,
+    bytes: &[u8],
+    warnings: &mut Vec<String>,
+) -> Result<(), String> {
     let dir = final_path
         .parent()
         .ok_or_else(|| format!("'{}' has no parent directory", final_path.display()))?;
@@ -173,18 +202,26 @@ pub(crate) fn write_atomic(final_path: &Path, bytes: &[u8]) -> Result<(), String
             final_path.display()
         )
     })?;
-    sync_dir(dir);
+    if let Err(flush_warning) = sync_dir(dir) {
+        warnings.push(format!(
+            "{flush_warning} (recorded, I12; recovery covers the gap)"
+        ));
+    }
     Ok(())
 }
 
 /// Creates the write-once review-begun marker if absent (idempotent;
 /// marker-before-first-decision, ADR-005 D4).
-pub(crate) fn ensure_marker(paths: &QueuePaths, record_id: &str) -> Result<(), String> {
+pub(crate) fn ensure_marker(
+    paths: &QueuePaths,
+    record_id: &str,
+    warnings: &mut Vec<String>,
+) -> Result<(), String> {
     let marker = paths.marker(record_id);
     if marker.exists() {
         return Ok(());
     }
-    write_atomic(&marker, b"")
+    write_atomic(&marker, b"", warnings)
 }
 
 /// One record's files as found on disk (paired with cn-ingest's
@@ -210,6 +247,8 @@ impl ScannedRecord {
 /// Everything the startup scan observed.
 pub(crate) struct ScanOutcome {
     pub records: BTreeMap<String, ScannedRecord>,
+    /// Non-fatal IO notes surfaced into the run report (I12; round-1 F3).
+    pub io_warnings: Vec<String>,
     /// Parsed unconsumed decision files (path kept for retirement).
     pub decisions: Vec<(PathBuf, DecisionMessage)>,
     /// Decision files that failed to parse or failed version checks: loud,
@@ -237,6 +276,7 @@ pub(crate) fn scan(paths: &QueuePaths) -> Result<ScanOutcome, String> {
 
     let mut outcome = ScanOutcome {
         records: BTreeMap::new(),
+        io_warnings: Vec::new(),
         decisions: Vec::new(),
         unreadable_decisions: Vec::new(),
         tombstones: Vec::new(),

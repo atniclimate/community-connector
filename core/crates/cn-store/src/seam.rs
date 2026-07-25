@@ -19,11 +19,14 @@ use crate::log::{OpLog, StoreError};
 use crate::op::Operation;
 
 /// Canonical digest of an operation: SHA-256 (lowercase hex) over its
-/// serde_json serialization. Both the approval plan and durable-log
-/// classification compute digests over the in-memory `Operation`, so the
-/// domain is identical on both sides.
+/// sorted-key canonical serialization (via a `serde_json::Value` tree,
+/// whose objects are BTreeMaps - matching cn-ingest's `canonical_digest`
+/// byte domain exactly; ADR-005 D4 sorted-keys rule). Both the approval
+/// plan and durable-log classification compute digests over the
+/// in-memory `Operation`, so the domain is identical on both sides.
 pub fn canonical_op_digest(op: &Operation) -> Result<String, StoreError> {
-    let bytes = serde_json::to_vec(op).map_err(|err| StoreError::Serialize(err.to_string()))?;
+    let tree = serde_json::to_value(op).map_err(|err| StoreError::Serialize(err.to_string()))?;
+    let bytes = serde_json::to_vec(&tree).map_err(|err| StoreError::Serialize(err.to_string()))?;
     let mut hasher = Sha256::new();
     hasher.update(&bytes);
     Ok(format!("{:x}", hasher.finalize()))
@@ -56,6 +59,14 @@ impl DurableOpIndex {
     pub fn is_empty(&self) -> bool {
         self.map.is_empty()
     }
+
+    /// True when the given op id is durable (any digest). Recovery mode
+    /// selection depends on this: ALL-absent plans re-run the FULL
+    /// first-attempt step (preflight included) per ADR-005 D4; only a
+    /// batch with durable presence completes under the intent marker.
+    pub fn contains(&self, op_id: &OpId) -> bool {
+        self.map.contains_key(op_id)
+    }
 }
 
 /// One planned batch entry: the op plus its preassigned canonical digest
@@ -66,9 +77,14 @@ pub struct BatchEntry {
     pub digest: String,
 }
 
-/// First attempts preflight authorization and fold acceptance; recovery
-/// under a durable `approved_intent` completes WITHOUT re-authorization
-/// (ADR-005 D4: authority was decided and durably marked at intent time).
+/// First attempts preflight authorization and fold acceptance.
+/// `RecoveryUnderIntent` completes a PARTIALLY APPENDED batch without
+/// re-authorization (ADR-005 D4: the durable intent marker, not
+/// post-crash authority, governs completion of what first-attempt
+/// preflight already authorized). An ALL-ABSENT plan at recovery must
+/// NOT use it - the ADR's rule for that pattern is "re-run step 2",
+/// which includes preflight; callers select the mode via
+/// `DurableOpIndex::contains`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BatchMode {
     FirstAttempt,

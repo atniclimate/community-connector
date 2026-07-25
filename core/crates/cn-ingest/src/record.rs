@@ -162,6 +162,9 @@ pub enum HistoryEntry {
         decided_at: Timestamp,
         reason: Option<String>,
         outcome: DecisionOutcome,
+        /// Unknown-minor fields preserved across sidecar rewrites (I7).
+        #[serde(flatten)]
+        extras: BTreeMap<String, Value>,
     },
     /// What happened to an admitted approval AFTER admission.
     Transaction {
@@ -172,6 +175,9 @@ pub enum HistoryEntry {
         at: Timestamp,
         /// Submit report reference or typed failure description.
         detail: Option<String>,
+        /// Unknown-minor fields preserved across sidecar rewrites (I7).
+        #[serde(flatten)]
+        extras: BTreeMap<String, Value>,
     },
 }
 
@@ -189,6 +195,9 @@ pub struct ApprovalPlanRef {
     /// suffix from THESE bytes: ids and digests are never regenerated
     /// (ADR-005 D4), and ids/digests alone cannot reconstruct the ops.
     pub ops: Vec<Value>,
+    /// Unknown-minor fields preserved across sidecar rewrites (I7).
+    #[serde(flatten)]
+    pub extras: BTreeMap<String, Value>,
 }
 
 /// Mutable review-state sidecar, rewritten atomically by the native owner.

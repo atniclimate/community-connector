@@ -1,17 +1,26 @@
 //! The `cn intake apply` run (ADR-005 D4; blueprint section 2's "the
-//! durable owner" and section 9 step 5).
+//! durable owner" and section 9 step 5; amended per the 2026-07-25
+//! adversarial round 1).
 //!
 //! Order inside one locked run: open the durable store -> scan the queue ->
-//! approval recovery FIRST (before any other queue work) -> the rest of the
-//! crash-state table -> tombstone reconciliation -> decision admission in
-//! deterministic order -> the I12 run report.
+//! classify the whole crash-state table -> STOP-THE-LINE if any halt row
+//! classified (nothing executes) -> approval recovery first -> the rest of
+//! the recovery actions -> tombstone reconciliation -> decision admission
+//! in deterministic order -> the I12 run report.
 //!
-//! Halting rule: the lost-decision-state and binding-mismatch rows, a
-//! failed sidecar rewrite, and a corrupt persisted plan HALT the run before
-//! any decision is admitted (stop-the-line; nothing is guessed, ADR-005
-//! D4). Quarantines, stale/illegal decisions, and id-reuse conflicts are
-//! recorded loudly and the run continues; any of them still yields a
-//! failure exit code so attention is unmissable.
+//! Halting rule (D-070.2 as amended): halt-class classifications
+//! (lost-decision-state, binding mismatch, marker-with-nothing) stop the
+//! run BEFORE any mutation; a failed approval recovery, failed sidecar
+//! rewrite, or corrupt persisted plan stops the run at that point with
+//! nothing further executed. Quarantines, stale/illegal decisions, and
+//! id-reuse conflicts are recorded loudly and the run continues; any of
+//! them still yields a failure exit code so attention is unmissable.
+//!
+//! Recovery mode selection (round-1 F1): an ALL-ABSENT plan re-runs the
+//! FULL first-attempt step - preflight authorization, fold acceptance,
+//! and the validation gate included (ADR-005 D4 "re-run step 2"); only a
+//! plan with durable presence completes under the intent marker without
+//! re-authorization.
 
 use std::collections::BTreeMap;
 use std::io::Write;
@@ -24,9 +33,9 @@ use cn_ingest::{
     AdmissionVerdict, ApprovalPlan, DecisionMessage, DecisionOutcome, DecisionType, FoundRecord,
     FoundSidecar, HistoryEntry, PlanContext, QueueRecord, RecoveryAction, ReviewSidecar,
     ReviewState, TransactionKind, admit, apply_verdict, classify, plan_approval,
-    record_transaction,
+    record_transaction, validate_record, validate_submission, verify_persisted_plan,
 };
-use cn_model::{GroupId, KindId, PersonId, Timestamp};
+use cn_model::{GroupId, KindId, OpId, PersonId, Timestamp};
 use cn_perm::PermAuthorizer;
 use cn_store::{
     BatchEntry, BatchFailure, BatchMode, DurableOpIndex, GroupState, OpDisposition, OpLog,
@@ -176,6 +185,15 @@ fn parse_args(args: &[String]) -> Result<ApplyArgs, String> {
     })
 }
 
+/// Everything the transaction executor needs from the run context.
+struct TxContext<'a> {
+    paths: &'a QueuePaths,
+    log: &'a mut OpLog,
+    index: &'a mut DurableOpIndex,
+    state: &'a mut GroupState,
+    now_ms: i64,
+}
+
 fn run_apply(args: &ApplyArgs, paths: &QueuePaths) -> Result<(RunReport, Exit), String> {
     let group_id: GroupId = args
         .group
@@ -222,15 +240,17 @@ fn run_apply(args: &ApplyArgs, paths: &QueuePaths) -> Result<(RunReport, Exit), 
         )
     };
 
-    if !queue::dir_sync_supported() {
-        warnings.push(
+    match queue::dir_sync_status() {
+        queue::DirSyncStatus::Supported => {}
+        queue::DirSyncStatus::Unsupported => warnings.push(
             "directory-handle flush is unavailable on this platform; staging proceeds \
              with this recorded WARN (ADR-005 D4 degraded-platform row, I12)"
                 .to_string(),
-        );
+        ),
     }
 
     let scan = queue::scan(paths)?;
+    warnings.extend(scan.io_warnings.iter().cloned());
     for name in &scan.unrecognized {
         warnings.push(format!("unrecognized file '{name}' at the queue root"));
     }
@@ -249,8 +269,7 @@ fn run_apply(args: &ApplyArgs, paths: &QueuePaths) -> Result<(RunReport, Exit), 
         temp_discarded: scan.temp_discarded,
     };
 
-    // Crash-state classification (cn-ingest owns the table); approval
-    // recovery runs before any other queue work (ADR-005 D4).
+    // Crash-state classification (cn-ingest owns the table).
     let mut pending_by_record: BTreeMap<String, usize> = BTreeMap::new();
     for (_, message) in &scan.decisions {
         *pending_by_record
@@ -273,116 +292,144 @@ fn run_apply(args: &ApplyArgs, paths: &QueuePaths) -> Result<(RunReport, Exit), 
     classified
         .sort_by_key(|(action, _)| !matches!(action, RecoveryAction::RunApprovalRecovery { .. }));
 
-    let mut live: BTreeMap<String, Live> = BTreeMap::new();
     let mut recovery = Vec::new();
     let mut halts = Vec::new();
     let mut ops_appended = 0usize;
-    for (action, found) in classified {
+
+    // STOP-THE-LINE pre-pass (D-070.2 as amended, round-1 F5): every
+    // halt-class row is reported and the run executes NOTHING.
+    for (action, _) in &classified {
         match action {
-            RecoveryAction::None { record_id } => {
-                insert_live(&mut live, record_id, found);
-            }
-            RecoveryAction::ProceedWithAdmission { record_id } => {
-                recovery.push(RecoveryEntry {
-                    record_id: record_id.clone(),
-                    action: "proceed_with_admission".to_string(),
-                    detail: Some(
-                        "marker present with unconsumed decisions; benign transient".to_string(),
-                    ),
-                });
-                insert_live(&mut live, record_id, found);
-            }
-            RecoveryAction::ReportMarkerAnomaly { record_id } => {
-                warnings.push(format!(
-                    "record {record_id}: review-begun marker present with no decision \
-                     history and no decision file; stays pending - re-decide in the \
-                     wizard if a decision was intended (I12)"
-                ));
-                recovery.push(RecoveryEntry {
-                    record_id: record_id.clone(),
-                    action: "report_marker_anomaly".to_string(),
-                    detail: None,
-                });
-                insert_live(&mut live, record_id, found);
-            }
-            RecoveryAction::ReconstructPendingSidecar { record_id } => {
-                let record = found
-                    .payload
-                    .ok_or_else(|| format!("record {record_id}: classify invariant broken"))?;
-                let sidecar =
-                    ReviewSidecar::initial(&record).map_err(|ingest_err| ingest_err.to_string())?;
-                write_sidecar(paths, &sidecar)?;
-                recovery.push(RecoveryEntry {
-                    record_id: record_id.clone(),
-                    action: "reconstruct_pending_sidecar".to_string(),
-                    detail: Some("initial pending state only; no history recreated".to_string()),
-                });
-                live.insert(record_id, Live { record, sidecar });
-            }
-            RecoveryAction::QuarantineCorrupt { record_id } => {
-                queue::quarantine_pair(paths, &record_id)?;
-                warnings.push(format!(
-                    "record {record_id}: checksum-failing pair moved to corrupt/ \
-                     (retained, never trusted; loud typed error, I3)"
-                ));
-                recovery.push(RecoveryEntry {
-                    record_id,
-                    action: "quarantine_corrupt".to_string(),
-                    detail: None,
-                });
-                attention = true;
-            }
-            RecoveryAction::HaltLostDecisionState { record_id } => {
-                halts.push(format!(
-                    "record {record_id}: review-begun marker present without a readable \
-                     sidecar - lost decision state; a decision history is never silently \
-                     recreated (ADR-005 D4)"
-                ));
-            }
-            RecoveryAction::HaltBindingMismatch { record_id } => {
-                halts.push(format!(
-                    "record {record_id}: sidecar binding does not match its payload; both \
-                     files retained for facilitator investigation, no automatic repair \
-                     (ADR-005 D4)"
-                ));
-            }
-            RecoveryAction::RunApprovalRecovery { record_id } => {
-                let record = found
-                    .payload
-                    .ok_or_else(|| format!("record {record_id}: classify invariant broken"))?;
-                let FoundSidecar::Valid(sidecar) = found.sidecar else {
-                    return Err(format!("record {record_id}: classify invariant broken"));
-                };
-                let mut sidecar = *sidecar;
-                match recover_approval(
-                    paths,
-                    &record_id,
-                    &mut sidecar,
-                    &mut log,
-                    &mut index,
-                    &mut state,
-                    now_ms,
-                ) {
-                    Ok((transaction, appended)) => {
-                        ops_appended += appended;
-                        recovery.push(RecoveryEntry {
-                            record_id: record_id.clone(),
-                            action: "approval_recovery".to_string(),
-                            detail: Some(format!(
-                                "{} -> {}",
-                                transaction.kind, transaction.resulting_state
-                            )),
-                        });
-                        live.insert(record_id, Live { record, sidecar });
+            RecoveryAction::HaltLostDecisionState { record_id } => halts.push(format!(
+                "record {record_id}: review-begun marker present without a readable \
+                 sidecar (or without any files at all) - lost decision state; nothing \
+                 is guessed (ADR-005 D4)"
+            )),
+            RecoveryAction::HaltBindingMismatch { record_id } => halts.push(format!(
+                "record {record_id}: sidecar binding does not match its payload; both \
+                 files retained for facilitator investigation, no automatic repair \
+                 (ADR-005 D4)"
+            )),
+            _ => {}
+        }
+    }
+    let halted_before_execution = !halts.is_empty();
+
+    let mut live: BTreeMap<String, Live> = BTreeMap::new();
+    if !halted_before_execution {
+        for (action, found) in classified {
+            match action {
+                RecoveryAction::None { record_id } => {
+                    insert_live(&mut live, record_id, found);
+                }
+                RecoveryAction::ProceedWithAdmission { record_id } => {
+                    recovery.push(RecoveryEntry {
+                        record_id: record_id.clone(),
+                        action: "proceed_with_admission".to_string(),
+                        detail: Some(
+                            "marker present with unconsumed decisions; benign transient"
+                                .to_string(),
+                        ),
+                    });
+                    insert_live(&mut live, record_id, found);
+                }
+                RecoveryAction::ReportMarkerAnomaly { record_id } => {
+                    warnings.push(format!(
+                        "record {record_id}: review-begun marker present with no decision \
+                         history and no decision file; stays pending - re-decide in the \
+                         wizard if a decision was intended (I12)"
+                    ));
+                    recovery.push(RecoveryEntry {
+                        record_id: record_id.clone(),
+                        action: "report_marker_anomaly".to_string(),
+                        detail: None,
+                    });
+                    insert_live(&mut live, record_id, found);
+                }
+                RecoveryAction::ReconstructPendingSidecar { record_id } => {
+                    let record = found
+                        .payload
+                        .ok_or_else(|| format!("record {record_id}: classify invariant broken"))?;
+                    let sidecar = ReviewSidecar::initial(&record)
+                        .map_err(|ingest_err| ingest_err.to_string())?;
+                    write_sidecar(paths, &sidecar, &mut warnings)?;
+                    recovery.push(RecoveryEntry {
+                        record_id: record_id.clone(),
+                        action: "reconstruct_pending_sidecar".to_string(),
+                        detail: Some(
+                            "initial pending state only; no history recreated".to_string(),
+                        ),
+                    });
+                    live.insert(record_id, Live { record, sidecar });
+                }
+                RecoveryAction::QuarantineCorrupt { record_id } => {
+                    queue::quarantine_pair(paths, &record_id)?;
+                    warnings.push(format!(
+                        "record {record_id}: checksum-failing pair moved to corrupt/ \
+                         (retained, never trusted; loud typed error, I3)"
+                    ));
+                    recovery.push(RecoveryEntry {
+                        record_id,
+                        action: "quarantine_corrupt".to_string(),
+                        detail: None,
+                    });
+                    attention = true;
+                }
+                RecoveryAction::HaltLostDecisionState { .. }
+                | RecoveryAction::HaltBindingMismatch { .. } => {
+                    unreachable!("halt rows returned before execution")
+                }
+                RecoveryAction::RunApprovalRecovery { record_id } => {
+                    let record = found
+                        .payload
+                        .ok_or_else(|| format!("record {record_id}: classify invariant broken"))?;
+                    let FoundSidecar::Valid(sidecar) = found.sidecar else {
+                        return Err(format!("record {record_id}: classify invariant broken"));
+                    };
+                    let mut sidecar = *sidecar;
+                    let mut context = TxContext {
+                        paths,
+                        log: &mut log,
+                        index: &mut index,
+                        state: &mut state,
+                        now_ms,
+                    };
+                    match recover_approval(
+                        &mut context,
+                        &record_id,
+                        &record,
+                        &template,
+                        &mut sidecar,
+                        &mut warnings,
+                    ) {
+                        Ok((transaction, appended)) => {
+                            ops_appended += appended;
+                            recovery.push(RecoveryEntry {
+                                record_id: record_id.clone(),
+                                action: "approval_recovery".to_string(),
+                                detail: Some(format!(
+                                    "{} -> {}",
+                                    transaction.kind, transaction.resulting_state
+                                )),
+                            });
+                            live.insert(record_id, Live { record, sidecar });
+                        }
+                        Err(message) => {
+                            // Stop-the-line: a failed approval recovery
+                            // halts the run at this point; nothing further
+                            // executes (D-070.2 as amended).
+                            halts.push(message);
+                            break;
+                        }
                     }
-                    Err(message) => halts.push(message),
                 }
             }
         }
     }
 
-    // Startup tombstone reconciliation: a consumed tombstone must appear in
-    // a decision event of its record (I12; never silently deleted).
+    // Startup tombstone reconciliation (round-1 F8: digest-bound): a
+    // consumed tombstone must match a decision event of its record by
+    // decision_id AND message digest (I12; never silently deleted).
     let mut tombstone_anomalies = Vec::new();
     for (name, parsed) in &scan.tombstones {
         match parsed {
@@ -390,13 +437,17 @@ fn run_apply(args: &ApplyArgs, paths: &QueuePaths) -> Result<(RunReport, Exit), 
                 tombstone_anomalies.push(format!("unreadable tombstone '{name}': {reason}"));
             }
             Ok(message) => {
-                let recorded = live
-                    .get(&message.record_id)
-                    .is_some_and(|entry| has_decision_event(&entry.sidecar, &message.decision_id));
+                let digest = message
+                    .message_digest()
+                    .map_err(|ingest_err| ingest_err.to_string())?;
+                let recorded = live.get(&message.record_id).is_some_and(|entry| {
+                    has_decision_event(&entry.sidecar, &message.decision_id, &digest)
+                });
                 if !recorded {
                     tombstone_anomalies.push(format!(
-                        "tombstone '{name}': decision {} appears in no decision event of \
-                         record {} - impossible under the ordering rule; investigate (I12)",
+                        "tombstone '{name}': decision {} matches no decision event of \
+                         record {} by id AND digest - impossible under the ordering \
+                         rule; investigate (I12)",
                         message.decision_id, message.record_id
                     ));
                 }
@@ -413,8 +464,15 @@ fn run_apply(args: &ApplyArgs, paths: &QueuePaths) -> Result<(RunReport, Exit), 
                 .cmp(&(b.1.decided_at, b.1.decision_id.as_str()))
         });
         for (file, message) in messages {
-            match consume_decision(
+            let mut context = TxContext {
                 paths,
+                log: &mut log,
+                index: &mut index,
+                state: &mut state,
+                now_ms,
+            };
+            match consume_decision(
+                &mut context,
                 &file,
                 &message,
                 &mut live,
@@ -423,16 +481,15 @@ fn run_apply(args: &ApplyArgs, paths: &QueuePaths) -> Result<(RunReport, Exit), 
                 group_id,
                 facilitator,
                 &default_kind,
-                now_ms,
-                &mut log,
-                &mut index,
-                &mut state,
                 &mut warnings,
             ) {
                 Ok(Consumed::Entry(entry, appended)) => {
                     if matches!(
                         entry.outcome.as_str(),
-                        "id_reuse_conflict" | "binding_mismatch" | "unknown_record"
+                        "id_reuse_conflict"
+                            | "binding_mismatch"
+                            | "unknown_record"
+                            | "reviewer_mismatch"
                     ) {
                         attention = true;
                     }
@@ -476,7 +533,7 @@ enum Consumed {
 
 #[allow(clippy::too_many_arguments)]
 fn consume_decision(
-    paths: &QueuePaths,
+    context: &mut TxContext<'_>,
     file: &Path,
     message: &DecisionMessage,
     live: &mut BTreeMap<String, Live>,
@@ -485,10 +542,6 @@ fn consume_decision(
     group_id: GroupId,
     facilitator: PersonId,
     default_kind: &KindId,
-    now_ms: i64,
-    log: &mut OpLog,
-    index: &mut DurableOpIndex,
-    state: &mut GroupState,
     warnings: &mut Vec<String>,
 ) -> Result<Consumed, String> {
     let entry = |outcome: &str, transaction: Option<TransactionEntry>| DecisionEntry {
@@ -497,6 +550,25 @@ fn consume_decision(
         outcome: outcome.to_string(),
         transaction,
     };
+
+    // Reviewer-identity binding (round-1 F2): the message's reviewer must
+    // be the authorized person this apply run acts as - the ops'
+    // responsible_human (ADR-005 D5) and the authority PermAuthorizer
+    // checks. A mismatched or unparseable reviewer is never admitted
+    // under borrowed authority; the file stays for facilitator
+    // disposition (I3, I6).
+    match message.reviewer.parse::<PersonId>() {
+        Ok(reviewer) if reviewer == facilitator => {}
+        _ => {
+            warnings.push(format!(
+                "decision {} names reviewer '{}' but this apply run is authorized as \
+                 facilitator {}; refusing to admit under borrowed authority - file \
+                 left for facilitator disposition (I6)",
+                message.decision_id, message.reviewer, facilitator
+            ));
+            return Ok(Consumed::Entry(entry("reviewer_mismatch", None), 0));
+        }
+    }
 
     let Some(target) = live.get_mut(&message.record_id) else {
         warnings.push(format!(
@@ -511,7 +583,7 @@ fn consume_decision(
     match &verdict {
         AdmissionVerdict::WritelessReplay => {
             // The original durable entry is the retirement proof; no write.
-            queue::retire_decision(paths, file)?;
+            queue::retire_decision(context.paths, file)?;
             Ok(Consumed::Entry(entry("writeless_replay", None), 0))
         }
         AdmissionVerdict::IdReuseConflict => {
@@ -536,32 +608,34 @@ fn consume_decision(
             } else {
                 "illegal"
             };
-            queue::ensure_marker(paths, &message.record_id)?;
+            queue::ensure_marker(context.paths, &message.record_id, warnings)?;
             apply_verdict(&mut target.sidecar, &verdict)
                 .map_err(|ingest_err| ingest_err.to_string())?;
-            write_sidecar(paths, &target.sidecar)?;
-            queue::retire_decision(paths, file)?;
+            write_sidecar(context.paths, &target.sidecar, warnings)?;
+            queue::retire_decision(context.paths, file)?;
             Ok(Consumed::Entry(entry(outcome, None), 0))
         }
         AdmissionVerdict::Admit { .. } => {
-            queue::ensure_marker(paths, &message.record_id)?;
+            queue::ensure_marker(context.paths, &message.record_id, warnings)?;
             let mut planned: Option<ApprovalPlan> = None;
+            let mut submission_errors: Vec<String> = Vec::new();
             if matches!(message.decision, DecisionType::Approve) {
-                let context = PlanContext {
+                let plan_context = PlanContext {
                     group_id,
                     facilitator,
                     kind: kind_for(&target.record, default_kind, warnings),
-                    now_ms,
+                    now_ms: context.now_ms,
                     template_version: template_version.clone(),
                 };
-                let plan = plan_approval(&target.record, template, &context, &mut || {
+                let plan = plan_approval(&target.record, template, &plan_context, &mut || {
                     uuid::Uuid::now_v7()
                 })
                 .map_err(|ingest_err| ingest_err.to_string())?;
+                let submission = validate_submission(&target.record.payload, template);
+                submission_errors = submission.errors.clone();
                 target.sidecar.plan = Some(plan.plan_ref.clone());
                 target.sidecar.validation_report = Some(
-                    serde_json::to_string(&plan.validation)
-                        .map_err(|render_err| render_err.to_string())?,
+                    json!({ "submission": submission, "entity": plan.validation }).to_string(),
                 );
                 planned = Some(plan);
             }
@@ -569,24 +643,29 @@ fn consume_decision(
             // replace (apply_verdict seals over the plan set above).
             apply_verdict(&mut target.sidecar, &verdict)
                 .map_err(|ingest_err| ingest_err.to_string())?;
-            write_sidecar(paths, &target.sidecar)?;
-            queue::retire_decision(paths, file)?;
+            write_sidecar(context.paths, &target.sidecar, warnings)?;
+            queue::retire_decision(context.paths, file)?;
 
             let mut transaction = None;
             let mut appended_count = 0;
             if let Some(plan) = planned {
+                let mut validation_errors = submission_errors;
+                validation_errors.extend(
+                    plan.validation
+                        .errors
+                        .iter()
+                        .map(|finding| format!("{finding:?}")),
+                );
                 let digests = plan.plan_ref.per_op_digests.clone();
                 let (summary, appended) = execute_transaction(
-                    paths,
+                    context,
                     &mut target.sidecar,
                     &message.decision_id,
                     plan.ops,
                     &digests,
                     BatchMode::FirstAttempt,
-                    log,
-                    index,
-                    state,
-                    now_ms,
+                    &validation_errors,
+                    warnings,
                 )?;
                 appended_count = appended;
                 transaction = Some(summary);
@@ -600,89 +679,126 @@ fn consume_decision(
 }
 
 /// Runs the approval-recovery rule for a sidecar found in `approved_intent`
-/// (ADR-005 D4): the persisted plan's ops go back through the seam in
-/// recovery mode - no re-authorization; the durable intent marker governs.
+/// (ADR-005 D4, round-1 F1): the persisted plan is cross-field verified
+/// (round-1 F6); an ALL-ABSENT plan re-runs the FULL first-attempt step -
+/// preflight and validation gate included; only a plan with durable
+/// presence completes under the intent marker without re-authorization.
 fn recover_approval(
-    paths: &QueuePaths,
+    context: &mut TxContext<'_>,
     record_id: &str,
+    record: &QueueRecord,
+    template: &cn_schema::GroupTemplate,
     sidecar: &mut ReviewSidecar,
-    log: &mut OpLog,
-    index: &mut DurableOpIndex,
-    state: &mut GroupState,
-    now_ms: i64,
+    warnings: &mut Vec<String>,
 ) -> Result<(TransactionEntry, usize), String> {
     let plan = sidecar.plan.clone().ok_or_else(|| {
         format!("record {record_id}: approved_intent with no persisted plan; halting (I3)")
     })?;
-    if plan.ops.len() != plan.per_op_digests.len() || plan.ops.is_empty() {
-        return Err(format!(
-            "record {record_id}: persisted plan is malformed ({} ops, {} digests); halting",
-            plan.ops.len(),
-            plan.per_op_digests.len()
-        ));
-    }
-    let ops: Vec<Operation> = plan
-        .ops
-        .iter()
-        .map(|value| serde_json::from_value(value.clone()))
-        .collect::<Result<_, _>>()
-        .map_err(|parse_err| {
-            format!("record {record_id}: persisted plan ops do not parse ({parse_err}); halting")
-        })?;
+    let ops = verify_persisted_plan(&plan)
+        .map_err(|ingest_err| format!("record {record_id}: {ingest_err}; halting (I3)"))?;
     let decision_id = admitting_decision_id(sidecar).ok_or_else(|| {
         format!(
             "record {record_id}: approved_intent with no admitting approve decision \
              event; halting"
         )
     })?;
+    let any_present = ops.iter().any(|op| context.index.contains(&op.op_id));
+    let (mode, validation_errors) = if any_present {
+        // Durable presence: the intent marker authorizes completion of
+        // what first-attempt preflight already authorized.
+        (BatchMode::RecoveryUnderIntent, Vec::new())
+    } else {
+        // ALL absent: nothing was appended - "re-run step 2" (ADR-005
+        // D4), preflight and validation included, under the SAME plan.
+        let submission = validate_submission(&record.payload, template);
+        let mut errors = submission.errors;
+        if let Ok(report) = validate_record(record, template, &plan_kind(&ops)) {
+            errors.extend(report.errors.iter().map(|finding| format!("{finding:?}")));
+        }
+        (BatchMode::FirstAttempt, errors)
+    };
     execute_transaction(
-        paths,
+        context,
         sidecar,
         &decision_id,
         ops,
         &plan.per_op_digests,
-        BatchMode::RecoveryUnderIntent,
-        log,
-        index,
-        state,
-        now_ms,
+        mode,
+        &validation_errors,
+        warnings,
     )
 }
 
+/// The planned entity kind, recovered from the plan's own ops (recovery
+/// has no CLI kind context; the plan is the authority).
+fn plan_kind(ops: &[Operation]) -> KindId {
+    for op in ops {
+        if let cn_store::OpKind::EntityCreate { entity } = &op.kind {
+            return entity.kind.clone();
+        }
+    }
+    KindId::new(cn_ingest::DEFAULT_PILOT_KIND).expect("valid const")
+}
+
 /// Pushes the plan through the durable seam and records the outcome as the
-/// linked transaction event (ADR-005 D4 step 3). A failed sidecar rewrite
-/// is a halt, not a warning.
+/// linked transaction event (ADR-005 D4 step 3). The validation gate
+/// (round-1 F9) preflight-fails BEFORE the seam on first attempts; a
+/// failed sidecar rewrite is a halt, not a warning. After a recovery
+/// append, the real fold's quarantine report is checked - a quarantined
+/// batch op is a loud halt, never a silent approval (round-1 F1 tail).
 #[allow(clippy::too_many_arguments)]
 fn execute_transaction(
-    paths: &QueuePaths,
+    context: &mut TxContext<'_>,
     sidecar: &mut ReviewSidecar,
     decision_id: &str,
     ops: Vec<Operation>,
     digests: &[String],
     mode: BatchMode,
-    log: &mut OpLog,
-    index: &mut DurableOpIndex,
-    state: &mut GroupState,
-    now_ms: i64,
+    validation_errors: &[String],
+    warnings: &mut Vec<String>,
 ) -> Result<(TransactionEntry, usize), String> {
-    let batch: Vec<BatchEntry> = ops
-        .into_iter()
-        .zip(digests.iter())
-        .map(|(op, digest)| BatchEntry {
-            op,
-            digest: digest.clone(),
-        })
-        .collect();
-    let mut scratch = StoreReport::default();
-    let outcome = append_batch_idempotent(
-        log,
-        index,
-        state,
-        &PermAuthorizer,
-        &batch,
-        mode,
-        &mut scratch,
-    );
+    let batch_op_ids: Vec<OpId> = ops.iter().map(|op| op.op_id).collect();
+    let outcome = if mode == BatchMode::FirstAttempt && !validation_errors.is_empty() {
+        // Validation preflight (blueprint section 2 hostile-content rule):
+        // an approve of a record with rejecting findings never reaches the
+        // durable seam; the failure is recorded, loud, reviewable.
+        Err(None)
+    } else {
+        let batch: Vec<BatchEntry> = ops
+            .into_iter()
+            .zip(digests.iter())
+            .map(|(op, digest)| BatchEntry {
+                op,
+                digest: digest.clone(),
+            })
+            .collect();
+        let mut scratch = StoreReport::default();
+        let result = append_batch_idempotent(
+            context.log,
+            context.index,
+            context.state,
+            &PermAuthorizer,
+            &batch,
+            mode,
+            &mut scratch,
+        );
+        if result.is_ok() {
+            let quarantined: Vec<String> = scratch
+                .quarantined
+                .iter()
+                .filter(|entry| batch_op_ids.contains(&entry.op_id))
+                .map(|entry| entry.op_id.to_string())
+                .collect();
+            if !quarantined.is_empty() {
+                return Err(format!(
+                    "recovery fold quarantined durable op(s) {}: state diverged from the \
+                     intent-time preflight; halting for facilitator investigation (I3)",
+                    quarantined.join(", ")
+                ));
+            }
+        }
+        result.map_err(Some)
+    };
 
     let (kind, resulting_state, detail, appended) = match outcome {
         Ok(dispositions) => {
@@ -702,7 +818,13 @@ fn execute_transaction(
                 appended,
             )
         }
-        Err(BatchFailure::Denied { op_id, denial }) => {
+        Err(None) => (
+            TransactionKind::PreflightFailed,
+            ReviewState::Pending,
+            json!({ "code": "validation_failed", "errors": validation_errors }).to_string(),
+            0,
+        ),
+        Err(Some(BatchFailure::Denied { op_id, denial })) => {
             require_first_attempt(mode, "authorization denial")?;
             (
                 TransactionKind::PreflightFailed,
@@ -712,7 +834,7 @@ fn execute_transaction(
                 0,
             )
         }
-        Err(BatchFailure::WouldQuarantine { op_id }) => {
+        Err(Some(BatchFailure::WouldQuarantine { op_id })) => {
             require_first_attempt(mode, "would-quarantine")?;
             (
                 TransactionKind::PreflightFailed,
@@ -721,25 +843,25 @@ fn execute_transaction(
                 0,
             )
         }
-        Err(BatchFailure::DigestConflict { op_id }) => (
+        Err(Some(BatchFailure::DigestConflict { op_id })) => (
             TransactionKind::DurableConflict,
             ReviewState::Failed,
             json!({ "op_id": op_id.to_string(), "code": "durable_conflict" }).to_string(),
             0,
         ),
-        Err(BatchFailure::DurableInconsistency { op_id }) => (
+        Err(Some(BatchFailure::DurableInconsistency { op_id })) => (
             TransactionKind::DurableInconsistency,
             ReviewState::Failed,
             json!({ "op_id": op_id.to_string(), "code": "durable_inconsistency" }).to_string(),
             0,
         ),
-        Err(BatchFailure::PlanDigestMismatch { op_id }) => {
+        Err(Some(BatchFailure::PlanDigestMismatch { op_id })) => {
             return Err(format!(
                 "plan digest mismatch for op {op_id}: the persisted plan is corrupt; \
                  halting (I3)"
             ));
         }
-        Err(BatchFailure::Store(store_err)) => {
+        Err(Some(BatchFailure::Store(store_err))) => {
             return Err(format!(
                 "durable store failure during the approval transaction: {store_err}; halting"
             ));
@@ -751,11 +873,11 @@ fn execute_transaction(
         decision_id,
         kind,
         resulting_state,
-        Timestamp(now_ms),
+        Timestamp(context.now_ms),
         Some(detail.clone()),
     )
     .map_err(|ingest_err| ingest_err.to_string())?;
-    write_sidecar(paths, sidecar).map_err(|write_err| {
+    write_sidecar(context.paths, sidecar, warnings).map_err(|write_err| {
         format!(
             "sidecar rewrite failed after the {} transaction event: {write_err}; a \
              repeatedly encountered approved_intent is a stop condition (ADR-005 D4)",
@@ -794,9 +916,15 @@ fn insert_live(live: &mut BTreeMap<String, Live>, record_id: String, found: Foun
     }
 }
 
-fn has_decision_event(sidecar: &ReviewSidecar, decision_id: &str) -> bool {
+/// Digest-bound decision-event lookup (round-1 F8): id alone is not
+/// identity - the recorded message digest must match too.
+fn has_decision_event(sidecar: &ReviewSidecar, decision_id: &str, digest: &str) -> bool {
     sidecar.history.iter().any(|entry| {
-        matches!(entry, HistoryEntry::Decision { decision_id: recorded, .. } if recorded == decision_id)
+        matches!(
+            entry,
+            HistoryEntry::Decision { decision_id: recorded, message_digest, .. }
+                if recorded == decision_id && message_digest == digest
+        )
     })
 }
 
@@ -824,10 +952,14 @@ fn kind_for(record: &QueueRecord, default_kind: &KindId, warnings: &mut Vec<Stri
     kind
 }
 
-fn write_sidecar(paths: &QueuePaths, sidecar: &ReviewSidecar) -> Result<(), String> {
+fn write_sidecar(
+    paths: &QueuePaths,
+    sidecar: &ReviewSidecar,
+    warnings: &mut Vec<String>,
+) -> Result<(), String> {
     let bytes = serde_json::to_vec_pretty(sidecar)
         .map_err(|render_err| format!("cannot serialize sidecar: {render_err}"))?;
-    queue::write_atomic(&paths.sidecar(&sidecar.record_id), &bytes)
+    queue::write_atomic(&paths.sidecar(&sidecar.record_id), &bytes, warnings)
 }
 
 fn store_findings(report: &StoreReport, stage: &str) -> Vec<String> {

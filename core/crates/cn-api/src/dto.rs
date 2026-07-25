@@ -81,6 +81,9 @@ pub(crate) struct ExportSnapshot {
 #[derive(Debug, Serialize)]
 pub(crate) struct IntakeValidation {
     pub(crate) kind: KindId,
+    /// Raw submission-schema findings (allowlist, consent, caps; round-1
+    /// F9) - authoritative alongside the entity template-fit report.
+    pub(crate) submission: cn_ingest::SubmissionFindings,
     pub(crate) report: cn_schema::ValidationReport,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) kind_warning: Option<String>,

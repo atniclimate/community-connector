@@ -576,3 +576,203 @@ fn preflight_denial_returns_the_record_to_pending() {
     assert_eq!(sidecar.decision_generation, 2, "admit + preflight_failed");
     assert_eq!(ops_line_count(&ops), 1, "nothing appended");
 }
+
+// --- round-1 amendments (2026-07-25 adversarial round) ---
+
+/// F1: a crash after a first-attempt DENIAL leaves a durable
+/// approved_intent with an all-absent plan. Recovery must re-run the
+/// FULL first-attempt step (ADR-005 D4 "re-run step 2") - the denial
+/// recurs, the record returns to pending, and nothing is ever appended
+/// without authorization.
+#[test]
+fn crash_after_denial_recovers_with_full_preflight() {
+    let (_dir, queue, ops) = setup();
+    // No facilitator membership: authorization DENIES the unowned create.
+    write_ops_log(&ops, false);
+    let record = staged_record(&uuid_string(0xE6));
+
+    let (template, report) = cn_schema::parse_template(&template_json()).expect("template");
+    assert!(report.errors.is_empty());
+    let context = PlanContext {
+        group_id: id(10),
+        facilitator: id(2),
+        kind: cn_model::KindId::new("person").expect("kind"),
+        now_ms: 1_000,
+        template_version: semver::Version::new(0, 1, 0),
+    };
+    let mut n: u128 = 0;
+    let plan = plan_approval(&record, &template, &context, &mut || {
+        n += 1;
+        uuid::Uuid::from_u128(0xBEEF_0000_0000_0000_0000_0000_0000_0000 + n)
+    })
+    .expect("plan builds");
+    let mut sidecar = ReviewSidecar::initial(&record).expect("sidecar");
+    let message = decision_message(
+        &record,
+        &uuid_string(0xD7),
+        100,
+        ReviewState::Pending,
+        0,
+        DecisionType::Approve,
+    );
+    let verdict = admit(&sidecar, &message).expect("verdict");
+    sidecar.plan = Some(plan.plan_ref.clone());
+    apply_verdict(&mut sidecar, &verdict).expect("admitted");
+    assert_eq!(sidecar.review_state, ReviewState::ApprovedIntent);
+    fs::write(
+        queue.join(format!("{}.record.json", record.record_id)),
+        serde_json::to_vec_pretty(&record).expect("record serializes"),
+    )
+    .expect("record staged");
+    write_sidecar_file(&queue, &sidecar);
+    fs::write(queue.join(format!("{}.reviewed", record.record_id)), b"").expect("marker");
+
+    let outcome = run_apply(&queue, &ops);
+    assert_eq!(outcome.exit, cn::Exit::Ok, "stderr: {}", outcome.stderr);
+    let report = outcome.report.expect("report");
+    assert_eq!(report["recovery"][0]["action"], "approval_recovery");
+    assert!(
+        report["recovery"][0]["detail"]
+            .as_str()
+            .expect("detail")
+            .contains("preflight_failed"),
+        "denial recurs at recovery: {report}"
+    );
+
+    let recovered = read_sidecar(&queue, &record.record_id);
+    assert_eq!(
+        recovered.review_state,
+        ReviewState::Pending,
+        "denied plan NEVER completes under the intent marker"
+    );
+    assert_eq!(
+        ops_line_count(&ops),
+        1,
+        "nothing appended without authorization"
+    );
+}
+
+/// F2: a decision naming a different reviewer than the authorized
+/// facilitator is refused - authority is never borrowed from the CLI
+/// argument.
+#[test]
+fn reviewer_mismatch_is_refused() {
+    let (_dir, queue, ops) = setup();
+    write_ops_log(&ops, true);
+    let record = staged_record(&uuid_string(0xE7));
+    let sidecar_before = stage_pair(&queue, &record);
+    let mut message = decision_message(
+        &record,
+        &uuid_string(0xD8),
+        100,
+        ReviewState::Pending,
+        0,
+        DecisionType::Approve,
+    );
+    message.reviewer = uuid_string(0x99); // NOT the --facilitator person
+    let file = drop_decision(&queue, &message);
+
+    let outcome = run_apply(&queue, &ops);
+    assert_eq!(outcome.exit, cn::Exit::Failure, "attention required");
+    let report = outcome.report.expect("report");
+    assert_eq!(report["decisions"][0]["outcome"], "reviewer_mismatch");
+    assert!(file.exists(), "file left for facilitator disposition");
+    let unchanged = read_sidecar(&queue, &record.record_id);
+    assert_eq!(
+        unchanged.sidecar_revision, sidecar_before.sidecar_revision,
+        "nothing admitted under borrowed authority"
+    );
+    assert_eq!(ops_line_count(&ops), 2, "nothing appended");
+}
+
+/// F8: tombstone reconciliation is digest-bound - a tombstone whose id
+/// matches a decision event but whose BYTES differ is an anomaly.
+#[test]
+fn tampered_tombstone_is_a_reconciliation_anomaly() {
+    let (_dir, queue, ops) = setup();
+    write_ops_log(&ops, true);
+    let record = staged_record(&uuid_string(0xE8));
+    stage_pair(&queue, &record);
+    let message = decision_message(
+        &record,
+        &uuid_string(0xD9),
+        100,
+        ReviewState::Pending,
+        0,
+        DecisionType::Approve,
+    );
+    let file = drop_decision(&queue, &message);
+    assert_eq!(run_apply(&queue, &ops).exit, cn::Exit::Ok);
+
+    // Rewrite the tombstone with the SAME decision_id but different bytes.
+    let tombstone = queue
+        .join("decisions")
+        .join("consumed")
+        .join(file.file_name().expect("name"));
+    let mut tampered = message.clone();
+    tampered.decided_at = cn_model::Timestamp(999);
+    fs::write(
+        &tombstone,
+        serde_json::to_vec_pretty(&tampered).expect("serializes"),
+    )
+    .expect("tampered tombstone written");
+
+    let outcome = run_apply(&queue, &ops);
+    assert_eq!(outcome.exit, cn::Exit::Failure);
+    let report = outcome.report.expect("report");
+    assert!(
+        report["tombstone_anomalies"]
+            .as_array()
+            .expect("anomalies")
+            .iter()
+            .any(|entry| entry.as_str().expect("text").contains("digest")),
+        "digest-bound reconciliation flags the tampered tombstone: {report}"
+    );
+}
+
+/// F9: an approve of a payload whose consent is NOT affirmed
+/// preflight-fails on the validation gate before the durable seam.
+#[test]
+fn unconsented_payload_preflight_fails_validation() {
+    let (_dir, queue, ops) = setup();
+    write_ops_log(&ops, true);
+    let mut unconsented = payload();
+    unconsented["consent"]["consent_affirmed"] = serde_json::json!(false);
+    let record = QueueRecord::new(
+        uuid_string(0xE9),
+        Timestamp(10),
+        SubmissionSource::InApp {},
+        unconsented,
+    )
+    .expect("record builds");
+    stage_pair(&queue, &record);
+    drop_decision(
+        &queue,
+        &decision_message(
+            &record,
+            &uuid_string(0xDA),
+            100,
+            ReviewState::Pending,
+            0,
+            DecisionType::Approve,
+        ),
+    );
+
+    let outcome = run_apply(&queue, &ops);
+    assert_eq!(outcome.exit, cn::Exit::Ok, "stderr: {}", outcome.stderr);
+    let report = outcome.report.expect("report");
+    assert_eq!(
+        report["decisions"][0]["transaction"]["kind"],
+        "preflight_failed"
+    );
+    assert!(
+        report["decisions"][0]["transaction"]["detail"]
+            .as_str()
+            .expect("detail")
+            .contains("validation_failed"),
+        "the validation gate is recorded: {report}"
+    );
+    let sidecar = read_sidecar(&queue, &record.record_id);
+    assert_eq!(sidecar.review_state, ReviewState::Pending);
+    assert_eq!(ops_line_count(&ops), 2, "nothing reached the durable seam");
+}

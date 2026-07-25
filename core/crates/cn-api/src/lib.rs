@@ -256,9 +256,11 @@ impl Api {
         let default_kind = cn_model::KindId::new(cn_ingest::DEFAULT_PILOT_KIND)
             .map_err(|_| ApiError::internal("default pilot kind is invalid"))?;
         let (kind, kind_warning) = cn_ingest::resolve_kind(&record, &default_kind);
+        let submission = cn_ingest::validate_submission(&record.payload, template);
         let report = cn_ingest::validate_record(&record, template, &kind).map_err(ingest_error)?;
         Ok(IntakeValidation {
             kind,
+            submission,
             report,
             kind_warning,
         })

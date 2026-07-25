@@ -140,6 +140,7 @@ pub fn admit(
             _ => None,
         },
         outcome,
+        extras: std::collections::BTreeMap::new(),
     };
 
     // CAS: generation AND state (the generation is what closes the ABA
@@ -153,6 +154,21 @@ pub fn admit(
                 sidecar.review_state,
                 sidecar.decision_generation,
                 DecisionOutcome::Stale,
+            ),
+        });
+    }
+
+    // Core enforcement of the required rejection reason (blueprint
+    // section 5; round-1 F9): an empty reason is an ILLEGAL decision,
+    // durably audited, never applied - UI prompts are advisory only.
+    if let DecisionType::Reject { reason } = &message.decision
+        && reason.trim().is_empty()
+    {
+        return Ok(AdmissionVerdict::Illegal {
+            entry: make_entry(
+                sidecar.review_state,
+                sidecar.decision_generation,
+                DecisionOutcome::Illegal,
             ),
         });
     }
@@ -234,6 +250,7 @@ pub fn record_transaction(
         resulting_state,
         at,
         detail,
+        extras: std::collections::BTreeMap::new(),
     });
     sidecar.review_state = resulting_state;
     sidecar.decision_generation += 1;

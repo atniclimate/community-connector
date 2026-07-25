@@ -3,7 +3,10 @@
 use sha2::{Digest, Sha256};
 
 /// Current queue record/sidecar/decision format version (ADR-005 D4).
-pub const QUEUE_RECORD_VERSION: &str = "0.1.0";
+/// 0.2.0: `reject` decisions carry their required reason as a struct
+/// variant (round-1 F10 - a wire-shape change, not additive to readers;
+/// no 0.1.0 writer was ever deployed, so no compatibility reader exists).
+pub const QUEUE_RECORD_VERSION: &str = "0.2.0";
 
 /// Typed ingest failure (I3: loud, never silent).
 #[derive(Debug, Clone, PartialEq, thiserror::Error)]
@@ -18,11 +21,17 @@ pub enum IngestError {
     Serialize(String),
 }
 
-/// SHA-256 (lowercase hex) over a value's canonical serde_json bytes.
-/// serde_json's default map is ordered (BTreeMap), so object keys are
-/// sorted and the serialization is canonical for our purposes.
+/// SHA-256 (lowercase hex) over a value's canonical bytes: the value is
+/// first converted to a `serde_json::Value` tree - whose objects are
+/// BTreeMaps, so EVERY object's keys (struct fields, flattened extras,
+/// and payload maps alike) serialize in sorted order - then serialized
+/// compactly. Direct struct serialization would emit declaration order,
+/// which is NOT canonical (ADR-005 D4 sorted-keys rule; round-1 F7).
+/// Golden vectors in tests/blueprint.rs pin the byte domain.
 pub fn canonical_digest<T: serde::Serialize>(value: &T) -> Result<String, IngestError> {
-    let bytes = serde_json::to_vec(value).map_err(|err| IngestError::Serialize(err.to_string()))?;
+    let tree =
+        serde_json::to_value(value).map_err(|err| IngestError::Serialize(err.to_string()))?;
+    let bytes = serde_json::to_vec(&tree).map_err(|err| IngestError::Serialize(err.to_string()))?;
     let mut hasher = Sha256::new();
     hasher.update(&bytes);
     Ok(format!("{:x}", hasher.finalize()))

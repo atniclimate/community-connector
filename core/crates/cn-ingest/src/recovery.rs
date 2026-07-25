@@ -76,9 +76,15 @@ pub fn classify(found: &FoundRecord) -> Result<RecoveryAction, IngestError> {
     }
 
     let Some(payload) = &found.payload else {
-        // Sidecar without payload is a binding-level investigation case.
         return Ok(match found.sidecar {
+            // A review-begun marker with BOTH bound files gone is lost
+            // decision state, not a no-op: review provably began and
+            // nothing remains to reconstruct it from (round-1 F5).
+            FoundSidecar::Missing if found.marker_present => {
+                RecoveryAction::HaltLostDecisionState { record_id }
+            }
             FoundSidecar::Missing => RecoveryAction::None { record_id },
+            // Sidecar without payload is a binding-level investigation case.
             _ => RecoveryAction::HaltBindingMismatch { record_id },
         });
     };

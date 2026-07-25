@@ -51,6 +51,243 @@ pub fn resolve_kind(record: &QueueRecord, default_kind: &KindId) -> (KindId, Opt
     }
 }
 
+/// Submission-schema findings (blueprint section 2; round-1 F9): the
+/// typed report over the RAW payload - allowlist, versions, consent
+/// shape, length caps, control characters - which template-fit
+/// validation of the built entity cannot see.
+#[derive(Debug, Clone, Default, PartialEq, serde::Serialize)]
+pub struct SubmissionFindings {
+    /// Rejecting findings: an approve of a record carrying any of these
+    /// must not reach the durable seam (validation preflight).
+    pub errors: Vec<String>,
+    /// Non-rejecting findings, surfaced for review.
+    pub warnings: Vec<String>,
+}
+
+/// Payload text caps (hostile-content guardrails; ADR-005 D4).
+pub const PAYLOAD_TEXT_MAX: usize = 2_000;
+const KNOWN_TOP_LEVEL: &[&str] = &[
+    "submission_version",
+    "submission_id",
+    "form_version",
+    "kind",
+    "consent",
+    "captured_at",
+    "fields",
+];
+
+fn has_disallowed_controls(text: &str) -> bool {
+    text.chars()
+        .any(|c| (c.is_control() && c != '\n' && c != '\t') || c == '\u{2028}' || c == '\u{2029}')
+}
+
+fn check_text(findings: &mut SubmissionFindings, what: &str, text: &str) {
+    if text.len() > PAYLOAD_TEXT_MAX {
+        findings
+            .errors
+            .push(format!("{what}: exceeds {PAYLOAD_TEXT_MAX} bytes"));
+    }
+    if has_disallowed_controls(text) {
+        findings
+            .errors
+            .push(format!("{what}: contains disallowed control characters"));
+    }
+}
+
+/// Validates the RAW submission payload against the submission schema
+/// (allowlist, versions, consent, caps, control characters). Pure; the
+/// caller decides what staging state the findings produce. An approve of
+/// a record with `errors` must never reach the durable seam.
+pub fn validate_submission(payload: &Value, template: &GroupTemplate) -> SubmissionFindings {
+    let mut findings = SubmissionFindings::default();
+    let Some(object) = payload.as_object() else {
+        findings
+            .errors
+            .push("payload is not a JSON object".to_string());
+        return findings;
+    };
+
+    for key in object.keys() {
+        if !KNOWN_TOP_LEVEL.contains(&key.as_str()) {
+            findings
+                .errors
+                .push(format!("unknown top-level field '{key}'"));
+        }
+    }
+    match object.get("submission_version").and_then(Value::as_str) {
+        None => findings
+            .errors
+            .push("submission_version missing or not a string".to_string()),
+        Some(raw) => match semver::Version::parse(raw) {
+            Err(_) => findings
+                .errors
+                .push(format!("submission_version '{raw}' is not semver")),
+            Ok(version) if version.major != 0 => findings
+                .errors
+                .push(format!("unknown submission_version major {version}")),
+            Ok(_) => {}
+        },
+    }
+    match object.get("submission_id").and_then(Value::as_str) {
+        None => findings
+            .errors
+            .push("submission_id missing or not a string".to_string()),
+        Some(id) if id.trim().is_empty() => {
+            findings.errors.push("submission_id is empty".to_string());
+        }
+        Some(id) => check_text(&mut findings, "submission_id", id),
+    }
+    if object.get("form_version").and_then(Value::as_str).is_none() {
+        findings
+            .errors
+            .push("form_version missing or not a string".to_string());
+    }
+    match object.get("consent") {
+        None => findings.errors.push("consent block missing".to_string()),
+        Some(consent) => {
+            if consent.get("consent_affirmed").and_then(Value::as_bool) != Some(true) {
+                findings
+                    .errors
+                    .push("consent_affirmed is not true - nothing proceeds without the affirmation (D-030)".to_string());
+            }
+            if consent
+                .get("consent_text_digest")
+                .and_then(Value::as_str)
+                .is_none_or(|digest| digest.is_empty())
+            {
+                findings
+                    .errors
+                    .push("consent_text_digest missing or empty".to_string());
+            }
+            if consent
+                .get("consent_affirmed_at")
+                .and_then(Value::as_i64)
+                .is_none()
+            {
+                findings
+                    .errors
+                    .push("consent_affirmed_at missing or not an integer".to_string());
+            }
+        }
+    }
+    if object.get("captured_at").and_then(Value::as_i64).is_none() {
+        findings
+            .warnings
+            .push("captured_at missing or not an integer".to_string());
+    }
+
+    // Field allowlist against the template (payload kind rule, D-070.5).
+    let default_kind = KindId::new(DEFAULT_PILOT_KIND).expect("valid const");
+    let kind_id = object
+        .get("kind")
+        .and_then(Value::as_str)
+        .and_then(|raw| KindId::new(raw).ok())
+        .unwrap_or(default_kind);
+    let kind_def = template.kinds.iter().find(|k| k.id == kind_id);
+    match (kind_def, object.get("fields")) {
+        (_, None) => findings.errors.push("fields object missing".to_string()),
+        (None, _) => findings
+            .errors
+            .push(format!("kind '{kind_id}' is not in the group template")),
+        (Some(kind_def), Some(fields)) => match fields.as_object() {
+            None => findings
+                .errors
+                .push("fields is not a JSON object".to_string()),
+            Some(fields) => {
+                for (field, value) in fields {
+                    let Some(_def) = kind_def.attributes.iter().find(|a| a.id.as_str() == field)
+                    else {
+                        findings.errors.push(format!(
+                            "field '{field}' is not a template attribute of '{kind_id}'"
+                        ));
+                        continue;
+                    };
+                    match value {
+                        Value::String(text) => check_text(&mut findings, field, text),
+                        Value::Array(items) => {
+                            for (index, item) in items.iter().enumerate() {
+                                if let Value::String(text) = item {
+                                    check_text(&mut findings, &format!("{field}[{index}]"), text);
+                                }
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            }
+        },
+    }
+    findings
+}
+
+/// Verifies a persisted approval plan's cross-field integrity before
+/// recovery trusts it (round-1 F6): lengths agree, op ids are unique and
+/// equal the ops' own ids, every per-op digest matches its op's bytes,
+/// and the pre-link batch digest recomputes from the ops with every
+/// intake `batch_digest` blanked. Returns the parsed ops on success.
+pub fn verify_persisted_plan(plan: &ApprovalPlanRef) -> Result<Vec<Operation>, IngestError> {
+    if plan.ops.is_empty()
+        || plan.ops.len() != plan.per_op_digests.len()
+        || plan.ops.len() != plan.op_ids.len()
+    {
+        return Err(IngestError::Serialize(format!(
+            "persisted plan is malformed: {} ops, {} digests, {} ids",
+            plan.ops.len(),
+            plan.per_op_digests.len(),
+            plan.op_ids.len()
+        )));
+    }
+    let ops: Vec<Operation> = plan
+        .ops
+        .iter()
+        .map(|value| serde_json::from_value(value.clone()))
+        .collect::<Result<_, _>>()
+        .map_err(|err| IngestError::Serialize(format!("persisted plan ops do not parse: {err}")))?;
+    let mut seen = std::collections::BTreeSet::new();
+    for (index, op) in ops.iter().enumerate() {
+        if plan.op_ids[index] != op.op_id.to_string() {
+            return Err(IngestError::ChecksumMismatch {
+                what: format!("plan op id {} disagrees with its op", plan.op_ids[index]),
+            });
+        }
+        if !seen.insert(op.op_id) {
+            return Err(IngestError::ChecksumMismatch {
+                what: format!("plan op id {} is duplicated", op.op_id),
+            });
+        }
+        if canonical_digest(op)? != plan.per_op_digests[index] {
+            return Err(IngestError::ChecksumMismatch {
+                what: format!("plan digest for op {}", op.op_id),
+            });
+        }
+    }
+    // Recompute the pre-link projection: canonical ops with every intake
+    // batch_digest EMPTY (ADR-005 D5 non-circular definition).
+    let mut prelink = ops.clone();
+    for op in &mut prelink {
+        if let OpKind::EntityCreate { entity } = &mut op.kind {
+            if let Some(block) = entity.provenance.intake().cloned() {
+                let mut cleared = block;
+                cleared.batch_digest = String::new();
+                entity.provenance.set_intake(cleared);
+            }
+            for instance in entity.attributes.values_mut() {
+                if let Some(block) = instance.provenance.intake().cloned() {
+                    let mut cleared = block;
+                    cleared.batch_digest = String::new();
+                    instance.provenance.set_intake(cleared);
+                }
+            }
+        }
+    }
+    if canonical_digest(&prelink)? != plan.batch_digest {
+        return Err(IngestError::ChecksumMismatch {
+            what: "plan batch_digest does not recompute from its ops".to_string(),
+        });
+    }
+    Ok(ops)
+}
+
 /// The authoritative template-fit validation for a queue record, computed
 /// by building EXACTLY the entity `plan_approval` would build (throwaway
 /// ids and plan context, discarded ops): the review UI's report can never
@@ -286,6 +523,7 @@ pub fn plan_approval(
             .map(serde_json::to_value)
             .collect::<Result<_, _>>()
             .map_err(|err| IngestError::Serialize(err.to_string()))?,
+        extras: std::collections::BTreeMap::new(),
     };
     Ok(ApprovalPlan {
         ops,

@@ -396,6 +396,7 @@ fn preflight_failure_transaction_event_is_representable_and_serialized() {
             resulting_state: ReviewState::Failed,
             at: ts(3),
             detail: None,
+            extras: std::collections::BTreeMap::new(),
         };
         let json = serde_json::to_string(&entry).expect("serialize");
         let back: HistoryEntry = serde_json::from_str(&json).expect("parse");
@@ -935,5 +936,208 @@ fn validate_record_reports_template_fit_like_the_plan_path() {
     assert!(
         validate_record(&tampered, &template, &kind).is_err(),
         "checksum failure is a typed error, not a validation finding"
+    );
+}
+
+// --- round-1 amendments (2026-07-25 adversarial round) ---
+
+#[test]
+fn empty_reject_reason_is_illegal_in_core() {
+    let record = record();
+    let sidecar = ReviewSidecar::initial(&record).expect("sidecar");
+    let message = decision(
+        "d-empty",
+        1,
+        ReviewState::Pending,
+        0,
+        DecisionType::Reject {
+            reason: "   ".to_string(),
+        },
+    );
+    let verdict = admit(&sidecar, &message).expect("admission runs");
+    assert!(
+        matches!(verdict, AdmissionVerdict::Illegal { .. }),
+        "core enforces the required reason; UI prompts are advisory: {verdict:?}"
+    );
+}
+
+#[test]
+fn marker_with_no_files_is_lost_decision_state() {
+    let found = FoundRecord {
+        record_id: "rec-gone".to_string(),
+        payload: None,
+        payload_corrupt: false,
+        sidecar: FoundSidecar::Missing,
+        marker_present: true,
+        pending_decisions: 0,
+    };
+    assert_eq!(
+        classify(&found).expect("classify"),
+        RecoveryAction::HaltLostDecisionState {
+            record_id: "rec-gone".to_string()
+        },
+        "review provably began; nothing remains to reconstruct from"
+    );
+}
+
+#[test]
+fn validate_submission_rejects_hostile_and_malformed_payloads() {
+    let template = plan_template();
+
+    let clean = validate_submission(&payload(), &template);
+    assert!(
+        clean.errors.is_empty(),
+        "fixture payload is clean: {clean:?}"
+    );
+
+    let mut unaffirmed = payload();
+    unaffirmed["consent"]["consent_affirmed"] = json!(false);
+    assert!(
+        validate_submission(&unaffirmed, &template)
+            .errors
+            .iter()
+            .any(|e| e.contains("consent_affirmed")),
+        "unaffirmed consent is a rejecting finding (D-030)"
+    );
+
+    let mut unknown_top = payload();
+    unknown_top["tracking_pixel"] = json!("x");
+    assert!(
+        validate_submission(&unknown_top, &template)
+            .errors
+            .iter()
+            .any(|e| e.contains("unknown top-level")),
+        "top-level allowlist enforced"
+    );
+
+    let mut unknown_field = payload();
+    unknown_field["fields"]["shoe_size"] = json!("12");
+    assert!(
+        validate_submission(&unknown_field, &template)
+            .errors
+            .iter()
+            .any(|e| e.contains("shoe_size")),
+        "field allowlist against the template enforced"
+    );
+
+    let mut oversized = payload();
+    oversized["fields"]["display_name"] = json!("x".repeat(PAYLOAD_TEXT_MAX + 1));
+    assert!(
+        validate_submission(&oversized, &template)
+            .errors
+            .iter()
+            .any(|e| e.contains("display_name")),
+        "length cap enforced"
+    );
+
+    let mut hostile = payload();
+    hostile["fields"]["display_name"] = json!("Jo\u{0007}Doe");
+    assert!(
+        validate_submission(&hostile, &template)
+            .errors
+            .iter()
+            .any(|e| e.contains("control")),
+        "control characters rejected"
+    );
+
+    let mut no_version = payload();
+    no_version
+        .as_object_mut()
+        .expect("obj")
+        .remove("submission_version");
+    assert!(
+        !validate_submission(&no_version, &template)
+            .errors
+            .is_empty(),
+        "missing submission_version rejected"
+    );
+}
+
+#[test]
+fn verify_persisted_plan_accepts_real_plans_and_rejects_tampering() {
+    let record = remote_record();
+    let template = plan_template();
+    let context = plan_context();
+    let plan = plan_approval(&record, &template, &context, &mut deterministic_ids()).expect("plan");
+
+    let ops = verify_persisted_plan(&plan.plan_ref).expect("self-consistent plan verifies");
+    assert_eq!(ops.len(), 1);
+
+    // Drifted op id list.
+    let mut drifted = plan.plan_ref.clone();
+    drifted.op_ids[0] = "00000000-0000-0000-0000-00000000dead".to_string();
+    assert!(
+        verify_persisted_plan(&drifted).is_err(),
+        "op-id drift detected"
+    );
+
+    // Unrelated batch digest.
+    let mut wrong_batch = plan.plan_ref.clone();
+    wrong_batch.batch_digest = "0".repeat(64);
+    assert!(
+        verify_persisted_plan(&wrong_batch).is_err(),
+        "batch_digest must recompute from the ops"
+    );
+
+    // Tampered op bytes with a stale digest list.
+    let mut tampered = plan.plan_ref.clone();
+    tampered.ops[0]["recorded_at"] = json!(999_999);
+    assert!(
+        verify_persisted_plan(&tampered).is_err(),
+        "per-op digest mismatch detected"
+    );
+
+    // Length disagreement.
+    let mut short = plan.plan_ref.clone();
+    short.per_op_digests.clear();
+    assert!(verify_persisted_plan(&short).is_err(), "length checks hold");
+}
+
+#[test]
+fn nested_unknown_minor_fields_survive_sidecar_rewrite() {
+    let record = record();
+    let mut sidecar = ReviewSidecar::initial(&record).expect("sidecar");
+    let message = decision("d-n", 1, ReviewState::Pending, 0, DecisionType::Approve);
+    let verdict = admit(&sidecar, &message).expect("verdict");
+    apply_verdict(&mut sidecar, &verdict).expect("admitted");
+
+    // A newer-minor writer added fields inside the history entry.
+    let mut value = serde_json::to_value(&sidecar).expect("value");
+    value["history"][0]["future_note"] = json!("kept");
+    let mut parsed: ReviewSidecar = serde_json::from_value(value).expect("parses");
+    parsed.seal_rewrite().expect("reseal");
+    let round_tripped = serde_json::to_value(&parsed).expect("value");
+    assert_eq!(
+        round_tripped["history"][0]["future_note"], "kept",
+        "nested unknown-minor data survives the rewrite (I7)"
+    );
+}
+
+#[test]
+fn canonical_digest_golden_vectors_pin_the_byte_domain() {
+    // The canonical domain is the sorted-key JSON tree (ADR-005 D4).
+    // These vectors pin it: any serializer or schema drift that changes
+    // the bytes fails HERE, not in a live queue.
+    let simple = json!({ "b": 1, "a": { "d": true, "c": "x" } });
+    assert_eq!(
+        canonical_digest(&simple).expect("digest"),
+        "8db12c99f4ab6cb9510437ba655f2ce027fe900d0c2bcb0d9f4a8ad05ce2cda9",
+        "sorted-key object digest"
+    );
+
+    let record = QueueRecord::new(
+        "golden-rec".to_string(),
+        ts(42),
+        SubmissionSource::InApp {},
+        json!({ "submission_id": "sub-g", "fields": { "display_name": "Golden Vector" } }),
+    )
+    .expect("record");
+    assert_eq!(
+        record.record_checksum, "6200bcf8723b2efec194fc3e90e58489c73fe9ee6742d51ac0cf9f1001587bec",
+        "queue-record checksum domain"
+    );
+    assert_eq!(
+        record.payload_hash, "ca230fbb029d531f1615ba8f36f9075eb915d9070ecab75f354770194536a2eb",
+        "payload digest domain"
     );
 }
