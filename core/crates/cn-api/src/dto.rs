@@ -106,3 +106,25 @@ pub(crate) struct NearDupRequest {
     #[serde(default)]
     pub(crate) affiliation_attrs: Vec<AttrId>,
 }
+
+/// Staged pair returned by the pure record builder: the app writes these
+/// bytes create-only over FSA; it never computes a checksum itself.
+#[derive(Debug, Serialize)]
+pub(crate) struct StagedPair {
+    pub(crate) record: cn_ingest::QueueRecord,
+    pub(crate) sidecar: cn_ingest::ReviewSidecar,
+}
+
+/// Decision-message build request (D-073): identity (decision_id UUIDv7)
+/// and format version are core-generated; the app supplies only the CAS
+/// premise it observed and the decision content.
+#[derive(Debug, Deserialize)]
+pub(crate) struct DecisionRequest {
+    pub(crate) record_id: String,
+    pub(crate) payload_digest: String,
+    pub(crate) expected_review_state: cn_ingest::ReviewState,
+    pub(crate) expected_decision_generation: u64,
+    pub(crate) decision: cn_ingest::DecisionType,
+    pub(crate) reviewer: String,
+    pub(crate) decided_at_ms: i64,
+}

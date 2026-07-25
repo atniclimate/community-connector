@@ -87,6 +87,42 @@ export type KindMeta = {
   readonly colorRole: string;
 };
 
+/** One queue record as summarized for the wizard (display-only; the
+ * native CLI re-verifies everything authoritatively). */
+export type IntakeRecordSummaryDto = {
+  readonly recordId: string;
+  /** Sidecar review_state; null when the sidecar is missing/unreadable
+   * (the wizard refuses to stage decisions for such records). */
+  readonly reviewState: string | null;
+  readonly decisionGeneration: number;
+  /** The record_checksum value - the decision message's payload binding. */
+  readonly payloadDigest: string;
+  readonly stagedAtMs: number;
+  readonly payload: JsonObject;
+};
+
+export type IntakeStatus = "idle" | "working" | "ready" | "error";
+
+export type IntakeState = {
+  /** Granted FSA queue-directory name; null until the facilitator grants. */
+  readonly dirName: string | null;
+  readonly status: IntakeStatus;
+  readonly records: readonly IntakeRecordSummaryDto[];
+  /** Unconsumed decision files staged and awaiting `cn intake apply`. */
+  readonly pendingDecisionFiles: number;
+  readonly lastError: ErrorEnvelopeDto | null;
+};
+
+export function initialIntakeState(): IntakeState {
+  return {
+    dirName: null,
+    status: "idle",
+    records: [],
+    pendingDecisionFiles: 0,
+    lastError: null,
+  };
+}
+
 export interface AppState {
   readonly session: {
     readonly groupId: string | null;
@@ -118,6 +154,9 @@ export interface AppState {
     readonly kindMeta: Readonly<Record<string, KindMeta>>;
   };
   readonly search: SearchState;
+  /** Intake queue slice: survives group reloads (the queue is the
+   * facilitator's ops directory, not group-session data). */
+  readonly intake: IntakeState;
   readonly theme: {
     readonly resolved: Theme | null;
     readonly report: ThemeReport | null;
@@ -166,6 +205,7 @@ export function createInitialState(reducedMotion = false): AppState {
       kindMeta: {},
     },
     search: initialSearchState(),
+    intake: initialIntakeState(),
     theme: {
       resolved: null,
       report: null,

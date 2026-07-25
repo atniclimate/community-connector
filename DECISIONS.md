@@ -1492,3 +1492,31 @@ The human ruled on the two standing queue items (Q-CHK/Q-TEXT):
    + synthetic fixtures becomes a sequencing priority (it directly
    enables those meetings). Engineering stays on synthetic data
    throughout - unchanged.
+
+## D-073 (2026-07-24) - Step 8: core-built queue bytes; the app never computes a digest
+
+The queue formats carry embedded checksums that must byte-match the
+core's recomputation. Reimplementing serde-canonical serialization in
+TypeScript would duplicate format authority and invite silent
+divergence, so cn-api/cn-wasm gain two PURE BUILDER exports -
+`intake_stage_record` (checksummed record + initial pending sidecar,
+core-generated UUIDv7 record_id) and `intake_build_decision`
+(core-generated decision_id and format version; the app supplies only
+the CAS premise it observed and the decision content). These are
+compute, not mutation: nothing durable exists on the in-memory
+boundary, so the blueprint's no-approval-write rule stands untouched;
+the app remains a create-only writer of core-composed bytes (I2). A
+facade test proves the built decision ADMITS against the built sidecar
+end to end. Checksum verification is order-independent (recomputed from
+the parsed struct), so the app may re-serialize the returned objects
+without breaking verification.
+
+The FSA adapter (app/src/state/intake.ts) implements the create-only
+contract (refuse-if-exists, write, read-back byte compare), the
+best-effort in-browser guard (FSA grants no ancestor access, so only
+the granted directory is probed - the native CLI guard stays
+authoritative), the wizard refusal rule (no decisions against
+approved_intent or unreadable sidecars), and the read-only dashboard
+scan. Intake state is a new store slice that survives group reloads
+(the queue belongs to the facilitator's ops directory, not the group
+session).

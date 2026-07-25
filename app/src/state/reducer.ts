@@ -1,6 +1,6 @@
 import type { Action } from "./actions";
 import type { AppState } from "./state";
-import { initialSearchState } from "./state";
+import { initialIntakeState, initialSearchState } from "./state";
 import type { RequestIdentity } from "./state";
 
 function assertNever(value: never): never {
@@ -254,6 +254,52 @@ export function reduce(state: AppState, action: Action): AppState {
       return {
         ...state,
         session: { ...state.session, lastError: null },
+      };
+    case "intakeDirGranted":
+      return {
+        ...state,
+        intake: { ...initialIntakeState(), dirName: action.dirName },
+      };
+    case "intakeDirCleared":
+      return { ...state, intake: initialIntakeState() };
+    case "intakeScanStarted":
+      return {
+        ...state,
+        intake: { ...state.intake, status: "working", lastError: null },
+      };
+    case "intakeQueueLoaded":
+      return {
+        ...state,
+        intake: {
+          ...state.intake,
+          status: "ready",
+          records: action.records,
+          pendingDecisionFiles: action.pendingDecisionFiles,
+          lastError: null,
+        },
+      };
+    case "intakeRecordStaged":
+      return {
+        ...state,
+        intake: {
+          ...state.intake,
+          status: "ready",
+          records: [...state.intake.records, action.record],
+        },
+      };
+    case "intakeReviewDecided":
+      return {
+        ...state,
+        intake: {
+          ...state.intake,
+          status: "ready",
+          pendingDecisionFiles: state.intake.pendingDecisionFiles + 1,
+        },
+      };
+    case "intakeFailed":
+      return {
+        ...state,
+        intake: { ...state.intake, status: "error", lastError: action.error },
       };
     default:
       return assertNever(action);

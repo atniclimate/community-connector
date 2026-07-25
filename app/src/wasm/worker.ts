@@ -44,6 +44,16 @@ function runRequest(instance: CnApi, request: WorkerRequest): string {
       return instance.query_paths(request.groupId, viewerJson(request), JSON.stringify(request.request));
     case "queryNeighborhood":
       return instance.query_neighborhood(request.groupId, viewerJson(request), JSON.stringify(request.request));
+    case "intakeStageRecord":
+      return instance.intake_stage_record(request.payloadJson, request.stagedAtMs);
+    case "intakeBuildDecision":
+      return instance.intake_build_decision(request.requestJson);
+    case "intakeValidateRecord":
+      return instance.intake_validate_record(request.groupId, request.recordJson);
+    case "intakeDedupCheck":
+      return instance.intake_dedup_check(request.recordJson, request.existingKeysJson);
+    case "intakeNearDuplicates":
+      return instance.intake_near_duplicates(request.groupId, viewerJson(request), request.requestJson);
     default:
       return JSON.stringify({ err: protocolError("Unknown worker request") });
   }

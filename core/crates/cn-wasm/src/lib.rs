@@ -136,5 +136,14 @@ mod bindings {
             self.inner
                 .intake_near_duplicates(group_id, viewer_ctx_json, request_json)
         }
+
+        pub fn intake_stage_record(&self, payload_json: &str, staged_at_ms: f64) -> String {
+            self.inner
+                .intake_stage_record(payload_json, staged_at_ms as i64)
+        }
+
+        pub fn intake_build_decision(&self, request_json: &str) -> String {
+            self.inner.intake_build_decision(request_json)
+        }
     }
 }

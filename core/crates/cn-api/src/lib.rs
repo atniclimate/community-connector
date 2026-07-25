@@ -17,8 +17,9 @@ use cn_model::{EntityId, GroupId};
 use cn_perm::{ProjectedEntity, Projection, ViewerContext};
 use cn_store::{Operation, StoreReport};
 use dto::{
-    CoreInfo, DetailValue, EntityDetail, ExportOptions, ExportSnapshot, IntakeDedup,
-    IntakeValidation, LoadReport, NearDupRequest, NeighborhoodRequest, PathRequest, SubmitReport,
+    CoreInfo, DecisionRequest, DetailValue, EntityDetail, ExportOptions, ExportSnapshot,
+    IntakeDedup, IntakeValidation, LoadReport, NearDupRequest, NeighborhoodRequest, PathRequest,
+    StagedPair, SubmitReport,
 };
 use error::{ApiError, ErrorCode};
 use export::export_projection;
@@ -170,6 +171,61 @@ impl Api {
         request_json: &str,
     ) -> String {
         respond(|| self.intake_near_duplicates_impl(group_id, viewer_ctx_json, request_json))
+    }
+
+    /// PURE BUILDER (D-073): assembles the checksummed queue record and
+    /// its initial pending sidecar for one in-app submission payload. The
+    /// app writes the returned bytes create-only over FSA; format and
+    /// checksum authority stay in the core (I2) - the app never computes
+    /// a digest itself. Ids (record_id, UUIDv7) are core-generated. This
+    /// is compute, not mutation: nothing durable exists on this boundary.
+    pub fn intake_stage_record(&self, payload_json: &str, staged_at_ms: i64) -> String {
+        respond(|| self.intake_stage_record_impl(payload_json, staged_at_ms))
+    }
+
+    /// PURE BUILDER (D-073): assembles a decision-inbox message with a
+    /// core-generated decision_id (UUIDv7) and format version. The app
+    /// writes it create-only into `decisions/`; admission stays native.
+    pub fn intake_build_decision(&self, request_json: &str) -> String {
+        respond(|| self.intake_build_decision_impl(request_json))
+    }
+
+    fn intake_stage_record_impl(
+        &self,
+        payload_json: &str,
+        staged_at_ms: i64,
+    ) -> Result<StagedPair, ApiError> {
+        let payload: Value = parse_json(payload_json)?;
+        if !payload.is_object() {
+            return Err(ApiError::invalid_json(
+                "submission payload must be a JSON object",
+            ));
+        }
+        let record = cn_ingest::QueueRecord::new(
+            cn_ingest::new_uuid_v7(),
+            cn_model::Timestamp(staged_at_ms),
+            cn_ingest::SubmissionSource::InApp {},
+            payload,
+        )
+        .map_err(ingest_error)?;
+        let sidecar = cn_ingest::ReviewSidecar::initial(&record).map_err(ingest_error)?;
+        Ok(StagedPair { record, sidecar })
+    }
+
+    fn intake_build_decision_impl(&self, request_json: &str) -> Result<Value, ApiError> {
+        let request: DecisionRequest = parse_json(request_json)?;
+        let message = cn_ingest::DecisionMessage {
+            queue_record_version: cn_ingest::decision_message_version(),
+            decision_id: cn_ingest::new_uuid_v7(),
+            record_id: request.record_id,
+            payload_digest: request.payload_digest,
+            expected_review_state: request.expected_review_state,
+            expected_decision_generation: request.expected_decision_generation,
+            decision: request.decision,
+            reviewer: request.reviewer,
+            decided_at: cn_model::Timestamp(request.decided_at_ms),
+        };
+        serde_json::to_value(&message).map_err(|err| ApiError::internal(err.to_string()))
     }
 
     fn intake_validate_record_impl(

@@ -56,6 +56,36 @@ export type WorkerRequest =
       readonly groupId: string;
       readonly viewer: ViewerContextDto;
       readonly request: JsonObject;
+    }
+  | {
+      readonly correlationId: number;
+      readonly kind: "intakeStageRecord";
+      readonly payloadJson: string;
+      readonly stagedAtMs: number;
+    }
+  | {
+      readonly correlationId: number;
+      readonly kind: "intakeBuildDecision";
+      readonly requestJson: string;
+    }
+  | {
+      readonly correlationId: number;
+      readonly kind: "intakeValidateRecord";
+      readonly groupId: string;
+      readonly recordJson: string;
+    }
+  | {
+      readonly correlationId: number;
+      readonly kind: "intakeDedupCheck";
+      readonly recordJson: string;
+      readonly existingKeysJson: string;
+    }
+  | {
+      readonly correlationId: number;
+      readonly kind: "intakeNearDuplicates";
+      readonly groupId: string;
+      readonly viewer: ViewerContextDto;
+      readonly requestJson: string;
     };
 
 export type WorkerRequestInput =
@@ -65,12 +95,22 @@ export type WorkerRequestInput =
   | Omit<Extract<WorkerRequest, { readonly kind: "submitOps" }>, "correlationId">
   | Omit<Extract<WorkerRequest, { readonly kind: "search" }>, "correlationId">
   | Omit<Extract<WorkerRequest, { readonly kind: "queryPaths" }>, "correlationId">
-  | Omit<Extract<WorkerRequest, { readonly kind: "queryNeighborhood" }>, "correlationId">;
+  | Omit<Extract<WorkerRequest, { readonly kind: "queryNeighborhood" }>, "correlationId">
+  | Omit<Extract<WorkerRequest, { readonly kind: "intakeStageRecord" }>, "correlationId">
+  | Omit<Extract<WorkerRequest, { readonly kind: "intakeBuildDecision" }>, "correlationId">
+  | Omit<Extract<WorkerRequest, { readonly kind: "intakeValidateRecord" }>, "correlationId">
+  | Omit<Extract<WorkerRequest, { readonly kind: "intakeDedupCheck" }>, "correlationId">
+  | Omit<Extract<WorkerRequest, { readonly kind: "intakeNearDuplicates" }>, "correlationId">;
 
 export type WorkerResponse =
   | {
       readonly correlationId: number;
-      readonly ok: ProjectionDto | EntityDetailDto | readonly SearchHitDto[] | JsonObject;
+      readonly ok:
+        | ProjectionDto
+        | EntityDetailDto
+        | readonly SearchHitDto[]
+        | readonly JsonObject[]
+        | JsonObject;
     }
   | {
       readonly correlationId: number;

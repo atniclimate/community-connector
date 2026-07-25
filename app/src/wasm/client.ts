@@ -102,6 +102,30 @@ export class WasmClient {
     return this.request({ kind: "queryNeighborhood", groupId, viewer, request });
   }
 
+  public intakeStageRecord(payloadJson: string, stagedAtMs: number): Promise<JsonObject> {
+    return this.request({ kind: "intakeStageRecord", payloadJson, stagedAtMs });
+  }
+
+  public intakeBuildDecision(requestJson: string): Promise<JsonObject> {
+    return this.request({ kind: "intakeBuildDecision", requestJson });
+  }
+
+  public intakeValidateRecord(groupId: string, recordJson: string): Promise<JsonObject> {
+    return this.request({ kind: "intakeValidateRecord", groupId, recordJson });
+  }
+
+  public intakeDedupCheck(recordJson: string, existingKeysJson: string): Promise<JsonObject> {
+    return this.request({ kind: "intakeDedupCheck", recordJson, existingKeysJson });
+  }
+
+  public intakeNearDuplicates(
+    groupId: string,
+    viewer: ViewerContextDto,
+    requestJson: string,
+  ): Promise<readonly JsonObject[]> {
+    return this.request({ kind: "intakeNearDuplicates", groupId, viewer, requestJson });
+  }
+
   public toErrorEnvelope(error: unknown): ErrorEnvelopeDto {
     if (this.isErrorEnvelope(error)) {
       return error;

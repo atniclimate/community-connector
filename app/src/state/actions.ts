@@ -1,6 +1,7 @@
 import type {
   EntityDetailDto,
   ErrorEnvelopeDto,
+  IntakeRecordSummaryDto,
   KindMeta,
   ProjectionDto,
   QualityTierName,
@@ -119,4 +120,31 @@ export type Action =
     }
   | {
       readonly kind: "errorDismissed";
+    }
+  | {
+      readonly kind: "intakeDirGranted";
+      readonly dirName: string;
+    }
+  | {
+      readonly kind: "intakeDirCleared";
+    }
+  | {
+      readonly kind: "intakeScanStarted";
+    }
+  | {
+      readonly kind: "intakeQueueLoaded";
+      readonly records: readonly IntakeRecordSummaryDto[];
+      readonly pendingDecisionFiles: number;
+    }
+  | {
+      readonly kind: "intakeRecordStaged";
+      readonly record: IntakeRecordSummaryDto;
+    }
+  | {
+      readonly kind: "intakeReviewDecided";
+      readonly recordId: string;
+    }
+  | {
+      readonly kind: "intakeFailed";
+      readonly error: ErrorEnvelopeDto;
     };

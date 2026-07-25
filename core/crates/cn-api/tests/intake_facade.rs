@@ -319,3 +319,48 @@ fn dedup_check_classifies_against_supplied_keys() {
     let conflict = parse(&api.intake_dedup_check(&record_json, &conflicting));
     assert_eq!(conflict["verdict"], "conflict");
 }
+
+#[test]
+fn pure_builders_produce_verifiable_pair_and_admissible_decision() {
+    // No loaded group needed: the builders are pure compute (D-073).
+    let api = cn_api::Api::new();
+    let payload = queue_record().payload;
+    let staged = parse(&api.intake_stage_record(&payload.to_string(), 10));
+
+    let record: QueueRecord =
+        serde_json::from_value(staged["record"].clone()).expect("record parses");
+    let sidecar: cn_ingest::ReviewSidecar =
+        serde_json::from_value(staged["sidecar"].clone()).expect("sidecar parses");
+    record.verify().expect("core-computed checksums verify");
+    sidecar.verify_pair(&record).expect("pair binding verifies");
+    assert_eq!(sidecar.decision_generation, 0);
+    assert!(
+        uuid::Uuid::parse_str(&record.record_id).is_ok(),
+        "core-generated record id is a uuid"
+    );
+
+    // The built decision admits against the built sidecar: the whole
+    // app-side write path is core-composed end to end.
+    let request = json!({
+        "record_id": record.record_id,
+        "payload_digest": record.record_checksum,
+        "expected_review_state": "pending",
+        "expected_decision_generation": 0,
+        "decision": "approve",
+        "reviewer": uuid_string(2),
+        "decided_at_ms": 100
+    })
+    .to_string();
+    let message: cn_ingest::DecisionMessage =
+        serde_json::from_value(parse(&api.intake_build_decision(&request))).expect("message");
+    assert!(uuid::Uuid::parse_str(&message.decision_id).is_ok());
+    let verdict = cn_ingest::admit(&sidecar, &message).expect("admission runs");
+    assert!(
+        matches!(verdict, cn_ingest::AdmissionVerdict::Admit { .. }),
+        "built decision admits: {verdict:?}"
+    );
+
+    // A non-object payload is a typed error.
+    let rejected = api.intake_stage_record("[1,2]", 10);
+    assert!(rejected.contains("\"err\""), "typed error: {rejected}");
+}
