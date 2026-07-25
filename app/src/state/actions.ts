@@ -150,6 +150,10 @@ export type Action =
       readonly recordId: string | null;
     }
   | {
+      readonly kind: "intakeNoticeAdded";
+      readonly notice: string;
+    }
+  | {
       readonly kind: "intakeFailed";
       readonly error: ErrorEnvelopeDto;
     };

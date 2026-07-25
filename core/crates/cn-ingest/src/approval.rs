@@ -9,6 +9,7 @@
 //! blueprint's earlier op-list sketch, recorded here).
 
 use serde_json::Value;
+use unicode_normalization::UnicodeNormalization;
 
 use cn_model::{
     ActorRef, AttributeInstance, AttributeValue, Entity, EntityId, GeoValue, GroupId,
@@ -81,6 +82,14 @@ const KNOWN_TOP_LEVEL: &[&str] = &[
     "fields",
 ];
 
+/// NFC normalization applied to every stored free-text value (the
+/// blueprint's Unicode-normalization rule; round-3 F9): equal-looking
+/// names compare equally downstream, and validation measures the same
+/// bytes approval stores.
+fn nfc(text: &str) -> String {
+    text.nfc().collect()
+}
+
 fn has_disallowed_controls(text: &str) -> bool {
     text.chars()
         .any(|c| (c.is_control() && c != '\n' && c != '\t') || c == '\u{2028}' || c == '\u{2029}')
@@ -142,10 +151,14 @@ pub fn validate_submission(payload: &Value, template: &GroupTemplate) -> Submiss
         }
         Some(id) => check_text(&mut findings, "submission_id", id),
     }
-    if object.get("form_version").and_then(Value::as_str).is_none() {
-        findings
+    match object.get("form_version").and_then(Value::as_str) {
+        None => findings
             .errors
-            .push("form_version missing or not a string".to_string());
+            .push("form_version missing or not a string".to_string()),
+        Some(version) if version.trim().is_empty() => {
+            findings.errors.push("form_version is empty".to_string());
+        }
+        Some(version) => check_text(&mut findings, "form_version", version),
     }
     match object.get("consent") {
         None => findings.errors.push("consent block missing".to_string()),
@@ -155,14 +168,30 @@ pub fn validate_submission(payload: &Value, template: &GroupTemplate) -> Submiss
                     .errors
                     .push("consent_affirmed is not true - nothing proceeds without the affirmation (D-030)".to_string());
             }
-            if consent
-                .get("consent_text_digest")
-                .and_then(Value::as_str)
-                .is_none_or(|digest| digest.is_empty())
-            {
-                findings
+            match consent.get("consent_text_digest").and_then(Value::as_str) {
+                None => findings
                     .errors
-                    .push("consent_text_digest missing or empty".to_string());
+                    .push("consent_text_digest missing or not a string".to_string()),
+                Some("") => {
+                    findings
+                        .errors
+                        .push("consent_text_digest missing or empty".to_string());
+                }
+                Some(digest) => {
+                    check_text(&mut findings, "consent_text_digest", digest);
+                    // Shape is a WARNING, not a rejection: synthetic demo
+                    // digests are marker strings by design; the real form
+                    // computes sha-256 hex (round-3 F9 hardening).
+                    let is_sha256_hex =
+                        digest.len() == 64 && digest.chars().all(|c| c.is_ascii_hexdigit());
+                    if !is_sha256_hex {
+                        findings.warnings.push(
+                            "consent_text_digest is not sha-256 hex (expected for real \
+                             consent captures; synthetic fixtures may differ)"
+                                .to_string(),
+                        );
+                    }
+                }
             }
             if consent
                 .get("consent_affirmed_at")
@@ -343,14 +372,12 @@ pub struct ApprovalPlan {
 /// rejecting finding before any plan reaches the seam.
 fn attr_value_from_json(def: &AttrDef, value: &Value) -> Option<AttributeValue> {
     match (&def.attr_type, value) {
-        (AttrType::Text, Value::String(s)) => Some(AttributeValue::Text(s.clone())),
+        (AttrType::Text, Value::String(s)) => Some(AttributeValue::Text(nfc(s))),
         (AttrType::Enum, Value::String(s)) => Some(AttributeValue::Enum(s.clone())),
         (AttrType::Number, Value::Number(n)) => n.as_f64().map(AttributeValue::Number),
         (AttrType::Tags, Value::Array(items)) => {
-            let tags: Option<std::collections::BTreeSet<String>> = items
-                .iter()
-                .map(|item| item.as_str().map(str::to_string))
-                .collect();
+            let tags: Option<std::collections::BTreeSet<String>> =
+                items.iter().map(|item| item.as_str().map(nfc)).collect();
             tags.map(AttributeValue::Tags)
         }
         (AttrType::Date, Value::String(s)) => {
@@ -363,11 +390,9 @@ fn attr_value_from_json(def: &AttrDef, value: &Value) -> Option<AttributeValue> 
             ) {
                 GeoValue::point(lat, lon).ok().map(AttributeValue::Geo)
             } else {
-                map.get("name").and_then(Value::as_str).map(|name| {
-                    AttributeValue::Geo(GeoValue::Region {
-                        name: name.to_string(),
-                    })
-                })
+                map.get("name")
+                    .and_then(Value::as_str)
+                    .map(|name| AttributeValue::Geo(GeoValue::Region { name: nfc(name) }))
             }
         }
         (AttrType::Link, Value::String(s)) => LinkValue::new(s.clone(), def.format)
@@ -413,6 +438,24 @@ fn check_field(findings: &mut SubmissionFindings, def: &AttrDef, field: &str, va
         findings.errors.push(format!(
             "{field}: '{chosen}' is not one of the template's enum values"
         ));
+    }
+    if def.attr_type == AttrType::Geo
+        && let Value::Object(map) = value
+    {
+        // Deep geo contract (round-3 F9): exactly {lat, lon} numbers or
+        // {name}; region names get the same hazard checks as any text;
+        // unknown keys are rejected, never silently discarded.
+        let keys: Vec<&str> = map.keys().map(String::as_str).collect();
+        let point_shape = keys.len() == 2 && keys.contains(&"lat") && keys.contains(&"lon");
+        let region_shape = keys == ["name"];
+        if !point_shape && !region_shape {
+            findings.errors.push(format!(
+                "{field}: geo values are exactly {{lat, lon}} or {{name}}; got keys {keys:?}"
+            ));
+        }
+        if let Some(name) = map.get("name").and_then(Value::as_str) {
+            check_text(findings, &format!("{field}.name"), name);
+        }
     }
     if attr_value_from_json(def, value).is_none() {
         findings.errors.push(format!(

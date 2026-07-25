@@ -5,7 +5,7 @@ import { consentText, consentTextDigest } from "./consent";
 import {
   SUBMISSION_VERSION,
   TAGS_MAX_ITEMS,
-  TEXT_MAX_LENGTH,
+  TEXT_MAX_BYTES,
   advisoryIssues,
   buildPayload,
   canSubmit,
@@ -72,6 +72,19 @@ describe("fieldValue typed conversion", () => {
     expect(fieldValue(capacity!, "12.5")).toBe(12.5);
     expect(fieldValue(capacity!, "not a number")).toBeUndefined();
   });
+
+  it("encodes geo input as the core's canonical raw shape (round-3 F9)", () => {
+    const geoAttr = {
+      id: "location",
+      attrType: "geo" as const,
+      required: false,
+      values: [],
+      defaultVisibility: null,
+    };
+    expect(fieldValue(geoAttr, " 45.5 , -122.6 ")).toEqual({ lat: 45.5, lon: -122.6 });
+    expect(fieldValue(geoAttr, "Upper Basin")).toEqual({ name: "Upper Basin" });
+    expect(fieldValue(geoAttr, "not, numbers")).toEqual({ name: "not, numbers" });
+  });
 });
 
 describe("advisoryIssues (advisory UX only; the core stays authoritative, I2)", () => {
@@ -80,9 +93,12 @@ describe("advisoryIssues (advisory UX only; the core stays authoritative, I2)", 
     expect(advisoryIssues(name!, "")).toEqual(["This field is required."]);
     expect(advisoryIssues(capacity!, "abc")).toEqual(["Enter a number."]);
     expect(advisoryIssues(status!, "unlisted")[0]).toContain("listed choices");
-    expect(advisoryIssues(name!, "x".repeat(TEXT_MAX_LENGTH + 1))[0]).toContain(
-      String(TEXT_MAX_LENGTH),
+    expect(advisoryIssues(name!, "x".repeat(TEXT_MAX_BYTES + 1))[0]).toContain(
+      String(TEXT_MAX_BYTES),
     );
+    // Byte-measured, not UTF-16 units (round-3 F9): 1001 two-byte chars
+    // exceed 2000 bytes despite only 1001 code units.
+    expect(advisoryIssues(name!, "\u00e9".repeat(1001))[0]).toContain(String(TEXT_MAX_BYTES));
     const tooMany = Array.from({ length: TAGS_MAX_ITEMS + 1 }, (_, i) => `t${i}`).join(",");
     expect(advisoryIssues(tags!, tooMany)[0]).toContain(String(TAGS_MAX_ITEMS));
     expect(advisoryIssues(name!, "Ada")).toEqual([]);

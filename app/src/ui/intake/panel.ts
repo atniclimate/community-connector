@@ -166,6 +166,9 @@ export function mountIntakeWizard(container: HTMLElement, deps: IntakeWizardDeps
         }),
       );
     }
+    for (const notice of intake.notices) {
+      dashRegion.append(el("p", { className: "cn-intake-error", text: `Notice: ${notice}` }));
+    }
     for (const issue of intake.scanIssues) {
       dashRegion.append(
         el("p", { className: "cn-intake-error", text: `Scan issue: ${issue}` }),

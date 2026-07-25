@@ -14,10 +14,15 @@ import type { JsonObject, JsonValue } from "../../state/state";
 export const SUBMISSION_VERSION = "0.1.0";
 
 /** Advisory caps MIRRORING the core's authoritative limits
- * (cn-ingest PAYLOAD_TEXT_MAX / TAGS_MAX_ITEMS; round-2 F9: one
- * documented limit set, not two). */
-export const TEXT_MAX_LENGTH = 2000;
+ * (cn-ingest PAYLOAD_TEXT_MAX / TAGS_MAX_ITEMS): one documented limit
+ * set, measured in the SAME unit as the core - UTF-8 BYTES, not UTF-16
+ * code units (round-3 F9). */
+export const TEXT_MAX_BYTES = 2000;
 export const TAGS_MAX_ITEMS = 20;
+
+function utf8Bytes(text: string): number {
+  return new TextEncoder().encode(text).length;
+}
 
 export type AttrType =
   | "text"
@@ -120,6 +125,20 @@ export function fieldValue(attr: FormAttr, raw: RawFieldValue): JsonValue | unde
         .split(/[\n,]/)
         .map((item) => item.trim())
         .filter((item) => item.length > 0);
+    case "geo": {
+      // The core's canonical raw geo shape (round-3 F9): {lat, lon}
+      // numbers, or {name}. "lat, lon" input becomes a point; anything
+      // else becomes a named region.
+      const parts = text.split(",").map((part) => part.trim());
+      if (parts.length === 2) {
+        const lat = Number(parts[0]);
+        const lon = Number(parts[1]);
+        if (Number.isFinite(lat) && Number.isFinite(lon)) {
+          return { lat, lon };
+        }
+      }
+      return { name: text };
+    }
     default:
       return text;
   }
@@ -145,8 +164,8 @@ export function advisoryIssues(attr: FormAttr, raw: RawFieldValue): readonly str
     }
     return issues;
   }
-  if (typeof value === "string" && value.length > TEXT_MAX_LENGTH) {
-    issues.push(`Keep this under ${TEXT_MAX_LENGTH} characters.`);
+  if (typeof value === "string" && utf8Bytes(value) > TEXT_MAX_BYTES) {
+    issues.push(`Keep this under ${TEXT_MAX_BYTES} bytes.`);
   }
   if (Array.isArray(value) && value.length > TAGS_MAX_ITEMS) {
     issues.push(`List at most ${TAGS_MAX_ITEMS} items.`);

@@ -76,13 +76,26 @@ pub(crate) fn refuse_unsafe_root(root: &Path) -> Result<PathBuf, String> {
     let canonical = fs::canonicalize(root)
         .map_err(|io_err| format!("queue root '{}' is not usable: {io_err}", root.display()))?;
     for ancestor in canonical.ancestors() {
-        if ancestor.join(".git").exists() {
-            return Err(format!(
-                "queue root '{}' lies inside the git worktree at '{}'; the canonical queue \
-                 root must live outside any worktree (ADR-005 D4)",
-                canonical.display(),
-                ancestor.display()
-            ));
+        // Fail closed (round-3 F3): only NotFound means "no worktree
+        // marker here" - a metadata/permission error must never let the
+        // guard pass as though the marker were absent.
+        match fs::metadata(ancestor.join(".git")) {
+            Ok(_) => {
+                return Err(format!(
+                    "queue root '{}' lies inside the git worktree at '{}'; the canonical queue \
+                     root must live outside any worktree (ADR-005 D4)",
+                    canonical.display(),
+                    ancestor.display()
+                ));
+            }
+            Err(io_err) if io_err.kind() == std::io::ErrorKind::NotFound => {}
+            Err(io_err) => {
+                return Err(format!(
+                    "cannot probe '{}' for a worktree marker ({io_err}); refusing to run \
+                     against an unverifiable queue root (I3)",
+                    ancestor.display()
+                ));
+            }
         }
     }
     let lowered = canonical.to_string_lossy().to_lowercase();
@@ -310,19 +323,25 @@ pub(crate) fn scan(paths: &QueuePaths) -> Result<ScanOutcome, String> {
                 .records
                 .entry(record_id.to_string())
                 .or_insert_with(ScannedRecord::empty);
-            match read_verified::<QueueRecord>(&entry, |record| record.verify()) {
-                Ok(record) => slot.payload = Some(record),
-                Err(_) => slot.payload_corrupt = true,
+            match read_verified::<QueueRecord>(&entry, |record| record.verify())? {
+                VerifiedRead::Ok(record) => slot.payload = Some(record),
+                VerifiedRead::Corrupt(reason) => {
+                    outcome.io_warnings.push(reason);
+                    slot.payload_corrupt = true;
+                }
             }
         } else if let Some(record_id) = name.strip_suffix(".sidecar.json") {
             let slot = outcome
                 .records
                 .entry(record_id.to_string())
                 .or_insert_with(ScannedRecord::empty);
-            slot.sidecar = match read_verified::<ReviewSidecar>(&entry, |sidecar| sidecar.verify())
+            slot.sidecar = match read_verified::<ReviewSidecar>(&entry, |sidecar| sidecar.verify())?
             {
-                Ok(sidecar) => FoundSidecar::Valid(Box::new(sidecar)),
-                Err(_) => FoundSidecar::Corrupt,
+                VerifiedRead::Ok(sidecar) => FoundSidecar::Valid(Box::new(sidecar)),
+                VerifiedRead::Corrupt(reason) => {
+                    outcome.io_warnings.push(reason);
+                    FoundSidecar::Corrupt
+                }
             };
         } else if let Some(record_id) = name.strip_suffix(".reviewed") {
             outcome
@@ -340,18 +359,19 @@ pub(crate) fn scan(paths: &QueuePaths) -> Result<ScanOutcome, String> {
         if discard_if_temp(&entry, &name, &mut outcome)? {
             continue;
         }
-        match read_verified::<DecisionMessage>(&entry, |message| message.verify()) {
-            Ok(message) => outcome.decisions.push((entry, message)),
-            Err(reason) => outcome.unreadable_decisions.push((name, reason)),
+        match read_verified::<DecisionMessage>(&entry, |message| message.verify())? {
+            VerifiedRead::Ok(message) => outcome.decisions.push((entry, message)),
+            VerifiedRead::Corrupt(reason) => outcome.unreadable_decisions.push((name, reason)),
         }
     }
 
     for entry in read_dir_files(&paths.consumed_dir())? {
         let name = entry_name(&entry);
-        outcome.tombstones.push((
-            name,
-            read_verified::<DecisionMessage>(&entry, |message| message.verify()),
-        ));
+        let parsed = match read_verified::<DecisionMessage>(&entry, |message| message.verify())? {
+            VerifiedRead::Ok(message) => Ok(message),
+            VerifiedRead::Corrupt(reason) => Err(reason),
+        };
+        outcome.tombstones.push((name, parsed));
     }
 
     Ok(outcome)
@@ -364,7 +384,15 @@ fn read_dir_files(dir: &Path) -> Result<Vec<PathBuf>, String> {
     for entry in entries {
         let entry = entry.map_err(|io_err| format!("cannot list '{}': {io_err}", dir.display()))?;
         let path = entry.path();
-        if path.is_file() {
+        // Fail closed (round-3 F3): a metadata error must never silently
+        // omit a queue input from the startup state.
+        let file_type = entry.file_type().map_err(|io_err| {
+            format!(
+                "cannot stat '{}': {io_err}; refusing to scan blind (I3)",
+                path.display()
+            )
+        })?;
+        if file_type.is_file() {
             files.push(path);
         }
     }
@@ -388,19 +416,45 @@ fn discard_if_temp(path: &Path, name: &str, outcome: &mut ScanOutcome) -> Result
     Ok(true)
 }
 
+/// Read result distinguishing an IO failure (fail closed: the run cannot
+/// classify what it cannot read) from parse/checksum corruption (the
+/// quarantine row) - round-3 F3: a transient read error must never move
+/// a valid pair to corrupt/.
+pub(crate) enum VerifiedRead<T> {
+    Ok(T),
+    /// Parse or checksum failure: genuinely corrupt content.
+    Corrupt(String),
+}
+
 fn read_verified<T>(
     path: &Path,
     verify: impl Fn(&T) -> Result<(), cn_ingest::IngestError>,
-) -> Result<T, String>
+) -> Result<VerifiedRead<T>, String>
 where
     T: serde::de::DeserializeOwned,
 {
-    let bytes =
-        fs::read(path).map_err(|io_err| format!("cannot read '{}': {io_err}", path.display()))?;
-    let value: T = serde_json::from_slice(&bytes)
-        .map_err(|parse_err| format!("cannot parse '{}': {parse_err}", path.display()))?;
-    verify(&value).map_err(|verify_err| format!("'{}': {verify_err}", path.display()))?;
-    Ok(value)
+    let bytes = fs::read(path).map_err(|io_err| {
+        format!(
+            "cannot read '{}': {io_err}; refusing to classify (I3)",
+            path.display()
+        )
+    })?;
+    let value: T = match serde_json::from_slice(&bytes) {
+        Ok(value) => value,
+        Err(parse_err) => {
+            return Ok(VerifiedRead::Corrupt(format!(
+                "cannot parse '{}': {parse_err}",
+                path.display()
+            )));
+        }
+    };
+    if let Err(verify_err) = verify(&value) {
+        return Ok(VerifiedRead::Corrupt(format!(
+            "'{}': {verify_err}",
+            path.display()
+        )));
+    }
+    Ok(VerifiedRead::Ok(value))
 }
 
 /// Retires a decision file into `decisions/consumed/` (atomic rename;
@@ -417,8 +471,16 @@ pub(crate) fn retire_decision(paths: &QueuePaths, file: &Path) -> Result<(), Str
 /// (retained, never trusted; ADR-005 D4).
 pub(crate) fn quarantine_pair(paths: &QueuePaths, record_id: &str) -> Result<(), String> {
     for source in [paths.record(record_id), paths.sidecar(record_id)] {
-        if !source.exists() {
-            continue;
+        match fs::metadata(&source) {
+            Ok(_) => {}
+            Err(io_err) if io_err.kind() == std::io::ErrorKind::NotFound => continue,
+            Err(io_err) => {
+                return Err(format!(
+                    "cannot stat '{}' for quarantine ({io_err}); refusing a partial \
+                     quarantine (I3)",
+                    source.display()
+                ));
+            }
         }
         let name = source
             .file_name()

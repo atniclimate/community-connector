@@ -92,16 +92,14 @@ export async function grantQueueDirectory(
   dispatch({ kind: "intakeDirGranted", dirName: dir.name });
   const persisted = await persistHandle(dir);
   if (!persisted) {
-    // Visible, non-fatal (round-2 F11): the grant works this session,
-    // but the "use previously granted folder" promise would be false.
+    // A DURABLE notice (round-3 F3/F11): scans clear transient errors,
+    // so this rides the notices field the reducer never clears until the
+    // directory itself changes - the warning survives into painted state.
     dispatch({
-      kind: "intakeFailed",
-      error: {
-        code: "IntakePersistFailed",
-        message:
-          "Queue folder granted, but it could not be remembered for the next " +
-          "session; you will need to grant it again after a reload",
-      },
+      kind: "intakeNoticeAdded",
+      notice:
+        "Queue folder granted, but it could not be remembered for the next " +
+        "session; you will need to grant it again after a reload",
     });
   }
   await scanQueue(dir, dispatch);
@@ -214,8 +212,12 @@ export async function guardQueueDirectory(dir: IntakeDirHandle): Promise<string 
     try {
       await probe();
       return `directory '${dir.name}' contains .git; the queue root must live outside any git worktree (ADR-005 D4)`;
-    } catch {
-      // Absent: the good case.
+    } catch (error) {
+      // Only NotFound means absent (round-3 F3): an unverifiable root is
+      // refused, never assumed safe.
+      if (!isNotFound(error)) {
+        return `cannot verify '${dir.name}' is outside a worktree (${String(error)}); refusing an unverifiable queue root (I3)`;
+      }
     }
   }
   return null;

@@ -16,7 +16,9 @@ import {
   stageDecision,
   stageSubmission,
 } from "./intake";
+import { createInitialState } from "./state";
 import type { IntakeRecordSummaryDto, JsonObject } from "./state";
+import { reduce } from "./reducer";
 
 /** In-memory fake of the structural FSA surface. */
 class FakeDir implements IntakeDirHandle {
@@ -261,10 +263,19 @@ describe("grantQueueDirectory (round-1 F4: the effects layer owns the handle)", 
     // persist-failure notice fires between grant and scan (round-2 F11).
     expect(actions.map((a) => a.kind)).toEqual([
       "intakeDirGranted",
-      "intakeFailed",
+      "intakeNoticeAdded",
       "intakeScanStarted",
       "intakeQueueLoaded",
     ]);
+    // FINAL-STATE proof (round-3 F3): reduce the full action sequence
+    // and confirm the notice SURVIVES the scan that follows it.
+    let reduced = createInitialState();
+    for (const action of actions) {
+      reduced = reduce(reduced, action);
+    }
+    expect(reduced.intake.notices).toHaveLength(1);
+    expect(reduced.intake.notices[0]).toContain("could not be remembered");
+    expect(reduced.intake.status).toBe("ready");
     clearQueueDirectory(dispatch);
     expect(getQueueDirectory()).toBeNull();
   });

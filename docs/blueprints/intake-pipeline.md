@@ -362,6 +362,15 @@ authoring, per-field tiers, owner-binding (D-056.2 deferral) - unchanged.
 8. app: FSA create-only queue adapter + state module + tests.
 9. app: wizard panel + review flow + decision files + smoke (full
    decide -> apply -> reload round trip on synthetic data).
+   AMENDED (director, 2026-07-25, D-078 - after adversarial rounds 2-3):
+   the wizard mount contract is "bound to every interactive load path
+   that exists"; today that is the development demo path, and the
+   production/pilot interactive load path is OWED WITH THE AUGUST PILOT
+   BUILD (P3 remainder), where the same parameterized mount MUST be
+   called and the full synthetic decide -> apply -> reload rehearsal
+   MUST run before any pilot use. The absent production path fails
+   closed (no wizard is exposed anywhere); this amendment narrows
+   sequencing, never authority.
 10. pii-scan tripwires + self-test member.
 11. fixtures: synthetic intake demo records for both demo groups; docs
     true-up (HANDOFF, MANIFEST).

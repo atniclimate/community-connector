@@ -186,6 +186,14 @@ if ($SelfTest) {
             $failures++
         }
         if ($failures -gt 0) { exit 1 }
+        # Clean up BEFORE claiming removal; a cleanup failure fails the
+        # self-test rather than leaving marker fixtures behind a success
+        # message (round-3 F12 honesty note).
+        Remove-Item -Recurse -Force $tempRoot -ErrorAction SilentlyContinue
+        if (Test-Path $tempRoot) {
+            Write-Host "SELF-TEST FAIL: fixture cleanup left '$tempRoot' behind" -ForegroundColor Red
+            exit 1
+        }
         Write-Host "PII self-test passed: $($cases.Count) on-disk fixture(s) flagged through the real scan loop, exemption negative holds, fixtures removed."
         exit 0
     } finally {

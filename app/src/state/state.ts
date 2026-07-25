@@ -122,6 +122,10 @@ export type IntakeState = {
   /** Per-file scan problems surfaced for I12 visibility (round-1 F3:
    * "record unreadable" is never silently identical to "no record"). */
   readonly scanIssues: readonly string[];
+  /** Durable operator notices (round-3 F3): never cleared by scans -
+   * only by a directory change - so persistence warnings survive into
+   * painted state. */
+  readonly notices: readonly string[];
   readonly lastError: ErrorEnvelopeDto | null;
 };
 
@@ -133,6 +137,7 @@ export function initialIntakeState(): IntakeState {
     pendingDecisionFiles: 0,
     reviewRecordId: null,
     scanIssues: [],
+    notices: [],
     lastError: null,
   };
 }

@@ -288,6 +288,14 @@ export function reduce(state: AppState, action: Action): AppState {
           records: [...state.intake.records, action.record],
         },
       };
+    case "intakeNoticeAdded":
+      return {
+        ...state,
+        intake: {
+          ...state.intake,
+          notices: [...state.intake.notices, action.notice],
+        },
+      };
     case "intakeReviewSelected":
       return {
         ...state,
