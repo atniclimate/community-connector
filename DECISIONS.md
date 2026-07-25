@@ -1743,3 +1743,38 @@ IndexedDB/FSA tests, the August-pilot production path per the amended
 step 9, tripwire source/archive bypasses under the defense-in-depth
 disclaimer, and the D-068/D-059.8 deploy gates) and PASS-WITH-NOTES
 becomes warranted. Round 5 verifies.
+
+## D-080 (2026-07-25) - Intake implementation ACCEPTED: round 5 PASS-WITH-NOTES
+
+Round 5 (review at _reviews/community-connector/
+2026-07-25_intake-pipeline-impl-round5.md, target HEAD fbfced3) returned
+PASS-WITH-NOTES: the round-4 marker residue is closed (symlink_metadata,
+regular-file-only, loud on everything else; the reviewer found NO
+remaining error-collapsing predicate on the intake authority path), the
+value-contract regressions and app advisory checks are sound, and the
+open set is exactly the four recorded debts. The blueprint steps 1-11
+implementation, as amended by D-078, is ACCEPTED. The full 12-member
+verification battery was executed at fbfced3 by the verification owner
+(the reviewer was read-only), all green.
+
+Process record: the mandatory round became FIVE (rounds 1-4
+FAIL-and-amend at D-076/D-077/D-078/D-079, round 5 pass). Every round's
+load-bearing findings were verified against files before judgment and
+none was rejected. The design hardened materially: recovery
+re-authorization for all-absent plans, reviewer-identity binding, the
+literal WRITE_THROUGH rename primitive, sticky durable-quarantine
+disposition, fail-closed native and app predicates end to end,
+sorted-key canonical digests with golden vectors, digest-bound
+tombstones, the typed submission-schema validator with the complete
+per-type value contract (incl. geo and NFC normalization), durable
+persistence notices, and the honest tripwire self-test. The review
+trail (5 files) lives in the out-of-repo lane.
+
+STANDING DEBTS (visible, unclaimed): (1) browser IndexedDB/FSA
+behavior tests; (2) the production interactive load path + mandatory
+synthetic decide -> apply -> reload rehearsal (amended step 9, owed
+with the August pilot build, BEFORE pilot use); (3) tripwire
+source/archive content bypasses under the defense-in-depth disclaimer;
+(4) the D-068/D-059.8 deploy gates (exhaustive fault injection,
+quiescent provenance deployment, provider-bound runbook evidence, human
+ceremony rehearsal) - the deploy bar remains unmet and unclaimed.

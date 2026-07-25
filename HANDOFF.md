@@ -141,18 +141,27 @@ of 11 LANDED, check-all green at each commit:**
   .rs/.ts/.md content exemption) + the pii-selftest check-all member
   (12 members) generating positive fixtures at runtime.
 
-**NOT done - ordered next actions (mandate item 2 continues autonomously;
-blueprint docs/blueprints/intake-pipeline.md section 9 is the sequence):**
-1. The MANDATORY adversarial round on the WHOLE implementation diff -
-   steps 1-11 are committed but unreviewed: 78e9aae, 661b02c, 73e228b,
-   52e274b, 1db3cd0, b47ab49, eaa8a13, bf02e5f, 76a0372, d677e5d, plus
-   the step-11 fixtures commit (all 11 blueprint steps now landed).
-   Permission-adjacent at the approval boundary; the round is a
-   blueprint precondition for acceptance. Deferred polish for later:
-   FSA handle persistence across sessions (IndexedDB; D-074 note).
-2. Asana refresh owed for this arc's notable progress (ADR-005
-   acceptance + blueprint steps 1-11) per the ratified convention -
-   deferred at session close for context budget; do at next close.
+**DONE 2026-07-25: the MANDATORY adversarial round ran and the
+implementation is ACCEPTED** (D-076..D-080; rounds 1-4 FAIL-and-amend,
+round 5 PASS-WITH-NOTES; amendment commits d1b5f47, 9630d1b, 12c91f8,
+ca4e714, 4d1aabf, fbfced3; review trail of five files in the
+out-of-repo lane). Blueprint step 9 was amended in place (D-078). The
+human rulings D-072 landed the same arc (consent boilerplate authorized
+as draft; checkpoint = convention; ad hoc demos open pathways).
+
+**NOT done - ordered next actions:**
+1. STANDING DEBTS from the round (D-080; visible, unclaimed): browser
+   IndexedDB/FSA tests; the production interactive load path + the
+   mandatory synthetic decide -> apply -> reload rehearsal (amended
+   step 9, owed with the August pilot build BEFORE pilot use);
+   tripwire source/archive bypass hardening (optional); the
+   D-068/D-059.8 deploy gates.
+2. Remote intake relay implementation (ADR-005 D2/D6, mandate item 3) -
+   building is unlocked; DEPLOY stays barred by D-059.8.
+3. Snapshot data pipeline (D-048 / P2.3-P2.5) - targets the convention
+   build.
+4. Phase 4 slimmed (D-056.3): minimal P4.1 story authoring.
+5. P1.3 benchmark deferred to September; record in ADR-004.
 2. **Remote intake relay implementation (per ACCEPTED ADR-005).** Pages form,
    client-side sealed box, Workers+KV relay (receipt ledger, admission
    allowlist), pilot-PC puller (bundle+key pins, crash protocol). The
