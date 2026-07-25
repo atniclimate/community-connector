@@ -1404,3 +1404,43 @@ Implementation position at session close: blueprint steps 1-4 of 11
 landed (78e9aae seam, 661b02c provenance block, 73e228b queue formats +
 admission + recovery, 52e274b near-dup + plan_approval); check-all 7/7
 green at every commit; next is step 5, the `cn intake apply` CLI.
+
+## D-070 (2026-07-24) - Step 5 `cn intake apply`: implementation choices under blueprint authority
+
+Blueprint step 5 landed (1db3cd0): the CLI is the native durable owner
+per ADR-005 D4 with recovery, admission, transaction, and I12 report.
+Nontrivial choices made inside the blueprint's discretion, recorded:
+
+1. **The persisted plan carries the ops verbatim.** `ApprovalPlanRef`
+   gains `ops: Vec<Value>` (the planned `Operation` values). Recovery
+   under a durable intent must re-append the absent suffix WITHOUT
+   regenerating ids (ADR-005 D4); op ids and digests alone cannot
+   reconstruct the ops (entity ids and envelopes live inside them). The
+   sidecar's "complete plan" is now literally complete.
+2. **Run-level halting.** The lost-decision-state and binding-mismatch
+   recovery rows, a failed sidecar rewrite, and a corrupt persisted plan
+   HALT the whole run before any admission (stop-the-line; nothing is
+   guessed). Quarantines, stale/illegal audits, id-reuse conflicts, and
+   tombstone anomalies are recorded loudly, processing continues, and
+   any of them forces a failure exit code so attention is unmissable.
+3. **Queue layout fixed** as the contract the step-8 FSA adapter and the
+   later relay puller write into: `<id>.record.json`,
+   `<id>.sidecar.json`, `<id>.reviewed`,
+   `decisions/<id>.<uuid>.json`, `decisions/consumed/`, `corrupt/`,
+   `intake.lock`, `*.tmp-<uuid>` temps.
+4. **The OS file lock IS the liveness check** (fs4): a held lock proves
+   a live process, the OS releases it at process death, so a stale lock
+   FILE never wedges the queue and takeover without liveness proof is
+   impossible - satisfying the ADR's stale-lock rule by construction.
+5. **Kind resolution:** a payload-carried `kind` field wins, else the
+   `--kind` default (person, the pilot form). A wrong kind surfaces as
+   preflight_failed via template validation - never a silent write.
+6. **No template argument:** apply reads group and template from the
+   folded ops log (the source of truth, I2), eliminating the
+   wrong-template-file failure mode.
+
+Deps fs4 + tempfile added after a RustSec/OSV/KEV audit (clean; fs4 1.x
+API drift caught by the audit before first compile). Six integration
+tests cover the decide -> apply -> reload round trip, worktree refusal,
+writeless crash replay, stale serialization, approved_intent recovery,
+and the authority-matrix preflight denial. check-all green.

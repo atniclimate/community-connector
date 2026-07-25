@@ -102,25 +102,30 @@ of 11 LANDED, check-all green at each commit:**
   EntityCreate per D-069, intake block on entity and every attribute
   instance, pre-link batch digest, deterministic under injected ids,
   authoritative validate_entity report). 20 cn-ingest tests total.
+- Step 5 (1db3cd0, D-070): `cn intake apply` - the native durable owner.
+  Queue lock (fs4 OS lock = the liveness check), worktree/cloud-sync
+  guard, atomic write primitive, crash-state recovery execution
+  (approval recovery first, RecoveryUnderIntent - no re-authorization),
+  tombstone reconciliation, deterministic admission, plan -> seam ->
+  transaction events, I12 JSON run report. ApprovalPlanRef now persists
+  the planned ops verbatim (recovery cannot regenerate ids). Six
+  integration tests incl. the FULL decide -> apply -> reload round trip
+  on synthetic data and the authority-matrix preflight denial. Queue
+  file layout fixed as the step-8 FSA adapter contract (D-070.3).
 
 **NOT done - ordered next actions (mandate item 2 continues autonomously;
 blueprint docs/blueprints/intake-pipeline.md section 9 is the sequence):**
-1. Step 5: `cn intake apply` CLI (queue lock, strict write primitive,
-   recovery execution via cn-ingest classify, decision consumption
-   through the admission table, plan_approval -> the cn-store seam ->
-   completion transaction events, run report I12). The full
-   decide -> apply -> reload integration test on synthetic data.
-2. Step 6: cn-api/cn-wasm READ-ONLY intake facade + the no-leak extension
+1. Step 6: cn-api/cn-wasm READ-ONLY intake facade + the no-leak extension
    test (near-dup candidates bounded by the REAL facilitator projection -
    the step-4 test proves projection-boundedness of the scorer; the
    facade test proves the projection is the facilitator's).
-3. Steps 7-9: app - template->form renderer (P3.6), FSA create-only
-   adapter, wizard panel (P3.5).
-4. Step 10: pii-scan tripwires (queue/secret markers + runtime-generated
+2. Steps 7-9: app - template->form renderer (P3.6), FSA create-only
+   adapter (writes the D-070.3 queue layout), wizard panel (P3.5).
+3. Step 10: pii-scan tripwires (queue/secret markers + runtime-generated
    positive fixtures). Step 11: synthetic fixtures + docs true-up.
-5. Then the MANDATORY adversarial round on the implementation diff.
-6. Asana refresh owed for this session's notable progress (ADR-005
-   acceptance + steps 1-4) per the ratified convention - deferred at
+4. Then the MANDATORY adversarial round on the implementation diff.
+5. Asana refresh owed for this session's notable progress (ADR-005
+   acceptance + steps 1-5) per the ratified convention - deferred at
    session close for context budget; do it at the next session close.
 2. **Remote intake relay implementation (per ACCEPTED ADR-005).** Pages form,
    client-side sealed box, Workers+KV relay (receipt ledger, admission
