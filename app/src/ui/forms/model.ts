@@ -13,8 +13,10 @@ import type { JsonObject, JsonValue } from "../../state/state";
 
 export const SUBMISSION_VERSION = "0.1.0";
 
-/** Advisory length caps (UX guardrails; the core's limits are authoritative). */
-export const TEXT_MAX_LENGTH = 200;
+/** Advisory caps MIRRORING the core's authoritative limits
+ * (cn-ingest PAYLOAD_TEXT_MAX / TAGS_MAX_ITEMS; round-2 F9: one
+ * documented limit set, not two). */
+export const TEXT_MAX_LENGTH = 2000;
 export const TAGS_MAX_ITEMS = 20;
 
 export type AttrType =

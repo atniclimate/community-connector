@@ -127,55 +127,84 @@ pub(crate) fn acquire_lock(paths: &QueuePaths) -> Result<QueueLock, String> {
     }
 }
 
-/// Directory-handle flush capability (ADR-005 D4 degraded-platform row):
-/// unsupported platforms get ONE recorded WARN per run instead of a
-/// silent downgrade; supported platforms record every flush FAILURE
-/// loudly (round-1 F3 - no swallowed IO).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum DirSyncStatus {
-    Supported,
-    Unsupported,
-}
+/// Durable rename (ADR-005 D4 crash-state protocol; round-2 F3): on
+/// Windows this is MoveFileExW with REPLACE_EXISTING | WRITE_THROUGH -
+/// the EXACT primitive the ADR names, so the namespace update does not
+/// outlive a later op-log fsync after power loss; on Unix it is rename
+/// plus fsync of the affected parent directories, and a flush failure is
+/// an ERROR (fail closed), never a warning - the intent marker must be
+/// durable before the durable seam runs.
+#[cfg(windows)]
+fn rename_durable(from: &Path, to: &Path) -> Result<(), String> {
+    use std::os::windows::ffi::OsStrExt;
 
-pub(crate) fn dir_sync_status() -> DirSyncStatus {
-    if cfg!(unix) {
-        DirSyncStatus::Supported
-    } else {
-        DirSyncStatus::Unsupported
+    use windows_sys::Win32::Storage::FileSystem::{
+        MOVEFILE_REPLACE_EXISTING, MOVEFILE_WRITE_THROUGH, MoveFileExW,
+    };
+
+    let wide = |path: &Path| -> Vec<u16> {
+        path.as_os_str()
+            .encode_wide()
+            .chain(std::iter::once(0))
+            .collect()
+    };
+    let from_wide = wide(from);
+    let to_wide = wide(to);
+    let ok = unsafe {
+        MoveFileExW(
+            from_wide.as_ptr(),
+            to_wide.as_ptr(),
+            MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH,
+        )
+    };
+    if ok == 0 {
+        return Err(format!(
+            "MoveFileExW '{}' -> '{}' failed: {}",
+            from.display(),
+            to.display(),
+            std::io::Error::last_os_error()
+        ));
     }
+    Ok(())
 }
 
-#[cfg(unix)]
-fn sync_dir(dir: &Path) -> Result<(), String> {
-    File::open(dir)
-        .and_then(|handle| handle.sync_all())
-        .map_err(|io_err| format!("directory flush of '{}' failed: {io_err}", dir.display()))
-}
-
-#[cfg(not(unix))]
-fn sync_dir(_dir: &Path) -> Result<(), String> {
-    // Windows: no directory-handle flush; the per-run WARN comes from
-    // dir_sync_status(). Replacement visibility comes from the rename;
-    // power-loss durability rests on the file flush plus startup
-    // recovery, exactly as ADR-005 D4 states.
+#[cfg(not(windows))]
+fn rename_durable(from: &Path, to: &Path) -> Result<(), String> {
+    fs::rename(from, to).map_err(|io_err| {
+        format!(
+            "cannot rename '{}' onto '{}': {io_err}",
+            from.display(),
+            to.display()
+        )
+    })?;
+    let mut dirs: Vec<&Path> = Vec::new();
+    if let Some(dir) = to.parent() {
+        dirs.push(dir);
+    }
+    if let Some(dir) = from.parent()
+        && !dirs.contains(&dir)
+    {
+        dirs.push(dir);
+    }
+    for dir in dirs {
+        File::open(dir)
+            .and_then(|handle| handle.sync_all())
+            .map_err(|io_err| {
+                format!(
+                    "directory flush of '{}' failed after rename: {io_err} (fail closed; \
+                     the namespace update must be durable, ADR-005 D4)",
+                    dir.display()
+                )
+            })?;
+    }
     Ok(())
 }
 
 /// The one write primitive (ADR-005 D4 crash-state protocol): exclusive
-/// temp in the same directory, flush + fsync, close, atomic rename onto
-/// the final path, then a directory flush where the platform allows.
-///
-/// Platform honesty note (round-1 F3): on Windows this uses
-/// `std::fs::rename`, which maps to MoveFileEx with REPLACE_EXISTING but
-/// WITHOUT WRITE_THROUGH; the ADR's own qualification applies - "atomic"
-/// means replacement visibility, and power-loss durability rests on the
-/// file flush plus startup recovery. A flush failure on a supporting
-/// platform is RECORDED in the run report, never swallowed.
-pub(crate) fn write_atomic(
-    final_path: &Path,
-    bytes: &[u8],
-    warnings: &mut Vec<String>,
-) -> Result<(), String> {
+/// temp in the same directory, flush + fsync, close, then the DURABLE
+/// atomic rename above. Any durability failure is an error (round-2 F3:
+/// fail closed - a lost intent cannot be reconstructed by recovery).
+pub(crate) fn write_atomic(final_path: &Path, bytes: &[u8]) -> Result<(), String> {
     let dir = final_path
         .parent()
         .ok_or_else(|| format!("'{}' has no parent directory", final_path.display()))?;
@@ -195,33 +224,17 @@ pub(crate) fn write_atomic(
             .and_then(|()| file.sync_all())
             .map_err(|io_err| format!("cannot write temp '{}': {io_err}", temp.display()))?;
     }
-    fs::rename(&temp, final_path).map_err(|io_err| {
-        format!(
-            "cannot rename '{}' onto '{}': {io_err}",
-            temp.display(),
-            final_path.display()
-        )
-    })?;
-    if let Err(flush_warning) = sync_dir(dir) {
-        warnings.push(format!(
-            "{flush_warning} (recorded, I12; recovery covers the gap)"
-        ));
-    }
-    Ok(())
+    rename_durable(&temp, final_path)
 }
 
 /// Creates the write-once review-begun marker if absent (idempotent;
 /// marker-before-first-decision, ADR-005 D4).
-pub(crate) fn ensure_marker(
-    paths: &QueuePaths,
-    record_id: &str,
-    warnings: &mut Vec<String>,
-) -> Result<(), String> {
+pub(crate) fn ensure_marker(paths: &QueuePaths, record_id: &str) -> Result<(), String> {
     let marker = paths.marker(record_id);
     if marker.exists() {
         return Ok(());
     }
-    write_atomic(&marker, b"", warnings)
+    write_atomic(&marker, b"")
 }
 
 /// One record's files as found on disk (paired with cn-ingest's
@@ -397,13 +410,7 @@ pub(crate) fn retire_decision(paths: &QueuePaths, file: &Path) -> Result<(), Str
         .file_name()
         .ok_or_else(|| format!("decision file '{}' has no name", file.display()))?;
     let target = paths.consumed_dir().join(name);
-    fs::rename(file, &target).map_err(|io_err| {
-        format!(
-            "cannot retire '{}' into '{}': {io_err}",
-            file.display(),
-            target.display()
-        )
-    })
+    rename_durable(file, &target)
 }
 
 /// Moves a record's payload and sidecar into `corrupt/` quarantine
@@ -417,13 +424,7 @@ pub(crate) fn quarantine_pair(paths: &QueuePaths, record_id: &str) -> Result<(),
             .file_name()
             .ok_or_else(|| format!("'{}' has no name", source.display()))?;
         let target = paths.corrupt_dir().join(name);
-        fs::rename(&source, &target).map_err(|io_err| {
-            format!(
-                "cannot quarantine '{}' into '{}': {io_err}",
-                source.display(),
-                target.display()
-            )
-        })?;
+        rename_durable(&source, &target)?;
     }
     Ok(())
 }

@@ -191,6 +191,10 @@ struct TxContext<'a> {
     log: &'a mut OpLog,
     index: &'a mut DurableOpIndex,
     state: &'a mut GroupState,
+    /// Op ids the STARTUP REPLAY quarantined (round-2 F1): a durable plan
+    /// op in this set can never complete to approved - the divergence is
+    /// durable, so the disposition must be too.
+    replay_quarantined: &'a std::collections::BTreeSet<OpId>,
     now_ms: i64,
 }
 
@@ -217,6 +221,11 @@ fn run_apply(args: &ApplyArgs, paths: &QueuePaths) -> Result<(RunReport, Exit), 
     let mut index = DurableOpIndex::from_ops(&replayed)
         .map_err(|store_err| format!("cannot index ops log: {store_err}"))?;
     let (mut state, fold_report) = fold(replayed);
+    let replay_quarantined: std::collections::BTreeSet<OpId> = fold_report
+        .quarantined
+        .iter()
+        .map(|entry| entry.op_id)
+        .collect();
     let mut warnings = store_findings(&open_report, "log-open");
     warnings.extend(store_findings(&fold_report, "replay-fold"));
 
@@ -239,15 +248,6 @@ fn run_apply(args: &ApplyArgs, paths: &QueuePaths) -> Result<(RunReport, Exit), 
             group.template_version.clone(),
         )
     };
-
-    match queue::dir_sync_status() {
-        queue::DirSyncStatus::Supported => {}
-        queue::DirSyncStatus::Unsupported => warnings.push(
-            "directory-handle flush is unavailable on this platform; staging proceeds \
-             with this recorded WARN (ADR-005 D4 degraded-platform row, I12)"
-                .to_string(),
-        ),
-    }
 
     let scan = queue::scan(paths)?;
     warnings.extend(scan.io_warnings.iter().cloned());
@@ -352,7 +352,7 @@ fn run_apply(args: &ApplyArgs, paths: &QueuePaths) -> Result<(RunReport, Exit), 
                         .ok_or_else(|| format!("record {record_id}: classify invariant broken"))?;
                     let sidecar = ReviewSidecar::initial(&record)
                         .map_err(|ingest_err| ingest_err.to_string())?;
-                    write_sidecar(paths, &sidecar, &mut warnings)?;
+                    write_sidecar(paths, &sidecar)?;
                     recovery.push(RecoveryEntry {
                         record_id: record_id.clone(),
                         action: "reconstruct_pending_sidecar".to_string(),
@@ -392,6 +392,7 @@ fn run_apply(args: &ApplyArgs, paths: &QueuePaths) -> Result<(RunReport, Exit), 
                         log: &mut log,
                         index: &mut index,
                         state: &mut state,
+                        replay_quarantined: &replay_quarantined,
                         now_ms,
                     };
                     match recover_approval(
@@ -400,7 +401,6 @@ fn run_apply(args: &ApplyArgs, paths: &QueuePaths) -> Result<(RunReport, Exit), 
                         &record,
                         &template,
                         &mut sidecar,
-                        &mut warnings,
                     ) {
                         Ok((transaction, appended)) => {
                             ops_appended += appended;
@@ -431,7 +431,10 @@ fn run_apply(args: &ApplyArgs, paths: &QueuePaths) -> Result<(RunReport, Exit), 
     // consumed tombstone must match a decision event of its record by
     // decision_id AND message digest (I12; never silently deleted).
     let mut tombstone_anomalies = Vec::new();
-    for (name, parsed) in &scan.tombstones {
+    // After a pre-pass halt `live` is empty; reconciling against it would
+    // report every tombstone as a false anomaly (round-2 F5 note).
+    let reconcile_tombstones = !halted_before_execution;
+    for (name, parsed) in scan.tombstones.iter().filter(|_| reconcile_tombstones) {
         match parsed {
             Err(reason) => {
                 tombstone_anomalies.push(format!("unreadable tombstone '{name}': {reason}"));
@@ -469,6 +472,7 @@ fn run_apply(args: &ApplyArgs, paths: &QueuePaths) -> Result<(RunReport, Exit), 
                 log: &mut log,
                 index: &mut index,
                 state: &mut state,
+                replay_quarantined: &replay_quarantined,
                 now_ms,
             };
             match consume_decision(
@@ -608,15 +612,15 @@ fn consume_decision(
             } else {
                 "illegal"
             };
-            queue::ensure_marker(context.paths, &message.record_id, warnings)?;
+            queue::ensure_marker(context.paths, &message.record_id)?;
             apply_verdict(&mut target.sidecar, &verdict)
                 .map_err(|ingest_err| ingest_err.to_string())?;
-            write_sidecar(context.paths, &target.sidecar, warnings)?;
+            write_sidecar(context.paths, &target.sidecar)?;
             queue::retire_decision(context.paths, file)?;
             Ok(Consumed::Entry(entry(outcome, None), 0))
         }
         AdmissionVerdict::Admit { .. } => {
-            queue::ensure_marker(context.paths, &message.record_id, warnings)?;
+            queue::ensure_marker(context.paths, &message.record_id)?;
             let mut planned: Option<ApprovalPlan> = None;
             let mut submission_errors: Vec<String> = Vec::new();
             if matches!(message.decision, DecisionType::Approve) {
@@ -643,7 +647,7 @@ fn consume_decision(
             // replace (apply_verdict seals over the plan set above).
             apply_verdict(&mut target.sidecar, &verdict)
                 .map_err(|ingest_err| ingest_err.to_string())?;
-            write_sidecar(context.paths, &target.sidecar, warnings)?;
+            write_sidecar(context.paths, &target.sidecar)?;
             queue::retire_decision(context.paths, file)?;
 
             let mut transaction = None;
@@ -665,7 +669,6 @@ fn consume_decision(
                     &digests,
                     BatchMode::FirstAttempt,
                     &validation_errors,
-                    warnings,
                 )?;
                 appended_count = appended;
                 transaction = Some(summary);
@@ -689,7 +692,6 @@ fn recover_approval(
     record: &QueueRecord,
     template: &cn_schema::GroupTemplate,
     sidecar: &mut ReviewSidecar,
-    warnings: &mut Vec<String>,
 ) -> Result<(TransactionEntry, usize), String> {
     let plan = sidecar.plan.clone().ok_or_else(|| {
         format!("record {record_id}: approved_intent with no persisted plan; halting (I3)")
@@ -712,9 +714,10 @@ fn recover_approval(
         // D4), preflight and validation included, under the SAME plan.
         let submission = validate_submission(&record.payload, template);
         let mut errors = submission.errors;
-        if let Ok(report) = validate_record(record, template, &plan_kind(&ops)) {
-            errors.extend(report.errors.iter().map(|finding| format!("{finding:?}")));
-        }
+        let report = validate_record(record, template, &plan_kind(&ops)).map_err(|ingest_err| {
+            format!("record {record_id}: authoritative validation failed ({ingest_err}); halting")
+        })?;
+        errors.extend(report.errors.iter().map(|finding| format!("{finding:?}")));
         (BatchMode::FirstAttempt, errors)
     };
     execute_transaction(
@@ -725,7 +728,6 @@ fn recover_approval(
         &plan.per_op_digests,
         mode,
         &validation_errors,
-        warnings,
     )
 }
 
@@ -755,9 +757,43 @@ fn execute_transaction(
     digests: &[String],
     mode: BatchMode,
     validation_errors: &[String],
-    warnings: &mut Vec<String>,
 ) -> Result<(TransactionEntry, usize), String> {
     let batch_op_ids: Vec<OpId> = ops.iter().map(|op| op.op_id).collect();
+    // Sticky durable-quarantine rule (round-2 F1): if any planned op is
+    // ALREADY durable and the startup replay quarantined it, the state
+    // divergence is durable - record the terminal `durable_inconsistency`
+    // disposition instead of ever reinterpreting an empty later scratch
+    // report as success.
+    let replayed_quarantined: Vec<String> = batch_op_ids
+        .iter()
+        .filter(|op_id| context.index.contains(op_id) && context.replay_quarantined.contains(op_id))
+        .map(|op_id| op_id.to_string())
+        .collect();
+    if !replayed_quarantined.is_empty() {
+        let detail = json!({
+            "code": "durable_inconsistency",
+            "quarantined_durable_ops": replayed_quarantined,
+        })
+        .to_string();
+        record_transaction(
+            sidecar,
+            decision_id,
+            TransactionKind::DurableInconsistency,
+            ReviewState::Failed,
+            Timestamp(context.now_ms),
+            Some(detail.clone()),
+        )
+        .map_err(|ingest_err| ingest_err.to_string())?;
+        write_sidecar(context.paths, sidecar)?;
+        return Ok((
+            TransactionEntry {
+                kind: kind_name(TransactionKind::DurableInconsistency).to_string(),
+                resulting_state: state_name(ReviewState::Failed).to_string(),
+                detail: Some(detail),
+            },
+            0,
+        ));
+    }
     let outcome = if mode == BatchMode::FirstAttempt && !validation_errors.is_empty() {
         // Validation preflight (blueprint section 2 hostile-content rule):
         // an approve of a record with rejecting findings never reaches the
@@ -790,10 +826,32 @@ fn execute_transaction(
                 .map(|entry| entry.op_id.to_string())
                 .collect();
             if !quarantined.is_empty() {
-                return Err(format!(
-                    "recovery fold quarantined durable op(s) {}: state diverged from the \
-                     intent-time preflight; halting for facilitator investigation (I3)",
-                    quarantined.join(", ")
+                // Durable terminal disposition, not a transient halt: the
+                // ops are durable and quarantined, and a later run must
+                // find `failed`, never reinterpret an all-present plan
+                // with an empty scratch report as success (round-2 F1).
+                let detail = json!({
+                    "code": "durable_inconsistency",
+                    "quarantined_durable_ops": quarantined,
+                })
+                .to_string();
+                record_transaction(
+                    sidecar,
+                    decision_id,
+                    TransactionKind::DurableInconsistency,
+                    ReviewState::Failed,
+                    Timestamp(context.now_ms),
+                    Some(detail.clone()),
+                )
+                .map_err(|ingest_err| ingest_err.to_string())?;
+                write_sidecar(context.paths, sidecar)?;
+                return Ok((
+                    TransactionEntry {
+                        kind: kind_name(TransactionKind::DurableInconsistency).to_string(),
+                        resulting_state: state_name(ReviewState::Failed).to_string(),
+                        detail: Some(detail),
+                    },
+                    0,
                 ));
             }
         }
@@ -877,7 +935,7 @@ fn execute_transaction(
         Some(detail.clone()),
     )
     .map_err(|ingest_err| ingest_err.to_string())?;
-    write_sidecar(context.paths, sidecar, warnings).map_err(|write_err| {
+    write_sidecar(context.paths, sidecar).map_err(|write_err| {
         format!(
             "sidecar rewrite failed after the {} transaction event: {write_err}; a \
              repeatedly encountered approved_intent is a stop condition (ADR-005 D4)",
@@ -952,14 +1010,10 @@ fn kind_for(record: &QueueRecord, default_kind: &KindId, warnings: &mut Vec<Stri
     kind
 }
 
-fn write_sidecar(
-    paths: &QueuePaths,
-    sidecar: &ReviewSidecar,
-    warnings: &mut Vec<String>,
-) -> Result<(), String> {
+fn write_sidecar(paths: &QueuePaths, sidecar: &ReviewSidecar) -> Result<(), String> {
     let bytes = serde_json::to_vec_pretty(sidecar)
         .map_err(|render_err| format!("cannot serialize sidecar: {render_err}"))?;
-    queue::write_atomic(&paths.sidecar(&sidecar.record_id), &bytes, warnings)
+    queue::write_atomic(&paths.sidecar(&sidecar.record_id), &bytes)
 }
 
 fn store_findings(report: &StoreReport, stage: &str) -> Vec<String> {

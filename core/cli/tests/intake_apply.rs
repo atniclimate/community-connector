@@ -776,3 +776,94 @@ fn unconsented_payload_preflight_fails_validation() {
     assert_eq!(sidecar.review_state, ReviewState::Pending);
     assert_eq!(ops_line_count(&ops), 2, "nothing reached the durable seam");
 }
+
+/// Round-2 F1: a durable-but-quarantined plan op is a STICKY terminal
+/// `failed` (durable_inconsistency) - a later run must never reinterpret
+/// the all-present plan with an empty scratch report as success.
+#[test]
+fn quarantined_durable_plan_is_sticky_failed_across_runs() {
+    let (_dir, queue, ops) = setup();
+    write_ops_log(&ops, true);
+
+    // A record whose entity would QUARANTINE at fold (missing required
+    // display_name), with its op already durable - the round-2 timeline.
+    let mut bare = payload();
+    bare["fields"] = serde_json::json!({});
+    let record = QueueRecord::new(
+        uuid_string(0xEA),
+        Timestamp(10),
+        SubmissionSource::InApp {},
+        bare,
+    )
+    .expect("record builds");
+    let (template, report) = cn_schema::parse_template(&template_json()).expect("template");
+    assert!(report.errors.is_empty());
+    let context = PlanContext {
+        group_id: id(10),
+        facilitator: id(2),
+        kind: cn_model::KindId::new("person").expect("kind"),
+        now_ms: 1_000,
+        template_version: semver::Version::new(0, 1, 0),
+    };
+    let mut n: u128 = 0;
+    let plan = plan_approval(&record, &template, &context, &mut || {
+        n += 1;
+        uuid::Uuid::from_u128(0xFACE_0000_0000_0000_0000_0000_0000_0000 + n)
+    })
+    .expect("plan builds");
+
+    // Append the planned op to the durable log (it will quarantine at
+    // replay because the entity lacks its required attribute).
+    let mut log_lines = fs::read_to_string(&ops).expect("ops readable");
+    for op_value in &plan.plan_ref.ops {
+        log_lines.push_str(&op_value.to_string());
+        log_lines.push('\n');
+    }
+    fs::write(&ops, log_lines).expect("ops appended");
+
+    let mut sidecar = ReviewSidecar::initial(&record).expect("sidecar");
+    let message = decision_message(
+        &record,
+        &uuid_string(0xDB),
+        100,
+        ReviewState::Pending,
+        0,
+        DecisionType::Approve,
+    );
+    let verdict = admit(&sidecar, &message).expect("verdict");
+    sidecar.plan = Some(plan.plan_ref.clone());
+    apply_verdict(&mut sidecar, &verdict).expect("admitted");
+    fs::write(
+        queue.join(format!("{}.record.json", record.record_id)),
+        serde_json::to_vec_pretty(&record).expect("record serializes"),
+    )
+    .expect("record staged");
+    write_sidecar_file(&queue, &sidecar);
+    fs::write(queue.join(format!("{}.reviewed", record.record_id)), b"").expect("marker");
+
+    // Run 1: the durable-quarantine divergence lands as terminal failed.
+    let first = run_apply(&queue, &ops);
+    let sidecar_after_one = read_sidecar(&queue, &record.record_id);
+    assert_eq!(
+        sidecar_after_one.review_state,
+        ReviewState::Failed,
+        "durable quarantined plan op -> terminal failed: {:?}",
+        first.report
+    );
+    let lines_after_one = ops_line_count(&ops);
+
+    // Run 2: STICKY - still failed, nothing appended, never approved.
+    let second = run_apply(&queue, &ops);
+    let sidecar_after_two = read_sidecar(&queue, &record.record_id);
+    assert_eq!(
+        sidecar_after_two.review_state,
+        ReviewState::Failed,
+        "the next run never reinterprets the state as success: {:?}",
+        second.report
+    );
+    assert_eq!(
+        sidecar_after_two.sidecar_revision, sidecar_after_one.sidecar_revision,
+        "terminal state is stable"
+    );
+    assert_eq!(ops_line_count(&ops), lines_after_one, "no further appends");
+}

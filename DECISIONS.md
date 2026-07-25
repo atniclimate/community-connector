@@ -1621,3 +1621,54 @@ validation arms) but not yet exhaustive per boundary; quiescent
 provenance deployment, provider-bound runbook evidence, and the ceremony
 rehearsal remain OWED - the D-059.8 deploy bar is unchanged and unmet.
 Round 2 (verification) follows this commit.
+
+## D-077 (2026-07-25) - Implementation adversarial round 2: FAIL, amended
+
+Round 2 (verification; review at _reviews/community-connector/
+2026-07-25_intake-pipeline-impl-round2.md, target HEAD 12c91f8) closed
+F2/F4/F5/F6/F7/F8 and returned FAIL on the remainder. Every load-bearing
+finding verified before judgment; none rejected. Amendments:
+
+1. **Durable intent ordering (was the recorded Windows divergence,
+   ruled BLOCKER-grade - accepted).** The queue now uses the ADR-005 D4
+   primitive literally: MoveFileExW with REPLACE_EXISTING |
+   WRITE_THROUGH on Windows (windows-sys), rename + parent-directory
+   fsync FAILING CLOSED on Unix - for every queue rename (sidecar
+   writes, decision retirement, quarantine moves). The intent marker can
+   no longer be outlived by a later op-log fsync; the degraded-platform
+   WARN is gone because the primitive replaced it.
+2. **Sticky recovery quarantine.** A planned op that is durable AND
+   quarantined by the startup replay - or quarantined by a recovery
+   fold - now lands as the terminal `durable_inconsistency -> failed`
+   transaction event (durable disposition), never a transient halt a
+   later all-present run could reinterpret as success. Two-run
+   integration test added.
+3. **Fail-closed IO everywhere flagged:** recover_approval propagates
+   validate_record errors; the app distinguishes NotFound from IO/
+   permission failures (createOnly can no longer proceed past an
+   ambiguous existence check), decisions-directory enumeration failures
+   are reported, IndexedDB persist/restore failures are visible and
+   typed ("granted"/"none"/"failed"); the pii-scan readers return
+   typed results and an unreadable file is a READ FAIL violation
+   (self-test case added).
+4. **Full value contract (F9).** attr_value_from_json maps EVERY
+   template type (date, geo point/region, link with format, media);
+   validate_submission type-checks each field against its AttrDef (enum
+   membership, tags cap 20 + homogeneity, shape validity via the same
+   mapping approval uses) so nothing the planner would drop escapes a
+   rejecting finding. The pilot's contact_email link field is proven to
+   survive approval. The form's advisory caps now mirror the core's
+   (2000 bytes text, 20 tags). The review panel renders BOTH validation
+   reports.
+5. **F10 tail:** extras preservation proven on plan and transaction
+   carriers too. **F5 note:** tombstone reconciliation skipped after a
+   pre-pass halt (no false anomalies).
+
+Still-open by design (recorded, not silently claimed): the app's only
+interactive load path remains the dev demo - blueprint step 9's
+production mount is NARROWED to "bound to every interactive load path
+that exists," with the August-pilot build owing the production path
+(the absent path fails closed); IndexedDB paths have no node-env tests.
+D-068 gates unchanged from D-076 except fault-injection coverage grew
+(two-run quarantine, denial-crash, READ FAIL). Deploy bar unchanged and
+unmet. Round 3 verification follows.

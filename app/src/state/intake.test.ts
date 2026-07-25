@@ -257,8 +257,11 @@ describe("grantQueueDirectory (round-1 F4: the effects layer owns the handle)", 
     const dir = new FakeDir("intake-queue");
     expect(await grantQueueDirectory(dir, dispatch)).toBe(true);
     expect(getQueueDirectory()).toBe(dir);
+    // In this node environment IndexedDB is absent, so the honest
+    // persist-failure notice fires between grant and scan (round-2 F11).
     expect(actions.map((a) => a.kind)).toEqual([
       "intakeDirGranted",
+      "intakeFailed",
       "intakeScanStarted",
       "intakeQueueLoaded",
     ]);

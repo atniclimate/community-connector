@@ -90,7 +90,20 @@ export async function grantQueueDirectory(
   }
   queueDirectory = dir;
   dispatch({ kind: "intakeDirGranted", dirName: dir.name });
-  await persistHandle(dir);
+  const persisted = await persistHandle(dir);
+  if (!persisted) {
+    // Visible, non-fatal (round-2 F11): the grant works this session,
+    // but the "use previously granted folder" promise would be false.
+    dispatch({
+      kind: "intakeFailed",
+      error: {
+        code: "IntakePersistFailed",
+        message:
+          "Queue folder granted, but it could not be remembered for the next " +
+          "session; you will need to grant it again after a reload",
+      },
+    });
+  }
   await scanQueue(dir, dispatch);
   return true;
 }
@@ -115,18 +128,19 @@ function openHandleDb(): Promise<IDBDatabase | null> {
   });
 }
 
-async function persistHandle(dir: IntakeDirHandle): Promise<void> {
+async function persistHandle(dir: IntakeDirHandle): Promise<boolean> {
   const db = await openHandleDb();
   if (db === null) {
-    return;
+    return false;
   }
-  await new Promise<void>((resolve) => {
+  const stored = await new Promise<boolean>((resolve) => {
     const tx = db.transaction(IDB_STORE, "readwrite");
     tx.objectStore(IDB_STORE).put(dir, IDB_KEY);
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => resolve();
+    tx.oncomplete = () => resolve(true);
+    tx.onerror = () => resolve(false);
   });
   db.close();
+  return stored;
 }
 
 type PermissionedHandle = IntakeDirHandle & {
@@ -134,25 +148,31 @@ type PermissionedHandle = IntakeDirHandle & {
   readonly requestPermission?: (options: { mode: string }) => Promise<string>;
 };
 
+export type RestoreOutcome = "granted" | "none" | "failed";
+
 /**
  * Restores a previously granted handle from IndexedDB and re-requests
- * permission (must run from a user gesture in most browsers). Returns
- * true when the queue is granted and scanned.
+ * permission (must run from a user gesture in most browsers). The
+ * outcome distinguishes "nothing saved" from "restore failed" (round-2
+ * F3: failures are never disguised as absence).
  */
-export async function restoreQueueDirectory(dispatch: Dispatch): Promise<boolean> {
+export async function restoreQueueDirectory(dispatch: Dispatch): Promise<RestoreOutcome> {
   const db = await openHandleDb();
   if (db === null) {
-    return false;
+    return "failed";
   }
-  const stored = await new Promise<PermissionedHandle | null>((resolve) => {
+  const stored = await new Promise<PermissionedHandle | null | "error">((resolve) => {
     const tx = db.transaction(IDB_STORE, "readonly");
     const request = tx.objectStore(IDB_STORE).get(IDB_KEY);
     request.onsuccess = () => resolve((request.result as PermissionedHandle) ?? null);
-    request.onerror = () => resolve(null);
+    request.onerror = () => resolve("error");
   });
   db.close();
+  if (stored === "error") {
+    return "failed";
+  }
   if (stored === null) {
-    return false;
+    return "none";
   }
   try {
     const query = (await stored.queryPermission?.({ mode: "readwrite" })) ?? "granted";
@@ -161,12 +181,12 @@ export async function restoreQueueDirectory(dispatch: Dispatch): Promise<boolean
         ? "granted"
         : ((await stored.requestPermission?.({ mode: "readwrite" })) ?? "denied");
     if (status !== "granted") {
-      return false;
+      return "failed";
     }
   } catch {
-    return false;
+    return "failed";
   }
-  return grantQueueDirectory(stored, dispatch);
+  return (await grantQueueDirectory(stored, dispatch)) ? "granted" : "failed";
 }
 
 function intakeError(code: string, message: string): ErrorEnvelopeDto {
@@ -201,12 +221,34 @@ export async function guardQueueDirectory(dir: IntakeDirHandle): Promise<string 
   return null;
 }
 
+function isNotFound(error: unknown): boolean {
+  if (typeof error === "object" && error !== null) {
+    const named = error as { readonly name?: unknown; readonly message?: unknown };
+    if (named.name === "NotFoundError") {
+      return true;
+    }
+    if (typeof named.message === "string" && named.message.includes("NotFound")) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/** Existence check that FAILS CLOSED (round-2 F3): only a NotFound error
+ * means absent - a permission or IO failure must never let createOnly
+ * proceed as though the file were missing. */
 async function exists(dir: IntakeDirHandle, name: string): Promise<boolean> {
   try {
     await dir.getFileHandle(name);
     return true;
-  } catch {
-    return false;
+  } catch (error) {
+    if (isNotFound(error)) {
+      return false;
+    }
+    throw intakeError(
+      "IntakeIoError",
+      `cannot determine whether '${name}' exists (${String(error)}); refusing to write`,
+    );
   }
 }
 
@@ -416,8 +458,12 @@ export async function scanQueue(dir: IntakeDirHandle, dispatch: Dispatch): Promi
         pendingDecisionFiles += 1;
       }
     }
-  } catch {
-    // No decisions directory yet: zero staged decisions.
+  } catch (error) {
+    if (!isNotFound(error)) {
+      // An enumeration failure is NOT "zero staged decisions" (round-2
+      // F3): report it so the dashboard never understates staged work.
+      scanIssues.push(`decisions/: enumeration failed (${String(error)})`);
+    }
   }
   dispatch({ kind: "intakeQueueLoaded", records, pendingDecisionFiles, scanIssues });
 }

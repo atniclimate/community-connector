@@ -108,11 +108,18 @@ export function mountIntakeWizard(container: HTMLElement, deps: IntakeWizardDeps
       });
       restore.addEventListener("click", () => {
         restoreQueueDirectory(dispatch)
-          .then((restored) => {
-            if (!restored) {
+          .then((outcome) => {
+            if (outcome === "none") {
               fail({
                 code: "IntakeNoSavedFolder",
-                message: "No previously granted folder could be restored; grant one",
+                message: "No previously granted folder is saved; grant one",
+              });
+            } else if (outcome === "failed") {
+              fail({
+                code: "IntakeRestoreFailed",
+                message:
+                  "A saved folder exists but could not be restored (permission or " +
+                  "storage failure); grant it again",
               });
             }
           })
@@ -277,7 +284,11 @@ export function mountIntakeWizard(container: HTMLElement, deps: IntakeWizardDeps
       const checks: Promise<string>[] = [
         deps.client
           .intakeValidateRecord(groupId, JSON.stringify(record.record))
-          .then((result) => `validation: ${JSON.stringify(result["report"])}`),
+          .then(
+            (result) =>
+              `validation: submission=${JSON.stringify(result["submission"])} ` +
+              `entity=${JSON.stringify(result["report"])}`,
+          ),
         deps.client
           .intakeDedupCheck(
             JSON.stringify(record.record),

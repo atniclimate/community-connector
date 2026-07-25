@@ -11,10 +11,11 @@
 use serde_json::Value;
 
 use cn_model::{
-    ActorRef, AttributeInstance, AttributeValue, Entity, EntityId, GroupId, INTAKE_BLOCK_VERSION,
-    IntakeProvenance, KindId, Origin, PersonId, ProvenanceEnvelope, SensitivityTier, Timestamp,
+    ActorRef, AttributeInstance, AttributeValue, Entity, EntityId, GeoValue, GroupId,
+    INTAKE_BLOCK_VERSION, IntakeProvenance, IsoDate, KindId, LinkValue, MediaRefId, Origin,
+    PersonId, ProvenanceEnvelope, SensitivityTier, Timestamp,
 };
-use cn_schema::{AttrType, GroupTemplate, ValidationReport, validate_entity};
+use cn_schema::{AttrDef, AttrType, GroupTemplate, ValidationReport, validate_entity};
 use cn_store::{Hlc, OpKind, Operation, SortKey};
 
 use crate::record::{ApprovalPlanRef, QueueRecord, SubmissionSource};
@@ -64,8 +65,12 @@ pub struct SubmissionFindings {
     pub warnings: Vec<String>,
 }
 
-/// Payload text caps (hostile-content guardrails; ADR-005 D4).
+/// Payload text caps (hostile-content guardrails; ADR-005 D4). These are
+/// THE documented limits; the form's advisory caps mirror them (round-2
+/// F9 reconciliation).
 pub const PAYLOAD_TEXT_MAX: usize = 2_000;
+/// Maximum items in one tags field.
+pub const TAGS_MAX_ITEMS: usize = 20;
 const KNOWN_TOP_LEVEL: &[&str] = &[
     "submission_version",
     "submission_id",
@@ -195,24 +200,14 @@ pub fn validate_submission(payload: &Value, template: &GroupTemplate) -> Submiss
                 .push("fields is not a JSON object".to_string()),
             Some(fields) => {
                 for (field, value) in fields {
-                    let Some(_def) = kind_def.attributes.iter().find(|a| a.id.as_str() == field)
+                    let Some(def) = kind_def.attributes.iter().find(|a| a.id.as_str() == field)
                     else {
                         findings.errors.push(format!(
                             "field '{field}' is not a template attribute of '{kind_id}'"
                         ));
                         continue;
                     };
-                    match value {
-                        Value::String(text) => check_text(&mut findings, field, text),
-                        Value::Array(items) => {
-                            for (index, item) in items.iter().enumerate() {
-                                if let Value::String(text) = item {
-                                    check_text(&mut findings, &format!("{field}[{index}]"), text);
-                                }
-                            }
-                        }
-                        _ => {}
-                    }
+                    check_field(&mut findings, def, field, value);
                 }
             }
         },
@@ -341,8 +336,13 @@ pub struct ApprovalPlan {
     pub validation: ValidationReport,
 }
 
-fn attr_value_from_json(attr_type: &AttrType, value: &Value) -> Option<AttributeValue> {
-    match (attr_type, value) {
+/// Maps a raw payload value onto its typed attribute value. EVERY
+/// template type is handled (round-2 F9: optional link/date/geo/media
+/// values must survive approval, never silently drop); a `None` here is
+/// a type/shape mismatch that `validate_submission` reports as a
+/// rejecting finding before any plan reaches the seam.
+fn attr_value_from_json(def: &AttrDef, value: &Value) -> Option<AttributeValue> {
+    match (&def.attr_type, value) {
         (AttrType::Text, Value::String(s)) => Some(AttributeValue::Text(s.clone())),
         (AttrType::Enum, Value::String(s)) => Some(AttributeValue::Enum(s.clone())),
         (AttrType::Number, Value::Number(n)) => n.as_f64().map(AttributeValue::Number),
@@ -353,9 +353,72 @@ fn attr_value_from_json(attr_type: &AttrType, value: &Value) -> Option<Attribute
                 .collect();
             tags.map(AttributeValue::Tags)
         }
-        // Date/Geo/Link/Media are not in the pilot remote field set; a
-        // template requiring them surfaces through validate_entity below.
+        (AttrType::Date, Value::String(s)) => {
+            IsoDate::new(s.clone()).ok().map(AttributeValue::Date)
+        }
+        (AttrType::Geo, Value::Object(map)) => {
+            if let (Some(lat), Some(lon)) = (
+                map.get("lat").and_then(Value::as_f64),
+                map.get("lon").and_then(Value::as_f64),
+            ) {
+                GeoValue::point(lat, lon).ok().map(AttributeValue::Geo)
+            } else {
+                map.get("name").and_then(Value::as_str).map(|name| {
+                    AttributeValue::Geo(GeoValue::Region {
+                        name: name.to_string(),
+                    })
+                })
+            }
+        }
+        (AttrType::Link, Value::String(s)) => LinkValue::new(s.clone(), def.format)
+            .ok()
+            .map(AttributeValue::Link),
+        (AttrType::Media, Value::String(s)) => {
+            MediaRefId::new(s.clone()).ok().map(AttributeValue::Media)
+        }
         _ => None,
+    }
+}
+
+/// Typed per-field validation against the template attribute (round-2
+/// F9): hazard checks on every string, tags caps and homogeneity, enum
+/// membership, and shape/validity via the SAME mapping approval uses -
+/// so anything the planner would drop is a rejecting finding first.
+fn check_field(findings: &mut SubmissionFindings, def: &AttrDef, field: &str, value: &Value) {
+    match value {
+        Value::String(text) => check_text(findings, field, text),
+        Value::Array(items) => {
+            if items.len() > TAGS_MAX_ITEMS {
+                findings
+                    .errors
+                    .push(format!("{field}: lists more than {TAGS_MAX_ITEMS} items"));
+            }
+            for (index, item) in items.iter().enumerate() {
+                match item {
+                    Value::String(text) => {
+                        check_text(findings, &format!("{field}[{index}]"), text);
+                    }
+                    _ => findings
+                        .errors
+                        .push(format!("{field}[{index}]: tags items must be strings")),
+                }
+            }
+        }
+        _ => {}
+    }
+    if def.attr_type == AttrType::Enum
+        && let (Some(values), Value::String(chosen)) = (&def.values, value)
+        && !values.contains(chosen)
+    {
+        findings.errors.push(format!(
+            "{field}: '{chosen}' is not one of the template's enum values"
+        ));
+    }
+    if attr_value_from_json(def, value).is_none() {
+        findings.errors.push(format!(
+            "{field}: value does not fit its template type ({:?})",
+            def.attr_type
+        ));
     }
 }
 
@@ -459,8 +522,12 @@ pub fn plan_approval(
             let Some(raw) = fields.get(def.id.as_str()) else {
                 continue;
             };
-            let Some(value) = attr_value_from_json(&def.attr_type, raw) else {
-                continue; // type mismatch surfaces via validate_entity
+            let Some(value) = attr_value_from_json(def, raw) else {
+                // A mismatch here is ALWAYS a rejecting validate_submission
+                // finding (check_field uses the same mapping), so the
+                // validation gate blocks the approve before this plan can
+                // reach the seam - never a silent drop (round-2 F9).
+                continue;
             };
             let instance = AttributeInstance::new(value, def.default_visibility, envelope()?);
             entity.attributes.insert(def.id.clone(), instance);

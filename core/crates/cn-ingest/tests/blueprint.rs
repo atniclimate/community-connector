@@ -681,7 +681,10 @@ fn plan_template() -> cn_schema::GroupTemplate {
             "color_role": "kind-1",
             "attributes": [
                 { "id": "display_name", "type": "text", "required": true },
-                { "id": "affiliation", "type": "tags" }
+                { "id": "affiliation", "type": "tags" },
+                { "id": "contact_email", "type": "link", "format": "email" },
+                { "id": "career_stage", "type": "enum", "values": ["student", "established"] },
+                { "id": "started_on", "type": "date" }
             ]
         }],
         "edge_kinds": [],
@@ -1140,4 +1143,174 @@ fn canonical_digest_golden_vectors_pin_the_byte_domain() {
         record.payload_hash, "ca230fbb029d531f1615ba8f36f9075eb915d9070ecab75f354770194536a2eb",
         "payload digest domain"
     );
+}
+
+// --- round-2 amendments (2026-07-25 adversarial round, verification pass) ---
+
+#[test]
+fn optional_typed_fields_survive_approval_not_silently_dropped() {
+    // Round-2 F9: the pilot forms submit contact_email as a link; the
+    // planner must map EVERY template type, never silently omit.
+    let mut with_typed = payload();
+    with_typed["fields"]["contact_email"] = json!("rowan@example.test");
+    with_typed["fields"]["career_stage"] = json!("student");
+    with_typed["fields"]["started_on"] = json!("2026-07-01");
+    let record = QueueRecord::new(
+        "rec-typed".to_string(),
+        ts(20),
+        SubmissionSource::InApp {},
+        with_typed,
+    )
+    .expect("record");
+    let template = plan_template();
+
+    let findings = validate_submission(&record.payload, &template);
+    assert!(
+        findings.errors.is_empty(),
+        "typed payload clean: {findings:?}"
+    );
+
+    let plan = plan_approval(
+        &record,
+        &template,
+        &plan_context(),
+        &mut deterministic_ids(),
+    )
+    .expect("plan");
+    let cn_store::OpKind::EntityCreate { entity } = &plan.ops[0].kind else {
+        panic!("expected EntityCreate");
+    };
+    let email_attr = cn_model::AttrId::new("contact_email").expect("attr");
+    assert!(
+        matches!(
+            entity.attributes.get(&email_attr).map(|a| &a.value),
+            Some(cn_model::AttributeValue::Link(_))
+        ),
+        "link field survives approval as a Link value"
+    );
+    let date_attr = cn_model::AttrId::new("started_on").expect("attr");
+    assert!(
+        matches!(
+            entity.attributes.get(&date_attr).map(|a| &a.value),
+            Some(cn_model::AttributeValue::Date(_))
+        ),
+        "date field survives approval"
+    );
+    assert!(plan.validation.errors.is_empty(), "{:?}", plan.validation);
+}
+
+#[test]
+fn validate_submission_enforces_template_value_contract() {
+    let template = plan_template();
+
+    let mut wrong_number_shape = payload();
+    wrong_number_shape["fields"]["career_stage"] = json!(7);
+    assert!(
+        validate_submission(&wrong_number_shape, &template)
+            .errors
+            .iter()
+            .any(|e| e.contains("career_stage")),
+        "wrong value shape for an OPTIONAL field is a rejecting finding"
+    );
+
+    let mut off_enum = payload();
+    off_enum["fields"]["career_stage"] = json!("emeritus");
+    assert!(
+        validate_submission(&off_enum, &template)
+            .errors
+            .iter()
+            .any(|e| e.contains("enum values")),
+        "enum membership enforced"
+    );
+
+    let mut bad_date = payload();
+    bad_date["fields"]["started_on"] = json!("July 1st");
+    assert!(
+        validate_submission(&bad_date, &template)
+            .errors
+            .iter()
+            .any(|e| e.contains("started_on")),
+        "invalid date rejected"
+    );
+
+    let mut bad_link = payload();
+    bad_link["fields"]["contact_email"] = json!("   ");
+    assert!(
+        validate_submission(&bad_link, &template)
+            .errors
+            .iter()
+            .any(|e| e.contains("contact_email")),
+        "invalid link rejected"
+    );
+
+    let mut too_many_tags = payload();
+    too_many_tags["fields"]["affiliation"] = json!(
+        (0..TAGS_MAX_ITEMS + 1)
+            .map(|i| format!("t{i}"))
+            .collect::<Vec<_>>()
+    );
+    assert!(
+        validate_submission(&too_many_tags, &template)
+            .errors
+            .iter()
+            .any(|e| e.contains("items")),
+        "tags cap enforced in core"
+    );
+
+    let mut mixed_tags = payload();
+    mixed_tags["fields"]["affiliation"] = json!(["ok", 5]);
+    assert!(
+        validate_submission(&mixed_tags, &template)
+            .errors
+            .iter()
+            .any(|e| e.contains("strings")),
+        "mixed-type tags rejected"
+    );
+}
+
+#[test]
+fn nested_extras_survive_on_plan_and_transaction_entries_too() {
+    // Round-2 F10: preservation proven for ALL three nested carriers.
+    let record = remote_record();
+    let template = plan_template();
+    let plan = plan_approval(
+        &record,
+        &template,
+        &plan_context(),
+        &mut deterministic_ids(),
+    )
+    .expect("plan");
+    let mut sidecar = ReviewSidecar::initial(&record).expect("sidecar");
+    let message = DecisionMessage {
+        queue_record_version: decision_message_version(),
+        decision_id: "d-x".to_string(),
+        record_id: record.record_id.clone(),
+        payload_digest: record.record_checksum.clone(),
+        expected_review_state: ReviewState::Pending,
+        expected_decision_generation: 0,
+        decision: DecisionType::Approve,
+        reviewer: "facilitator".to_string(),
+        decided_at: ts(1),
+    };
+    let verdict = admit(&sidecar, &message).expect("verdict");
+    sidecar.plan = Some(plan.plan_ref.clone());
+    apply_verdict(&mut sidecar, &verdict).expect("admitted");
+    record_transaction(
+        &mut sidecar,
+        "d-x",
+        TransactionKind::IntentCompleted,
+        ReviewState::Approved,
+        ts(2),
+        None,
+    )
+    .expect("transaction");
+
+    let mut value = serde_json::to_value(&sidecar).expect("value");
+    value["plan"]["future_plan_field"] = json!("kept");
+    value["history"][1]["future_tx_field"] = json!("kept");
+    let mut parsed: ReviewSidecar = serde_json::from_value(value).expect("parses");
+    parsed.seal_rewrite().expect("reseal");
+    let round_tripped = serde_json::to_value(&parsed).expect("value");
+    assert_eq!(round_tripped["plan"]["future_plan_field"], "kept");
+    assert_eq!(round_tripped["history"][1]["future_tx_field"], "kept");
 }

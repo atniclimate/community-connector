@@ -24,8 +24,9 @@ Usage:
   pwsh scripts/pii-scan.ps1 -SelfTest  # write marker-bearing fixtures into the
                                        # session temp dir and run the REAL scan
                                        # loop over them (round-1 F12), assert
-                                       # every rule trips plus the exemption
-                                       # negative, then clean up
+                                       # every rule trips, the exemption
+                                       # negative holds, and an unreadable
+                                       # file FAILS CLOSED (round-2 F12)
 
 Exit code 0 = clean (or self-test passed), 1 = violations found (commit is
 blocked in hook mode) or self-test failure. False positives get a specific
@@ -104,7 +105,10 @@ function Test-FileViolations {
 
 # The ONE scan loop, shared by every mode including the self-test
 # (round-1 F12: the self-test exercises the real path, not a shortcut).
-# $Files: relative paths. $ReadContent: scriptblock(relPath) -> string|$null.
+# $Files: relative paths. $ReadContent: scriptblock(relPath) -> hashtable
+# @{ok=<string>} or @{fail=<reason>}. A read failure is a VIOLATION - the
+# scanner FAILS CLOSED (round-2 F12): unreadable content is never treated
+# as clean.
 function Invoke-ScanFiles {
     param([string[]]$Files, [scriptblock]$ReadContent, [string[]]$Allowed)
     $all = [System.Collections.Generic.List[string]]::new()
@@ -113,7 +117,12 @@ function Invoke-ScanFiles {
         $content = $null
         $ext = [System.IO.Path]::GetExtension($f).ToLowerInvariant()
         if ($skipContentExt -notcontains $ext) {
-            $content = & $ReadContent $f
+            $result = & $ReadContent $f
+            if ($result.ContainsKey('fail')) {
+                $all.Add("READ FAIL  $f  cannot be read for scanning ($($result.fail)); fix or remove it - unreadable is never clean (I3)")
+                continue
+            }
+            $content = $result.ok
         }
         foreach ($v in (Test-FileViolations -RelPath $f -Content $content -Allowed $Allowed)) {
             $all.Add($v)
@@ -148,8 +157,14 @@ if ($SelfTest) {
         $exemptName = 'record.rs'
         Set-Content -Path (Join-Path $tempRoot $exemptName) -Value 'let key = "queue_record_version": ;' -NoNewline
 
-        $reader = { param($rel) Get-Content -Raw -ErrorAction SilentlyContinue (Join-Path $tempRoot $rel) }
-        $names = @($cases | ForEach-Object { $_.Name }) + $exemptName
+        $reader = {
+            param($rel)
+            $full = Join-Path $tempRoot $rel
+            try { return @{ ok = (Get-Content -Raw -ErrorAction Stop $full) } }
+            catch { return @{ fail = "$_" } }
+        }
+        # A missing file exercises the fail-closed READ FAIL rule.
+        $names = @($cases | ForEach-Object { $_.Name }) + $exemptName + 'missing-file.txt'
         $hits = Invoke-ScanFiles -Files $names -ReadContent $reader -Allowed @()
 
         $failures = 0
@@ -163,6 +178,11 @@ if ($SelfTest) {
         $exemptHits = @($hits | Where-Object { $_.Contains($exemptName) })
         if ($exemptHits.Count -ne 0) {
             Write-Host "SELF-TEST FAIL: exempt source '$exemptName' tripped: $exemptHits" -ForegroundColor Red
+            $failures++
+        }
+        $readFailHits = @($hits | Where-Object { $_.StartsWith('READ FAIL') -and $_.Contains('missing-file.txt') })
+        if ($readFailHits.Count -eq 0) {
+            Write-Host "SELF-TEST FAIL: unreadable file did not produce READ FAIL (fail-closed rule)" -ForegroundColor Red
             $failures++
         }
         if ($failures -gt 0) { exit 1 }
@@ -189,8 +209,8 @@ if ($Staged) {
     $reader = {
         param($rel)
         $content = (& git -C $repoRoot show ":$rel" 2>$null) -join "`n"
-        if ($LASTEXITCODE -ne 0) { return $null }
-        return $content
+        if ($LASTEXITCODE -ne 0) { return @{ fail = "git show exited $LASTEXITCODE" } }
+        return @{ ok = $content }
     }
 } else {
     $tracked   = @(& git -C $repoRoot ls-files)
@@ -199,8 +219,11 @@ if ($Staged) {
     $reader = {
         param($rel)
         $full = Join-Path $repoRoot $rel
-        if (-not (Test-Path $full -PathType Leaf)) { return $null }
-        return Get-Content -Raw -ErrorAction SilentlyContinue $full
+        if (-not (Test-Path $full -PathType Leaf)) {
+            return @{ fail = 'listed by git but not a readable file on disk' }
+        }
+        try { return @{ ok = (Get-Content -Raw -ErrorAction Stop $full) } }
+        catch { return @{ fail = "$_" } }
     }
 }
 
