@@ -18,6 +18,7 @@ Members (in order):
   app-smoke       app/   npm run smoke:node
   app-snapshot    app/   npm run build:snapshot   (includes the 5MB size gate, I8)
   pii-scan        root   pwsh scripts/pii-scan.ps1  (always runs, every mode)
+  pii-selftest    root   pwsh scripts/pii-scan.ps1 -SelfTest  (tripwire liveness)
 
 Usage:
   pwsh scripts/check-all.ps1                # full battery
@@ -39,6 +40,7 @@ Staged trigger map (kept proportional so atomic commits stay cheap):
   fixtures/  -> app-test, app-templates, app-smoke
   scripts/   -> app-snapshot (exercises check-size.mjs)
   (any/none) -> pii-scan always
+  scripts/   -> pii-selftest (plus full-mode runs)
 #>
 param(
     [switch]$RustOnly,
@@ -98,6 +100,9 @@ $members = @(
     @{ Name = 'pii-scan';      Group = 'cross'; Dir = '.';    Exe = 'pwsh';
        Args = @('-NoProfile', '-File', 'scripts/pii-scan.ps1');
        StagedTriggers = @() }  # selected unconditionally below
+    @{ Name = 'pii-selftest';  Group = 'cross'; Dir = '.';    Exe = 'pwsh';
+       Args = @('-NoProfile', '-File', 'scripts/pii-scan.ps1', '-SelfTest');
+       StagedTriggers = @('scripts') }  # tripwires proven live on script change
 )
 
 # --- Selection ---------------------------------------------------------------

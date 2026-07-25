@@ -1551,3 +1551,20 @@ set-aside-note / clear-failed decisions as create-only decision files.
 Entry and approval remain two distinct recorded acts (D-030). FSA handle
 persistence across sessions (IndexedDB) is deferred to the step-11
 polish pass - the facilitator re-grants the folder per session for now.
+
+## D-075 (2026-07-24) - Step 10 pii-scan tripwires: scoping and self-test
+
+The intake tripwires (ADR-005 D4, blueprint section 7) landed: queue-shaped
+path rules (*.record.json, *.sidecar.json, *.reviewed - flagged anywhere,
+any content), the "queue_record_version" JSON data marker, and the
+"secret-encrypted" key-envelope marker. Scoping choice recorded: .rs/.ts
+sources and .md docs are exempt from the CONTENT markers only (they name
+and describe the format keys; a real staged queue file never arrives as
+source or markdown) - path rules apply to every file. The scanner file
+itself is content-exempt by name (it carries the regexes). A new
+`pii-selftest` check-all member (12 members now) GENERATES six positive
+marker-bearing fixtures in the session temp dir at runtime, asserts each
+trips its rule plus one exemption negative, and removes them - the
+tripwire is proven live on every full run without anything marker-shaped
+ever entering the repo. Tripwires remain defense in depth under the I1
+process boundary, not enforcement.
