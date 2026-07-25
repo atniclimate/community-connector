@@ -93,35 +93,26 @@ of 11 LANDED, check-all green at each commit:**
   envelope (own version, unknown-major rejected); model schema PATCH bump
   0.1.0 -> 0.1.1; fixed two version-space conflations the bump exposed in
   cn-api/cn-schema tests.
-- Step 3 (73e228b): cn-ingest queue formats (record/sidecar, two
-  counters, two-kind history, all four transaction events), decision
-  admission table (generation+state CAS, writeless replays), recovery
-  classification; 15 tests incl. both round-6 mandatory sequences.
-- Step 4 (52e274b): near-duplicate surfacing (projection-bounded,
-  reasons, conservative matching) + plan_approval (populated
-  EntityCreate per D-069, intake block on entity and every attribute
-  instance, pre-link batch digest, deterministic under injected ids,
-  authoritative validate_entity report). 20 cn-ingest tests total.
+- Step 3 + decision half of step 4 (73e228b): cn-ingest queue formats
+  (record/sidecar, two counters, two-kind history, all four transaction
+  events), decision admission table (generation+state CAS, writeless
+  replays), recovery classification; 15 tests incl. both round-6 mandatory
+  sequences.
 
 **NOT done - ordered next actions (mandate item 2 continues autonomously;
 blueprint docs/blueprints/intake-pipeline.md section 9 is the sequence):**
-1. Step 5: `cn intake apply` CLI (queue lock, strict write primitive,
-   recovery execution via cn-ingest classify, decision consumption
-   through the admission table, plan_approval -> the cn-store seam ->
-   completion transaction events, run report I12). The full
-   decide -> apply -> reload integration test on synthetic data.
-2. Step 6: cn-api/cn-wasm READ-ONLY intake facade + the no-leak extension
-   test (near-dup candidates bounded by the REAL facilitator projection -
-   the step-4 test proves projection-boundedness of the scorer; the
-   facade test proves the projection is the facilitator's).
-3. Steps 7-9: app - template->form renderer (P3.6), FSA create-only
+1. Blueprint step 4 remainder: cn-ingest near-dup scoring
+   (projection-bounded) + `plan_approval` (pre-link batch digest,
+   intake-block construction inside modeled values).
+2. Step 5: `cn intake apply` CLI (queue lock, recovery execution, decision
+   consumption, the transaction against OpLog, run report).
+3. Step 6: cn-api/cn-wasm READ-ONLY intake facade + the no-leak extension
+   test (near-dup candidates bounded by facilitator projection).
+4. Steps 7-9: app - template->form renderer (P3.6), FSA create-only
    adapter, wizard panel (P3.5).
-4. Step 10: pii-scan tripwires (queue/secret markers + runtime-generated
+5. Step 10: pii-scan tripwires (queue/secret markers + runtime-generated
    positive fixtures). Step 11: synthetic fixtures + docs true-up.
-5. Then the MANDATORY adversarial round on the implementation diff.
-6. Asana refresh owed for this session's notable progress (ADR-005
-   acceptance + steps 1-4) per the ratified convention - deferred at
-   session close for context budget; do it at the next session close.
+6. Then the MANDATORY adversarial round on the implementation diff.
 2. **Remote intake relay implementation (per ACCEPTED ADR-005).** Pages form,
    client-side sealed box, Workers+KV relay (receipt ledger, admission
    allowlist), pilot-PC puller (bundle+key pins, crash protocol). The

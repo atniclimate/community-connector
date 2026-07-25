@@ -18,9 +18,16 @@ blueprint (docs/blueprints/intake-pipeline.md) is written, aligned, and
 carries the reviewer's implementation gates in its test lists. The
 consent draft gained section 7: four wording conflicts for the D-023
 pass - the removal-semantics question (no-longer-shown vs erasure) is a
-human decision. Next action: implement the intake pipeline per the
-blueprint's 11-step sequencing (cn-store seam first), then its mandatory
-adversarial round. The deploy bar (D-059.8) is unchanged.
+human decision. Implementation then proceeded the same day: blueprint
+steps 1-4 of 11 are LANDED and pushed (cn-store durable seam, cn-model
+intake provenance block, cn-ingest queue formats + admission table +
+recovery classification + near-dup + plan_approval; check-all 7/7 green
+at every commit; D-069 records the populated-EntityCreate deviation).
+Next action: step 5, the `cn intake apply` CLI, then the facade and app
+steps, then the mandatory adversarial round on the implementation diff.
+An Asana refresh for this session is owed at the next session close.
+The deploy bar (D-059.8) is unchanged - ADR-005 acceptance satisfied its
+first condition; intake pipeline + keygen ceremony + D-023 remain.
 
 ## The previous brief (2026-07-24, end of the grill + first-push session)
 

@@ -1384,3 +1384,23 @@ can be met. Acceptance UNLOCKS: the P3.5/P3.6 intake-pipeline
 implementation (blueprint at docs/blueprints/intake-pipeline.md) and,
 separately gated, the relay implementation (mandate item 3). The deploy
 bar itself is unchanged.
+
+## D-069 (2026-07-24) - Intake approval ops: attributes ride inside EntityCreate
+
+Blueprint step 4 implementation (52e274b) deviates deliberately from the
+blueprint's earlier op-list sketch ("EntityCreate unowned + AttributeSets
++ EdgeCreates"): cn-store's fold validates REQUIRED attributes at entity
+creation, so a bare EntityCreate followed by AttributeSet ops would
+quarantine at create. plan_approval therefore builds ONE EntityCreate op
+carrying the fully populated entity (attributes as AttributeInstances,
+each carrying the D5 intake provenance block alongside the entity's own).
+Multi-op batches still arise from multi-entity/edge submissions later;
+the seam's prefix/recovery semantics are unaffected. Recorded in the
+module header and the blueprint (aligned in this true-up commit). Edge
+creation from the pilot form's org linkage stays deferred to the wizard's
+merge-by-hand flow.
+
+Implementation position at session close: blueprint steps 1-4 of 11
+landed (78e9aae seam, 661b02c provenance block, 73e228b queue formats +
+admission + recovery, 52e274b near-dup + plan_approval); check-all 7/7
+green at every commit; next is step 5, the `cn intake apply` CLI.

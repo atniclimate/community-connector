@@ -116,9 +116,10 @@ one path - the public remote `atniclimate/community-connector` and the Cloudflar
 Workers intake relay. The push preconditions were satisfied (D-058 sweep + D-059
 dispositions) and the FIRST PUSH was executed 2026-07-24 (D-060); the repo is
 public and stays continuously pushable. The DEPLOY bar for the Pages form +
-Workers relay remains separate and unmet (D-059.8): ADR-005 accepted post-round +
-intake pipeline working + keygen ceremony executed + D-023 sign-off. Every other
-gate stands unchanged.
+Workers relay remains separate and unmet (D-059.8); of its four conditions,
+ADR-005 acceptance is SATISFIED (D-068, eight adversarial rounds, 2026-07-24) -
+still owed: intake pipeline working + keygen ceremony executed + D-023
+sign-off. Every other gate stands unchanged.
 
 ### Real-data gate process - ATNI convention pilot (D-030, D-034, D-053)
 

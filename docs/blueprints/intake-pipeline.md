@@ -158,10 +158,14 @@ network code enters any core crate (ADR-005 D1 fence).
   `plan_approval(record, template, group_id, facilitator) ->
   ApprovalPlan { preassigned_op_ids, per_op_digests, ops, batch_digest }`
   (UUIDv7 ids and canonical per-op digests generated HERE, once, at apply
-  time; ops are ordinary `Operation` values - EntityCreate unowned +
-  AttributeSets + EdgeCreates per the template mapping, actor =
-  `cn-intake/<version>`, responsible_human = facilitator, D-056.2/ADR-005
-  D5/D7). The plan's `batch_digest` uses the ADR-005 pre-link projection
+  time; ops are ordinary `Operation` values - ONE EntityCreate carrying
+  the FULLY POPULATED unowned entity per submission (D-069: fold
+  validates required attributes at create, so bare-create + AttributeSet
+  would quarantine; attributes ride inside the create as
+  AttributeInstances, each carrying the D5 intake block; EdgeCreates
+  deferred to merge-by-hand), actor = `cn-intake/<version>`,
+  responsible_human = facilitator, D-056.2/ADR-005 D5/D7). The plan's
+  `batch_digest` uses the ADR-005 pre-link projection
   (canonical planned ops with every `intake.batch_digest` omitted), then
   populates the blocks; per-op durable-log digests are computed after
   population. Recovery follows the ADR-005 intent-as-authorization-marker
