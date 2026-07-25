@@ -4,7 +4,33 @@
 > CLAUDE.md -> HANDOFF.md -> this file. Refresh the Brief at each session
 > end (CLAUDE.md session-end protocol).
 
-## The 60-second brief (refreshed 2026-07-24, end of the ADR-005 acceptance session)
+## The 60-second brief (refreshed 2026-07-25, end of the implementation-review session)
+
+**The intake-pipeline implementation is ACCEPTED** (D-080): the
+mandatory adversarial round became FIVE rounds in one day (D-076..D-080;
+rounds 1-4 FAIL-and-amend, round 5 PASS-WITH-NOTES), and every finding
+was verified against the code before judgment. The hardening that
+landed: recovery re-authorization for all-absent plans (a crash after a
+denial can never recover into an unauthorized append), reviewer-identity
+binding, the literal WRITE_THROUGH durable-rename primitive, sticky
+durable-quarantine disposition, fail-closed native and app IO
+end-to-end, sorted-key canonical digests with golden vectors,
+digest-bound tombstones, a typed submission-schema validator with the
+complete per-type value contract (geo end-to-end, NFC normalization,
+byte-measured caps), durable persistence notices, and an honest
+tripwire self-test. Blueprint step 9 was amended in place (D-078): the
+production interactive path + synthetic decide -> apply -> reload
+rehearsal are owed with the August pilot build BEFORE pilot use. The
+four standing debts are recorded in D-080, visible and unclaimed; the
+deploy bar (D-059.8) remains unmet. The human's D-072 rulings stand
+(consent boilerplate authorized as draft pending D-023; checkpoint =
+convention; ad hoc demos open pathways - demo-readiness is a
+priority). Next: the remote relay implementation (build unlocked,
+deploy barred), the snapshot data pipeline (D-048), and minimal P4.1
+story authoring. Asana was refreshed twice this arc (progress + the
+acceptance update).
+
+## The previous brief (refreshed 2026-07-24, end of the ADR-005 acceptance session)
 
 **ADR-005 is ACCEPTED** (D-068) after EIGHT adversarial rounds in one day
 (D-061..D-068; rounds 1-7 FAIL-and-amend with every finding verified
