@@ -5,6 +5,7 @@ edition.workspace = true
 publish = false
 
 [dependencies]
+cn-ingest = { path = "../cn-ingest" }
 cn-model = { path = "../cn-model" }
 cn-schema = { path = "../cn-schema" }
 cn-store = { path = "../cn-store" }

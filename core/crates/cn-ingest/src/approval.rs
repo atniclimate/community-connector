@@ -24,6 +24,63 @@ use crate::version::{IngestError, canonical_digest};
 /// (ADR-005 D5).
 pub const INTAKE_ACTOR_ID: &str = "cn-intake/0.1.0";
 
+/// The pilot form's default entity kind (blueprint sections 2-4). The
+/// single source for both the CLI's `--kind` default and the read-only
+/// facade's kind resolution.
+pub const DEFAULT_PILOT_KIND: &str = "person";
+
+/// Resolves the entity kind for a record: a payload-carried `kind` field
+/// wins, else the caller's default. Returns an accompanying warning when a
+/// payload kind was invalid and the default was used - template validation
+/// and the seam preflight stay authoritative either way, so a wrong kind
+/// surfaces loudly downstream, never as a silent write.
+pub fn resolve_kind(record: &QueueRecord, default_kind: &KindId) -> (KindId, Option<String>) {
+    match record.payload.get("kind").and_then(Value::as_str) {
+        Some(raw) => match KindId::new(raw) {
+            Ok(kind) => (kind, None),
+            Err(_) => (
+                default_kind.clone(),
+                Some(format!(
+                    "record {}: payload kind '{raw}' is not a valid kind id; using \
+                     default '{default_kind}'",
+                    record.record_id
+                )),
+            ),
+        },
+        None => (default_kind.clone(), None),
+    }
+}
+
+/// The authoritative template-fit validation for a queue record, computed
+/// by building EXACTLY the entity `plan_approval` would build (throwaway
+/// ids and plan context, discarded ops): the review UI's report can never
+/// diverge from the apply-time report (I2). Verifies version and checksum
+/// first via `record.verify()` inside the plan path.
+pub fn validate_record(
+    record: &QueueRecord,
+    template: &GroupTemplate,
+    kind: &KindId,
+) -> Result<ValidationReport, IngestError> {
+    let nil = "00000000-0000-0000-0000-000000000000";
+    let context = PlanContext {
+        group_id: nil
+            .parse()
+            .map_err(|_| IngestError::Serialize("nil group id".to_string()))?,
+        facilitator: nil
+            .parse()
+            .map_err(|_| IngestError::Serialize("nil person id".to_string()))?,
+        kind: kind.clone(),
+        now_ms: 0,
+        template_version: semver::Version::new(0, 0, 0),
+    };
+    let mut n: u128 = 0;
+    let plan = plan_approval(record, template, &context, &mut || {
+        n += 1;
+        uuid::Uuid::from_u128(n)
+    })?;
+    Ok(plan.validation)
+}
+
 /// Everything the plan needs besides the record and template.
 #[derive(Debug, Clone)]
 pub struct PlanContext {

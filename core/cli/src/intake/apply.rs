@@ -18,7 +18,7 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 
 use serde::Serialize;
-use serde_json::{Value, json};
+use serde_json::json;
 
 use cn_ingest::{
     AdmissionVerdict, ApprovalPlan, DecisionMessage, DecisionOutcome, DecisionType, FoundRecord,
@@ -172,7 +172,7 @@ fn parse_args(args: &[String]) -> Result<ApplyArgs, String> {
         ops: ops.ok_or_else(|| "--ops is required".to_string())?,
         group: group.ok_or_else(|| "--group is required".to_string())?,
         facilitator: facilitator.ok_or_else(|| "--facilitator is required".to_string())?,
-        kind: kind.unwrap_or_else(|| "person".to_string()),
+        kind: kind.unwrap_or_else(|| cn_ingest::DEFAULT_PILOT_KIND.to_string()),
     })
 }
 
@@ -816,26 +816,12 @@ fn admitting_decision_id(sidecar: &ReviewSidecar) -> Option<String> {
     })
 }
 
-/// Resolves the entity kind for an approval: a payload-carried `kind` field
-/// wins; otherwise the CLI default (pilot form: person). An invalid payload
-/// kind falls back LOUDLY - template validation and the seam preflight stay
-/// authoritative, so a wrong kind surfaces as preflight_failed, never as a
-/// silent write.
+/// Resolves the entity kind via the shared cn-ingest rule (payload `kind`
+/// wins, else the CLI default), surfacing any fallback warning (I12).
 fn kind_for(record: &QueueRecord, default_kind: &KindId, warnings: &mut Vec<String>) -> KindId {
-    match record.payload.get("kind").and_then(Value::as_str) {
-        Some(raw) => match KindId::new(raw) {
-            Ok(kind) => kind,
-            Err(_) => {
-                warnings.push(format!(
-                    "record {}: payload kind '{raw}' is not a valid kind id; using \
-                     default '{default_kind}'",
-                    record.record_id
-                ));
-                default_kind.clone()
-            }
-        },
-        None => default_kind.clone(),
-    }
+    let (kind, warning) = cn_ingest::resolve_kind(record, default_kind);
+    warnings.extend(warning);
+    kind
 }
 
 fn write_sidecar(paths: &QueuePaths, sidecar: &ReviewSidecar) -> Result<(), String> {

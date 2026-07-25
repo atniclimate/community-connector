@@ -11,13 +11,15 @@
 
 use std::collections::BTreeSet;
 
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use cn_model::{AttrId, AttributeValue, EntityId};
 use cn_perm::Projection;
 
 /// Where a candidate was found.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum CandidateSource {
     /// An entity already in the facilitator's projected graph.
     GraphEntity(EntityId),
@@ -26,7 +28,7 @@ pub enum CandidateSource {
 }
 
 /// One near-duplicate candidate with transparent reasons.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct NearDupCandidate {
     pub source: CandidateSource,
     /// Human-readable match reasons (always non-empty; D-056.4 transparency).

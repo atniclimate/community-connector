@@ -17,8 +17,8 @@ use cn_model::{EntityId, GroupId};
 use cn_perm::{ProjectedEntity, Projection, ViewerContext};
 use cn_store::{Operation, StoreReport};
 use dto::{
-    CoreInfo, DetailValue, EntityDetail, ExportOptions, ExportSnapshot, LoadReport,
-    NeighborhoodRequest, PathRequest, SubmitReport,
+    CoreInfo, DetailValue, EntityDetail, ExportOptions, ExportSnapshot, IntakeDedup,
+    IntakeValidation, LoadReport, NearDupRequest, NeighborhoodRequest, PathRequest, SubmitReport,
 };
 use error::{ApiError, ErrorCode};
 use export::export_projection;
@@ -30,7 +30,7 @@ use wire::{
     parse_viewer, reject_template_report, reject_unsupported_ops, respond,
 };
 
-const BOUNDARY_VERSION: &str = "0.1.0";
+const BOUNDARY_VERSION: &str = "0.2.0";
 
 /// String-only API facade for ADR-003 D1-D4.
 pub struct Api {
@@ -140,6 +140,97 @@ impl Api {
         options_json: &str,
     ) -> String {
         respond(|| self.export_snapshot_impl(group_id, viewer_ctx_json, options_json))
+    }
+
+    /// Validates a staged intake queue record: version, checksum, and
+    /// template fit via the same entity build `plan_approval` uses, so the
+    /// review UI's report can never diverge from the apply-time report
+    /// (ADR-005 D4; blueprint section 3). Read-only: there is deliberately
+    /// NO approval-write export on this boundary - the in-memory facade
+    /// has no durable store; all intake mutation lives in native
+    /// `cn intake apply`.
+    pub fn intake_validate_record(&self, group_id: &str, record_json: &str) -> String {
+        respond(|| self.intake_validate_record_impl(group_id, record_json))
+    }
+
+    /// Classifies a staged record against existing dedup keys (transport
+    /// then semantic; conflicts are typed outcomes, never drops).
+    pub fn intake_dedup_check(&self, record_json: &str, existing_keys_json: &str) -> String {
+        respond(|| self.intake_dedup_check_impl(record_json, existing_keys_json))
+    }
+
+    /// Surfaces near-duplicate candidates for a payload against the OTHER
+    /// queue payloads and the VIEWER'S OWN projection, computed in-core -
+    /// the review UI can never receive a candidate the viewer could not
+    /// already see (the no-leak extension, blueprint section 6).
+    pub fn intake_near_duplicates(
+        &mut self,
+        group_id: &str,
+        viewer_ctx_json: &str,
+        request_json: &str,
+    ) -> String {
+        respond(|| self.intake_near_duplicates_impl(group_id, viewer_ctx_json, request_json))
+    }
+
+    fn intake_validate_record_impl(
+        &self,
+        group_id: &str,
+        record_json: &str,
+    ) -> Result<IntakeValidation, ApiError> {
+        let group_id = parse_group_id_for_lookup(group_id)?;
+        let record: cn_ingest::QueueRecord = parse_json(record_json)?;
+        let session = self.groups.get(&group_id).ok_or_else(ApiError::not_found)?;
+        let template = session.state.template.as_ref().ok_or_else(|| {
+            ApiError::new(ErrorCode::GroupNotLoaded, "group has no committed template")
+        })?;
+        let default_kind = cn_model::KindId::new(cn_ingest::DEFAULT_PILOT_KIND)
+            .map_err(|_| ApiError::internal("default pilot kind is invalid"))?;
+        let (kind, kind_warning) = cn_ingest::resolve_kind(&record, &default_kind);
+        let report = cn_ingest::validate_record(&record, template, &kind).map_err(ingest_error)?;
+        Ok(IntakeValidation {
+            kind,
+            report,
+            kind_warning,
+        })
+    }
+
+    fn intake_dedup_check_impl(
+        &self,
+        record_json: &str,
+        existing_keys_json: &str,
+    ) -> Result<IntakeDedup, ApiError> {
+        let record: cn_ingest::QueueRecord = parse_json(record_json)?;
+        record.verify().map_err(ingest_error)?;
+        let existing: Vec<cn_ingest::DedupKey> = parse_json(existing_keys_json)?;
+        Ok(IntakeDedup {
+            verdict: cn_ingest::classify_dedup(
+                &cn_ingest::DedupKey::from_record(&record),
+                &existing,
+            ),
+        })
+    }
+
+    fn intake_near_duplicates_impl(
+        &mut self,
+        group_id: &str,
+        viewer_ctx_json: &str,
+        request_json: &str,
+    ) -> Result<Vec<cn_ingest::NearDupCandidate>, ApiError> {
+        let request: NearDupRequest = parse_json(request_json)?;
+        let group_id = parse_group_id_for_lookup(group_id)?;
+        let viewer = parse_viewer(viewer_ctx_json)?;
+        let session = self
+            .groups
+            .get_mut(&group_id)
+            .ok_or_else(ApiError::not_found)?;
+        let projection = session.projection_for(&viewer);
+        Ok(cn_ingest::near_duplicates(
+            &request.payload,
+            &request.queue_payloads,
+            &projection,
+            &request.name_attrs,
+            &request.affiliation_attrs,
+        ))
     }
 
     fn load_group_begin_impl(
@@ -411,5 +502,17 @@ fn detail_from_projection(
 fn graph_error(err: GraphError) -> ApiError {
     match err {
         GraphError::NotFound => ApiError::not_found(),
+    }
+}
+
+/// Maps typed ingest failures onto the boundary error codes: version
+/// rejections keep their unsupported-schema identity; integrity failures
+/// (checksums, bindings) surface as invalid input - loud, never silent (I3).
+fn ingest_error(err: cn_ingest::IngestError) -> ApiError {
+    match &err {
+        cn_ingest::IngestError::UnknownMajorVersion { .. } => {
+            ApiError::new(ErrorCode::UnsupportedSchemaVersion, err.to_string())
+        }
+        _ => ApiError::invalid_json(err.to_string()),
     }
 }

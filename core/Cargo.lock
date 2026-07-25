@@ -73,6 +73,7 @@ name = "cn-api"
 version = "0.1.0"
 dependencies = [
  "cn-graph",
+ "cn-ingest",
  "cn-model",
  "cn-perm",
  "cn-schema",

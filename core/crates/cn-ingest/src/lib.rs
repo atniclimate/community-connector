@@ -9,6 +9,7 @@
 
 pub mod approval;
 pub mod decision;
+pub mod dedup;
 pub mod near_dup;
 pub mod record;
 pub mod recovery;
@@ -16,6 +17,7 @@ mod version;
 
 pub use approval::*;
 pub use decision::*;
+pub use dedup::*;
 pub use near_dup::*;
 pub use record::*;
 pub use recovery::*;

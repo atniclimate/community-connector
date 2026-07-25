@@ -734,3 +734,158 @@ fn plan_surfaces_missing_required_attribute_via_validation() {
         "missing required display_name must surface as a finding"
     );
 }
+
+// --- transport and semantic dedup (ADR-005 D4, round-1 amendment) ---
+
+#[test]
+fn dedup_classifies_every_arm() {
+    let existing = vec![DedupKey::from_record(&remote_record())];
+
+    // Transport replay: same (receipt_id, ciphertext_hash) - recorded no-op.
+    assert_eq!(
+        classify_dedup(&DedupKey::from_record(&remote_record()), &existing),
+        DedupVerdict::TransportReplay
+    );
+
+    // Transport conflict: same receipt, DIFFERENT ciphertext - loud
+    // integrity conflict, never a no-op.
+    let mut substituted = DedupKey::from_record(&remote_record());
+    substituted.ciphertext_hash = Some("other-ct".to_string());
+    assert_eq!(
+        classify_dedup(&substituted, &existing),
+        DedupVerdict::TransportConflict
+    );
+
+    // Semantic replay: same (submission_id, payload_hash), no transport key.
+    assert_eq!(
+        classify_dedup(&DedupKey::from_record(&record()), &existing),
+        DedupVerdict::SemanticReplay
+    );
+
+    // Conflict: same submission_id, different payload - a DISTINCT typed
+    // outcome for facilitator disposition, never a drop.
+    let mut conflicting = payload();
+    conflicting["fields"]["display_name"] = json!("Different Person");
+    let conflict_record = QueueRecord::new(
+        "rec-9".to_string(),
+        ts(12),
+        SubmissionSource::InApp {},
+        conflicting,
+    )
+    .expect("record");
+    assert_eq!(
+        classify_dedup(&DedupKey::from_record(&conflict_record), &existing),
+        DedupVerdict::Conflict
+    );
+
+    // Fresh: different submission id and payload.
+    let mut fresh = payload();
+    fresh["submission_id"] = json!("sub-2");
+    fresh["fields"]["display_name"] = json!("Someone Else");
+    let fresh_record = QueueRecord::new(
+        "rec-10".to_string(),
+        ts(13),
+        SubmissionSource::InApp {},
+        fresh,
+    )
+    .expect("record");
+    assert_eq!(
+        classify_dedup(&DedupKey::from_record(&fresh_record), &existing),
+        DedupVerdict::Fresh
+    );
+}
+
+#[test]
+fn empty_submission_ids_never_match_each_other() {
+    let mut blank_a = payload();
+    blank_a["submission_id"] = json!("");
+    let mut blank_b = payload();
+    blank_b["submission_id"] = json!("");
+    blank_b["fields"]["display_name"] = json!("Other");
+    let a = QueueRecord::new(
+        "rec-a".to_string(),
+        ts(1),
+        SubmissionSource::InApp {},
+        blank_a,
+    )
+    .expect("record");
+    let b = QueueRecord::new(
+        "rec-b".to_string(),
+        ts(2),
+        SubmissionSource::InApp {},
+        blank_b,
+    )
+    .expect("record");
+    assert_eq!(
+        classify_dedup(&DedupKey::from_record(&b), &[DedupKey::from_record(&a)]),
+        DedupVerdict::Fresh,
+        "client-controlled blank ids are not the same submission"
+    );
+}
+
+// --- kind resolution and record validation (facade + CLI shared logic) ---
+
+#[test]
+fn resolve_kind_prefers_payload_and_falls_back_loudly() {
+    let default_kind = cn_model::KindId::new(DEFAULT_PILOT_KIND).expect("kind");
+
+    let (kind, warning) = resolve_kind(&record(), &default_kind);
+    assert_eq!(kind, default_kind, "no payload kind: default");
+    assert!(warning.is_none());
+
+    let mut with_kind = payload();
+    with_kind["kind"] = json!("person");
+    let carried = QueueRecord::new(
+        "rec-k".to_string(),
+        ts(1),
+        SubmissionSource::InApp {},
+        with_kind,
+    )
+    .expect("record");
+    let (kind, warning) = resolve_kind(&carried, &default_kind);
+    assert_eq!(kind.as_str(), "person");
+    assert!(warning.is_none());
+
+    let mut bad_kind = payload();
+    bad_kind["kind"] = json!("Not Valid Kind!");
+    let invalid = QueueRecord::new(
+        "rec-l".to_string(),
+        ts(1),
+        SubmissionSource::InApp {},
+        bad_kind,
+    )
+    .expect("record");
+    let (kind, warning) = resolve_kind(&invalid, &default_kind);
+    assert_eq!(kind, default_kind, "invalid payload kind falls back");
+    assert!(
+        warning
+            .expect("loud fallback")
+            .contains("not a valid kind id"),
+        "the fallback is recorded, never silent"
+    );
+}
+
+#[test]
+fn validate_record_reports_template_fit_like_the_plan_path() {
+    let template = plan_template();
+    let kind = cn_model::KindId::new("person").expect("kind");
+    let clean = validate_record(&record(), &template, &kind).expect("report");
+    assert!(clean.errors.is_empty(), "valid payload: {clean:?}");
+
+    let mut bare = payload();
+    bare["fields"] = json!({});
+    let missing = QueueRecord::new("rec-m".to_string(), ts(1), SubmissionSource::InApp {}, bare)
+        .expect("record");
+    let flagged = validate_record(&missing, &template, &kind).expect("report");
+    assert!(
+        !flagged.errors.is_empty(),
+        "missing required display_name surfaces as a finding"
+    );
+
+    let mut tampered = record();
+    tampered.payload["fields"]["display_name"] = json!("Tampered");
+    assert!(
+        validate_record(&tampered, &template, &kind).is_err(),
+        "checksum failure is a typed error, not a validation finding"
+    );
+}

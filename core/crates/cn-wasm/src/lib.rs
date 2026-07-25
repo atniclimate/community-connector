@@ -112,5 +112,29 @@ mod bindings {
             self.inner
                 .export_snapshot(group_id, viewer_ctx_json, options_json)
         }
+
+        // Read-only intake facade (ADR-005 D4; blueprint section 3). There
+        // is deliberately NO approval-write export: the browser has no
+        // durable store - all intake mutation lives in native
+        // `cn intake apply`.
+
+        pub fn intake_validate_record(&self, group_id: &str, record_json: &str) -> String {
+            self.inner.intake_validate_record(group_id, record_json)
+        }
+
+        pub fn intake_dedup_check(&self, record_json: &str, existing_keys_json: &str) -> String {
+            self.inner
+                .intake_dedup_check(record_json, existing_keys_json)
+        }
+
+        pub fn intake_near_duplicates(
+            &mut self,
+            group_id: &str,
+            viewer_ctx_json: &str,
+            request_json: &str,
+        ) -> String {
+            self.inner
+                .intake_near_duplicates(group_id, viewer_ctx_json, request_json)
+        }
     }
 }
