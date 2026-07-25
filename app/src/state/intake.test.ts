@@ -163,8 +163,10 @@ describe("stageDecision (create-only decision files with the CAS premise)", () =
     reviewState: "pending",
     decisionGeneration: 3,
     payloadDigest: "rc",
+    payloadHash: "ph",
     stagedAtMs: 10,
     payload: {},
+    record: {},
   };
 
   it("writes into decisions/ carrying the observed state and generation", async () => {

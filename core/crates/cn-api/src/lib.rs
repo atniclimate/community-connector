@@ -173,6 +173,20 @@ impl Api {
         respond(|| self.intake_near_duplicates_impl(group_id, viewer_ctx_json, request_json))
     }
 
+    /// Returns the viewer's OWN active role names (UI affordance: the
+    /// wizard shows itself only to facilitator-or-governance viewers).
+    /// Never an authorization check - the write paths enforce regardless.
+    pub fn viewer_roles(&self, group_id: &str, viewer_ctx_json: &str) -> String {
+        respond(|| self.viewer_roles_impl(group_id, viewer_ctx_json))
+    }
+
+    fn viewer_roles_impl(&self, group_id: &str, viewer_ctx_json: &str) -> Result<Value, ApiError> {
+        let group_id = parse_group_id_for_lookup(group_id)?;
+        let viewer = parse_viewer(viewer_ctx_json)?;
+        let session = self.groups.get(&group_id).ok_or_else(ApiError::not_found)?;
+        Ok(json!({ "roles": cn_perm::viewer_role_names(&session.state, &viewer) }))
+    }
+
     /// PURE BUILDER (D-073): assembles the checksummed queue record and
     /// its initial pending sidecar for one in-app submission payload. The
     /// app writes the returned bytes create-only over FSA; format and

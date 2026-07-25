@@ -332,3 +332,47 @@
 .cn-entry-form-submit:disabled {
   opacity: 0.5;
 }
+
+/* P3.5 facilitator wizard. Single column; holds at 375px. */
+.cn-intake {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  color: var(--cn-text-primary, #e6edf7);
+}
+
+.cn-intake-dashboard {
+  color: var(--cn-text-secondary, #b5c0d0);
+}
+
+.cn-intake-apply-note {
+  font-weight: 600;
+  color: var(--cn-accent-focusRing, #ffd38a);
+}
+
+.cn-intake-error {
+  color: var(--cn-accent-focusRing, #ffd38a);
+}
+
+.cn-intake-records ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.cn-intake-decisions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.cn-intake-review dl {
+  display: grid;
+  grid-template-columns: minmax(6rem, max-content) 1fr;
+  gap: 0.25rem 0.75rem;
+  overflow-wrap: anywhere;
+}

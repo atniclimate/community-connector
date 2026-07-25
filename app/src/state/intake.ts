@@ -139,10 +139,12 @@ function summarize(record: JsonObject, sidecar: JsonObject | null): IntakeRecord
         ? sidecar["decision_generation"]
         : 0,
     payloadDigest: typeof record["record_checksum"] === "string" ? record["record_checksum"] : "",
+    payloadHash: typeof record["payload_hash"] === "string" ? record["payload_hash"] : "",
     stagedAtMs: typeof record["staged_at"] === "number" ? record["staged_at"] : 0,
     payload: typeof payload === "object" && payload !== null && !Array.isArray(payload)
       ? (payload as JsonObject)
       : {},
+    record,
   };
 }
 

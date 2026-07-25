@@ -228,7 +228,15 @@ fn round6_stale_before_current_leaves_current_decision_admissible() {
 
     // An OLDER stale message (authored against generation 0) processes
     // before a current decision.
-    let stale = decision("d-old", 0, ReviewState::Pending, 0, DecisionType::Reject);
+    let stale = decision(
+        "d-old",
+        0,
+        ReviewState::Pending,
+        0,
+        DecisionType::Reject {
+            reason: "synthetic reject reason".to_string(),
+        },
+    );
     let verdict = admit(&sidecar, &stale).expect("verdict");
     let AdmissionVerdict::Stale { .. } = &verdict else {
         panic!("expected stale, got {verdict:?}");
@@ -303,7 +311,15 @@ fn two_concurrent_decisions_first_admits_second_stale_including_note_first() {
             note: "n".to_string(),
         },
     );
-    let reject = decision("d-b", 2, ReviewState::Pending, 0, DecisionType::Reject);
+    let reject = decision(
+        "d-b",
+        2,
+        ReviewState::Pending,
+        0,
+        DecisionType::Reject {
+            reason: "synthetic reject reason".to_string(),
+        },
+    );
     let verdict = admit(&sidecar, &note).expect("verdict");
     apply_verdict(&mut sidecar, &verdict).expect("apply first");
     let verdict = admit(&sidecar, &reject).expect("verdict");
@@ -317,7 +333,15 @@ fn two_concurrent_decisions_first_admits_second_stale_including_note_first() {
 fn same_id_different_digest_is_conflict_never_replay() {
     let record = record();
     let mut sidecar = ReviewSidecar::initial(&record).expect("sidecar");
-    let original = decision("d-1", 1, ReviewState::Pending, 0, DecisionType::Reject);
+    let original = decision(
+        "d-1",
+        1,
+        ReviewState::Pending,
+        0,
+        DecisionType::Reject {
+            reason: "synthetic reject reason".to_string(),
+        },
+    );
     let verdict = admit(&sidecar, &original).expect("verdict");
     apply_verdict(&mut sidecar, &verdict).expect("apply");
     let mut reused = decision("d-1", 9, ReviewState::Pending, 1, DecisionType::Approve);
@@ -382,9 +406,33 @@ fn preflight_failure_transaction_event_is_representable_and_serialized() {
 #[test]
 fn deterministic_processing_order() {
     let mut messages = vec![
-        decision("zz", 2, ReviewState::Pending, 0, DecisionType::Reject),
-        decision("aa", 2, ReviewState::Pending, 0, DecisionType::Reject),
-        decision("mm", 1, ReviewState::Pending, 0, DecisionType::Reject),
+        decision(
+            "zz",
+            2,
+            ReviewState::Pending,
+            0,
+            DecisionType::Reject {
+                reason: "synthetic reject reason".to_string(),
+            },
+        ),
+        decision(
+            "aa",
+            2,
+            ReviewState::Pending,
+            0,
+            DecisionType::Reject {
+                reason: "synthetic reject reason".to_string(),
+            },
+        ),
+        decision(
+            "mm",
+            1,
+            ReviewState::Pending,
+            0,
+            DecisionType::Reject {
+                reason: "synthetic reject reason".to_string(),
+            },
+        ),
     ];
     processing_order(&mut messages);
     let ids: Vec<&str> = messages.iter().map(|m| m.decision_id.as_str()).collect();

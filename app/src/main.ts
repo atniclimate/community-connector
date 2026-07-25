@@ -9,6 +9,8 @@ import { mountLegend } from "./viz/legend";
 import { mountSearch } from "./ui/search";
 import { mountDetailPanel } from "./ui/detail";
 import { mountFlatProjection } from "./ui/flat";
+import { mountIntakeWizard } from "./ui/intake/panel";
+import type { JsonObject } from "./state/state";
 
 declare const __CN_SNAPSHOT_MODE__: boolean;
 
@@ -22,6 +24,7 @@ const searchElement = document.createElement("div");
 const vizElement = document.createElement("div");
 const detailElement = document.createElement("div");
 const flatElement = document.createElement("div");
+const intakeElement = document.createElement("div");
 statusElement.className = "cn-status";
 statusElement.setAttribute("role", "status");
 statusElement.setAttribute("aria-live", "polite");
@@ -37,12 +40,14 @@ detailElement.setAttribute("aria-label", "Selected entity details");
 flatElement.className = "cn-flat-region";
 flatElement.setAttribute("role", "region");
 flatElement.setAttribute("aria-label", "Flat network view");
+intakeElement.className = "cn-intake-region";
 appElement.replaceChildren(
   statusElement,
   searchElement,
   vizElement,
   detailElement,
   flatElement,
+  intakeElement,
 );
 
 const reducedMotionMedia = matchMedia("(prefers-reduced-motion: reduce)");
@@ -63,6 +68,29 @@ function render(): void {
   ].filter((part) => part !== "").join(" | ");
 }
 
+// Template holder for the intake wizard's form renderer (set at load).
+let loadedTemplate: JsonObject | null = null;
+let unmountIntake: (() => void) | null = null;
+
+/** Mounts the wizard only for facilitator-or-governance viewers - an
+ * affordance; the core enforces authority regardless (blueprint
+ * section 5). */
+async function mountIntakeIfFacilitator(viewer: { readonly kind: string }): Promise<void> {
+  const roles = await client.viewerRoles(DEMO_GROUP_ID, viewer);
+  const names = Array.isArray(roles["roles"]) ? roles["roles"] : [];
+  const allowed = names.some((role) => role === "facilitator" || role === "governance");
+  if (!allowed || unmountIntake !== null) {
+    return;
+  }
+  unmountIntake = mountIntakeWizard(intakeElement, {
+    store,
+    client,
+    groupId: () => store.getState().session.groupId,
+    viewer: () => store.getState().session.viewer,
+    template: () => loadedTemplate,
+  });
+}
+
 async function loadDevDemo(): Promise<void> {
   const [templateResponse, opsResponse] = await Promise.all([
     fetch("/fixtures/templates/research-network.template.json"),
@@ -71,14 +99,11 @@ async function loadDevDemo(): Promise<void> {
   if (!templateResponse.ok || !opsResponse.ok) {
     throw new Error("Failed to fetch dev demo fixtures");
   }
-  await loadGroup(
-    store,
-    client,
-    DEMO_GROUP_ID,
-    { kind: "person", person: DEMO_VIEWER_PERSON },
-    await templateResponse.text(),
-    await opsResponse.text(),
-  );
+  const templateText = await templateResponse.text();
+  const viewer = { kind: "person", person: DEMO_VIEWER_PERSON };
+  await loadGroup(store, client, DEMO_GROUP_ID, viewer, templateText, await opsResponse.text());
+  loadedTemplate = JSON.parse(templateText) as JsonObject;
+  await mountIntakeIfFacilitator(viewer);
 }
 
 const onReducedMotion = (event: MediaQueryListEvent): void => {
@@ -127,6 +152,9 @@ function teardown(): void {
   reducedMotionMedia.removeEventListener("change", onReducedMotion);
   for (const unmount of unmounts.reverse()) {
     unmount();
+  }
+  if (unmountIntake !== null) {
+    unmountIntake();
   }
   client.dispose();
   worker.terminate();

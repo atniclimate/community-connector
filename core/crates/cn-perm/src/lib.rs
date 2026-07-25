@@ -15,4 +15,6 @@ pub use projection::{
 };
 pub use reports::redact_report;
 pub use rules::{effective_tier, required_circle, value_visible};
-pub use viewer::{ViewerContext, admissible_circle, viewer_cache_key, viewer_fingerprint};
+pub use viewer::{
+    ViewerContext, admissible_circle, viewer_cache_key, viewer_fingerprint, viewer_role_names,
+};

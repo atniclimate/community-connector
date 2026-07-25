@@ -102,6 +102,10 @@ export class WasmClient {
     return this.request({ kind: "queryNeighborhood", groupId, viewer, request });
   }
 
+  public viewerRoles(groupId: string, viewer: ViewerContextDto): Promise<JsonObject> {
+    return this.request({ kind: "viewerRoles", groupId, viewer });
+  }
+
   public intakeStageRecord(payloadJson: string, stagedAtMs: number): Promise<JsonObject> {
     return this.request({ kind: "intakeStageRecord", payloadJson, stagedAtMs });
   }

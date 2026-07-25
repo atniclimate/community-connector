@@ -20,8 +20,9 @@ use crate::version::{IngestError, QUEUE_RECORD_VERSION, canonical_digest, check_
 pub enum DecisionType {
     /// pending -> approved_intent (with the plan, in the same write).
     Approve,
-    /// pending -> rejected.
-    Reject,
+    /// pending -> rejected. The reason is REQUIRED (blueprint section 5;
+    /// the record persists under D-059.11, so the why must persist too).
+    Reject { reason: String },
     /// State REMAINS pending; the generation advance invalidates older
     /// views.
     SetAsideNote { note: String },
@@ -135,6 +136,7 @@ pub fn admit(
         decided_at: message.decided_at,
         reason: match &message.decision {
             DecisionType::SetAsideNote { note } => Some(note.clone()),
+            DecisionType::Reject { reason } => Some(reason.clone()),
             _ => None,
         },
         outcome,
@@ -158,7 +160,7 @@ pub fn admit(
     // Legal transitions only.
     let next_state = match (&message.decision, sidecar.review_state) {
         (DecisionType::Approve, ReviewState::Pending) => ReviewState::ApprovedIntent,
-        (DecisionType::Reject, ReviewState::Pending) => ReviewState::Rejected,
+        (DecisionType::Reject { .. }, ReviewState::Pending) => ReviewState::Rejected,
         (DecisionType::SetAsideNote { .. }, ReviewState::Pending) => ReviewState::Pending,
         (DecisionType::ClearFailed, ReviewState::Failed) => ReviewState::Pending,
         _ => {

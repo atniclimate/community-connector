@@ -432,7 +432,9 @@ fn stale_decision_serializes_after_an_admitted_one() {
             100,
             ReviewState::Pending,
             0,
-            DecisionType::Reject,
+            DecisionType::Reject {
+                reason: "synthetic reject reason".to_string(),
+            },
         ),
     );
     drop_decision(

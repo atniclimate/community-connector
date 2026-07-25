@@ -61,6 +61,18 @@ pub(crate) fn has_member_role(state: &GroupState, person: PersonId) -> bool {
     active_roles_for(state, &person).any(|role| role == GroupRole::Member)
 }
 
+/// Returns the viewer's OWN active role names, sorted (facilitator
+/// blueprint section 2 UI affordance: the wizard shows itself only to
+/// facilitator-or-governance viewers). This discloses nothing beyond the
+/// viewer's own authorization context - the write paths enforce
+/// regardless; this is never consulted as an authorization check.
+pub fn viewer_role_names(state: &GroupState, viewer: &ViewerContext) -> Vec<String> {
+    match viewer {
+        ViewerContext::Anonymous => Vec::new(),
+        ViewerContext::Person { person } => active_role_names(state, person),
+    }
+}
+
 /// Returns the projection cache fingerprint (ADR-003 D3 and round-1
 /// fingerprint amendment).
 pub fn viewer_fingerprint(state: &GroupState, viewer: &ViewerContext) -> String {

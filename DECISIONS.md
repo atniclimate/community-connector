@@ -1520,3 +1520,34 @@ approved_intent or unreadable sidecars), and the read-only dashboard
 scan. Intake state is a new store slice that survives group reloads
 (the queue belongs to the facilitator's ops directory, not the group
 session).
+
+## D-074 (2026-07-24) - Step 9 wizard: reject carries its reason; viewer_roles affordance
+
+Blueprint step 9 landed (the P3.5 wizard). Two format/surface decisions:
+
+1. **`DecisionType::Reject { reason }` (required).** The blueprint
+   mandates a rejection reason and the record persists under D-059.11,
+   so the WHY must persist too - but the ADR-005 D4 decision format's
+   reject was a bare variant with nowhere to put it. The variant now
+   carries `reason` (message body), and the admission table maps it into
+   the history entry's `reason` field exactly as set_aside_note's note.
+   Additive within the 0.x queue format; the wizard requires a non-empty
+   reason before staging a reject.
+2. **`viewer_roles` boundary export.** The wizard must show itself only
+   to facilitator-or-governance viewers (an affordance; the core
+   enforces regardless), but the app cannot recover roles from the
+   hashed viewer fingerprint. cn-perm gains `viewer_role_names` (the
+   viewer's OWN roles - their own authorization context, no third-party
+   disclosure) and cn-api/cn-wasm expose `viewer_roles`; main.ts mounts
+   the wizard only when the roles include facilitator or governance.
+
+The wizard implements the blueprint section-5 surface: ops-directory
+grant with the best-effort guard, queue dashboard (state counts, oldest
+pending age, staged-decision count with the `cn intake apply` + reload
+instruction), the P3.6 entry form staging through the create-only
+adapter, and the review view running the three read-only core checks
+(validation, dedup, near-duplicates) with approve / reject-with-reason /
+set-aside-note / clear-failed decisions as create-only decision files.
+Entry and approval remain two distinct recorded acts (D-030). FSA handle
+persistence across sessions (IndexedDB) is deferred to the step-11
+polish pass - the facilitator re-grants the folder per session for now.

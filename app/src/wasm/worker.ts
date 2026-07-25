@@ -44,6 +44,8 @@ function runRequest(instance: CnApi, request: WorkerRequest): string {
       return instance.query_paths(request.groupId, viewerJson(request), JSON.stringify(request.request));
     case "queryNeighborhood":
       return instance.query_neighborhood(request.groupId, viewerJson(request), JSON.stringify(request.request));
+    case "viewerRoles":
+      return instance.viewer_roles(request.groupId, viewerJson(request));
     case "intakeStageRecord":
       return instance.intake_stage_record(request.payloadJson, request.stagedAtMs);
     case "intakeBuildDecision":

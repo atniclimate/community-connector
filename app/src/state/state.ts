@@ -97,8 +97,12 @@ export type IntakeRecordSummaryDto = {
   readonly decisionGeneration: number;
   /** The record_checksum value - the decision message's payload binding. */
   readonly payloadDigest: string;
+  /** The payload_hash value - the semantic dedup key component. */
+  readonly payloadHash: string;
   readonly stagedAtMs: number;
   readonly payload: JsonObject;
+  /** The full queue record as read, for the review view's core calls. */
+  readonly record: JsonObject;
 };
 
 export type IntakeStatus = "idle" | "working" | "ready" | "error";
