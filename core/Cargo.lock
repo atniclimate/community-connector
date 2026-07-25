@@ -89,6 +89,9 @@ name = "cn-ingest"
 version = "0.1.0"
 dependencies = [
  "cn-model",
+ "cn-perm",
+ "cn-schema",
+ "cn-store",
  "semver",
  "serde",
  "serde_json",

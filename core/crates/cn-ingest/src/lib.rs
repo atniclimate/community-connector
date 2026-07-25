@@ -7,12 +7,16 @@
 //! crash-recovery classification as pure, exhaustively testable logic. No
 //! network code may ever enter this crate (ADR-005 D1 module fence).
 
+pub mod approval;
 pub mod decision;
+pub mod near_dup;
 pub mod record;
 pub mod recovery;
 mod version;
 
+pub use approval::*;
 pub use decision::*;
+pub use near_dup::*;
 pub use record::*;
 pub use recovery::*;
 pub use version::{IngestError, QUEUE_RECORD_VERSION, canonical_digest, new_uuid_v7};

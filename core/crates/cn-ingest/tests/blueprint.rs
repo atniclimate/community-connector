@@ -19,7 +19,10 @@ fn payload() -> serde_json::Value {
             "consent_affirmed_at": 5
         },
         "captured_at": 4,
-        "fields": { "name": "Synthetic Person" }
+        "fields": {
+            "display_name": "Synthetic Person",
+            "affiliation": ["River Alliance"]
+        }
     })
 }
 
@@ -507,5 +510,227 @@ fn recovery_table_rows() {
         RecoveryAction::HaltBindingMismatch {
             record_id: "rec-1".to_string()
         }
+    );
+}
+
+// --- near-duplicate surfacing (D-056.4) ---
+
+fn projected(name: &str, orgs: &[&str]) -> cn_perm::ProjectedEntity {
+    let mut attributes = std::collections::BTreeMap::new();
+    attributes.insert(
+        cn_model::AttrId::new("display_name").expect("attr id"),
+        cn_model::AttributeValue::Text(name.to_string()),
+    );
+    if !orgs.is_empty() {
+        attributes.insert(
+            cn_model::AttrId::new("affiliation").expect("attr id"),
+            cn_model::AttributeValue::Tags(orgs.iter().map(|s| s.to_string()).collect()),
+        );
+    }
+    cn_perm::ProjectedEntity {
+        id: "00000000-0000-0000-0000-00000000e001".parse().expect("id"),
+        kind: cn_model::KindId::new("person").expect("kind"),
+        owner_is_viewer: false,
+        attributes,
+    }
+}
+
+fn projection_with(entities: Vec<cn_perm::ProjectedEntity>) -> cn_perm::Projection {
+    cn_perm::Projection {
+        group_id: "00000000-0000-0000-0000-00000000000a".parse().expect("id"),
+        viewer_fingerprint: "test".to_string(),
+        revision: 1,
+        entities,
+        edges: Vec::new(),
+        stories: Vec::new(),
+    }
+}
+
+fn dup_payload(name: &str) -> serde_json::Value {
+    json!({
+        "submission_id": "sub-9",
+        "fields": { "display_name": name, "affiliation": ["River Alliance"] }
+    })
+}
+
+#[test]
+fn near_dup_reasons_present_and_projection_bounded() {
+    let name_attrs = [cn_model::AttrId::new("display_name").expect("attr")];
+    let affil_attrs = [cn_model::AttrId::new("affiliation").expect("attr")];
+    let payload = dup_payload("Jo\u{2028}Doe");
+
+    // The wider projection (e.g. governance) contains the matching entity;
+    // the narrower projection (facilitator without reach) does not. The
+    // scorer sees ONLY what the projection exposes - candidates differ.
+    let wide = projection_with(vec![projected("jo doe", &["river alliance"])]);
+    let narrow = projection_with(Vec::new());
+
+    let hits = near_duplicates(&payload, &[], &wide, &name_attrs, &affil_attrs);
+    assert_eq!(hits.len(), 1, "wide projection surfaces the candidate");
+    assert!(
+        hits[0]
+            .reasons
+            .iter()
+            .any(|r| r.contains("exact normalized name match")),
+        "reasons: {:?}",
+        hits[0].reasons
+    );
+    assert!(
+        hits[0]
+            .reasons
+            .iter()
+            .any(|r| r.contains("shared affiliation")),
+        "affiliation overlap strengthens with its own reason"
+    );
+
+    let none = near_duplicates(&payload, &[], &narrow, &name_attrs, &affil_attrs);
+    assert!(none.is_empty(), "no candidate outside the projection");
+}
+
+#[test]
+fn near_dup_queue_and_containment_matching() {
+    let name_attrs = [cn_model::AttrId::new("display_name").expect("attr")];
+    let payload = dup_payload("Jo Doe");
+    let queue = vec![
+        ("rec-x".to_string(), dup_payload("Jo A. Doe")),
+        ("rec-y".to_string(), dup_payload("Completely Different")),
+    ];
+    let hits = near_duplicates(
+        &payload,
+        &queue,
+        &projection_with(Vec::new()),
+        &name_attrs,
+        &[],
+    );
+    assert_eq!(hits.len(), 1);
+    assert_eq!(
+        hits[0].source,
+        CandidateSource::QueueRecord("rec-x".to_string())
+    );
+    assert!(hits[0].reasons[0].contains("token containment"));
+}
+
+#[test]
+fn one_line_matches_d057_characterization() {
+    assert_eq!(one_line("a\u{2028}b\u{2029}c\nd"), "a b c d");
+    assert_eq!(one_line("a\n\n\nb"), "a b");
+    assert_eq!(one_line("\n\u{2028}\u{2029}"), "");
+}
+
+// --- approval planning (ADR-005 D4/D5) ---
+
+fn plan_template() -> cn_schema::GroupTemplate {
+    let json = r##"{
+        "schema_version": "0.1.0",
+        "template_id": "research",
+        "name": "Research Network",
+        "description": "Synthetic",
+        "kinds": [{
+            "id": "person",
+            "label": "Person",
+            "shape": "sphere",
+            "color_role": "kind-1",
+            "attributes": [
+                { "id": "display_name", "type": "text", "required": true },
+                { "id": "affiliation", "type": "tags" }
+            ]
+        }],
+        "edge_kinds": [],
+        "theme": { "mode": "light", "roles": { "kind-1": "#112233" } }
+    }"##;
+    let (template, report) = cn_schema::parse_template(json).expect("template parses");
+    assert!(report.errors.is_empty(), "clean template: {report:?}");
+    template
+}
+
+fn plan_context() -> PlanContext {
+    PlanContext {
+        group_id: "00000000-0000-0000-0000-00000000000a".parse().expect("id"),
+        facilitator: "00000000-0000-0000-0000-000000000001".parse().expect("id"),
+        kind: cn_model::KindId::new("person").expect("kind"),
+        now_ms: 1000,
+        template_version: semver::Version::new(0, 1, 0),
+    }
+}
+
+fn deterministic_ids() -> impl FnMut() -> uuid::Uuid {
+    let mut n: u128 = 0;
+    move || {
+        n += 1;
+        uuid::Uuid::from_u128(0xABCD0000_0000_0000_0000_000000000000 + n)
+    }
+}
+
+#[test]
+fn plan_is_deterministic_and_links_batch_digest_into_every_envelope() {
+    let record = remote_record();
+    let template = plan_template();
+    let context = plan_context();
+    let plan_a =
+        plan_approval(&record, &template, &context, &mut deterministic_ids()).expect("plan");
+    let plan_b =
+        plan_approval(&record, &template, &context, &mut deterministic_ids()).expect("plan");
+    assert_eq!(
+        plan_a.plan_ref, plan_b.plan_ref,
+        "same record + ids -> same digests"
+    );
+    assert_eq!(plan_a.plan_ref.op_ids.len(), 1);
+    assert!(!plan_a.plan_ref.batch_digest.is_empty());
+    assert_ne!(
+        plan_a.plan_ref.per_op_digests[0], plan_a.plan_ref.batch_digest,
+        "final per-op digest is over POPULATED bytes, distinct from the pre-link digest"
+    );
+
+    let cn_store::OpKind::EntityCreate { entity } = &plan_a.ops[0].kind else {
+        panic!("expected EntityCreate");
+    };
+    let block = entity
+        .provenance
+        .intake()
+        .expect("entity carries intake block");
+    assert_eq!(block.batch_digest, plan_a.plan_ref.batch_digest);
+    assert_eq!(block.record_id, record.record_id);
+    assert_eq!(block.receipt_id.as_deref(), Some("receipt-1"));
+    assert!(
+        block.consent_affirmed,
+        "consent assertion survives into provenance"
+    );
+    assert_eq!(block.consent_text_digest, "digest-consent");
+    assert!(!entity.attributes.is_empty(), "payload fields mapped");
+    for instance in entity.attributes.values() {
+        let attr_block = instance
+            .provenance
+            .intake()
+            .expect("every modeled value carries the block");
+        assert_eq!(attr_block.batch_digest, plan_a.plan_ref.batch_digest);
+    }
+    assert!(
+        plan_a.validation.errors.is_empty(),
+        "valid payload validates: {:?}",
+        plan_a.validation
+    );
+}
+
+#[test]
+fn plan_surfaces_missing_required_attribute_via_validation() {
+    let mut bare = payload();
+    bare["fields"] = json!({});
+    let record = QueueRecord::new(
+        "rec-3".to_string(),
+        ts(12),
+        SubmissionSource::InApp {},
+        bare,
+    )
+    .expect("record");
+    let plan = plan_approval(
+        &record,
+        &plan_template(),
+        &plan_context(),
+        &mut deterministic_ids(),
+    )
+    .expect("plan builds; validation reports");
+    assert!(
+        !plan.validation.errors.is_empty(),
+        "missing required display_name must surface as a finding"
     );
 }
