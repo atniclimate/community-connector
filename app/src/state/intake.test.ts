@@ -7,7 +7,10 @@ import type {
   IntakeFileHandle,
 } from "./intake";
 import {
+  clearQueueDirectory,
   createOnly,
+  getQueueDirectory,
+  grantQueueDirectory,
   guardQueueDirectory,
   scanQueue,
   stageDecision,
@@ -236,5 +239,50 @@ describe("scanQueue (read-only dashboard view, I12)", () => {
     expect(loaded.records[0]?.reviewState).toBe("pending");
     expect(loaded.records[1]?.reviewState).toBeNull();
     expect(loaded.pendingDecisionFiles).toBe(1);
+  });
+});
+
+
+describe("grantQueueDirectory (round-1 F4: the effects layer owns the handle)", () => {
+  it("refuses unsafe directories with a dispatched error and no registration", async () => {
+    const { actions, dispatch } = collect();
+    const unsafe = new FakeDir("OneDrive - org");
+    expect(await grantQueueDirectory(unsafe, dispatch)).toBe(false);
+    expect(getQueueDirectory()).toBeNull();
+    expect(actions[0]?.kind).toBe("intakeFailed");
+  });
+
+  it("registers, announces, and scans a safe directory", async () => {
+    const { actions, dispatch } = collect();
+    const dir = new FakeDir("intake-queue");
+    expect(await grantQueueDirectory(dir, dispatch)).toBe(true);
+    expect(getQueueDirectory()).toBe(dir);
+    expect(actions.map((a) => a.kind)).toEqual([
+      "intakeDirGranted",
+      "intakeScanStarted",
+      "intakeQueueLoaded",
+    ]);
+    clearQueueDirectory(dispatch);
+    expect(getQueueDirectory()).toBeNull();
+  });
+});
+
+describe("scanQueue issue surfacing (round-1 F3)", () => {
+  it("reports unreadable records and sidecars instead of silently dropping them", async () => {
+    const dir = new FakeDir("queue");
+    dir.files.set("rec-x.record.json", "{corrupt");
+    dir.files.set("rec-y.record.json", JSON.stringify({ record_id: "rec-y", payload: {} }));
+    dir.files.set("rec-y.sidecar.json", "{corrupt");
+    const { actions, dispatch } = collect();
+    await scanQueue(dir, dispatch);
+    const loaded = actions.at(-1);
+    if (loaded?.kind !== "intakeQueueLoaded") {
+      throw new Error("expected intakeQueueLoaded");
+    }
+    expect(loaded.scanIssues.length).toBe(2);
+    expect(loaded.scanIssues[0]).toContain("rec-x.record.json");
+    expect(loaded.scanIssues[1]).toContain("rec-y.sidecar.json");
+    expect(loaded.records.map((r) => r.recordId)).toEqual(["rec-y"]);
+    expect(loaded.records[0]?.reviewState).toBeNull();
   });
 });

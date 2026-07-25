@@ -56,6 +56,119 @@ export type IntakeBuilderClient = {
 
 export type Dispatch = (action: Action) => void;
 
+/**
+ * The live FSA handle is I/O infrastructure owned by THIS effects module
+ * (round-1 F4): the store describes it (dirName), components never hold
+ * it. One queue directory per app session.
+ */
+let queueDirectory: IntakeDirHandle | null = null;
+
+export function getQueueDirectory(): IntakeDirHandle | null {
+  return queueDirectory;
+}
+
+export function clearQueueDirectory(dispatch: Dispatch): void {
+  queueDirectory = null;
+  dispatch({ kind: "intakeDirCleared" });
+}
+
+/**
+ * Guards, registers, persists, and scans a picked queue directory - the
+ * single entry point for granting (wizard button or IndexedDB restore).
+ */
+export async function grantQueueDirectory(
+  dir: IntakeDirHandle,
+  dispatch: Dispatch,
+): Promise<boolean> {
+  const refusal = await guardQueueDirectory(dir);
+  if (refusal !== null) {
+    dispatch({
+      kind: "intakeFailed",
+      error: { code: "IntakeUnsafeDirectory", message: refusal },
+    });
+    return false;
+  }
+  queueDirectory = dir;
+  dispatch({ kind: "intakeDirGranted", dirName: dir.name });
+  await persistHandle(dir);
+  await scanQueue(dir, dispatch);
+  return true;
+}
+
+// --- IndexedDB handle persistence (blueprint section 5; round-1 F11) ---
+
+const IDB_NAME = "cn-intake";
+const IDB_STORE = "handles";
+const IDB_KEY = "queue-directory";
+
+function openHandleDb(): Promise<IDBDatabase | null> {
+  if (typeof indexedDB === "undefined") {
+    return Promise.resolve(null);
+  }
+  return new Promise((resolve) => {
+    const request = indexedDB.open(IDB_NAME, 1);
+    request.onupgradeneeded = () => {
+      request.result.createObjectStore(IDB_STORE);
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => resolve(null);
+  });
+}
+
+async function persistHandle(dir: IntakeDirHandle): Promise<void> {
+  const db = await openHandleDb();
+  if (db === null) {
+    return;
+  }
+  await new Promise<void>((resolve) => {
+    const tx = db.transaction(IDB_STORE, "readwrite");
+    tx.objectStore(IDB_STORE).put(dir, IDB_KEY);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => resolve();
+  });
+  db.close();
+}
+
+type PermissionedHandle = IntakeDirHandle & {
+  readonly queryPermission?: (options: { mode: string }) => Promise<string>;
+  readonly requestPermission?: (options: { mode: string }) => Promise<string>;
+};
+
+/**
+ * Restores a previously granted handle from IndexedDB and re-requests
+ * permission (must run from a user gesture in most browsers). Returns
+ * true when the queue is granted and scanned.
+ */
+export async function restoreQueueDirectory(dispatch: Dispatch): Promise<boolean> {
+  const db = await openHandleDb();
+  if (db === null) {
+    return false;
+  }
+  const stored = await new Promise<PermissionedHandle | null>((resolve) => {
+    const tx = db.transaction(IDB_STORE, "readonly");
+    const request = tx.objectStore(IDB_STORE).get(IDB_KEY);
+    request.onsuccess = () => resolve((request.result as PermissionedHandle) ?? null);
+    request.onerror = () => resolve(null);
+  });
+  db.close();
+  if (stored === null) {
+    return false;
+  }
+  try {
+    const query = (await stored.queryPermission?.({ mode: "readwrite" })) ?? "granted";
+    const status =
+      query === "granted"
+        ? "granted"
+        : ((await stored.requestPermission?.({ mode: "readwrite" })) ?? "denied");
+    if (status !== "granted") {
+      return false;
+    }
+  } catch {
+    return false;
+  }
+  return grantQueueDirectory(stored, dispatch);
+}
+
 function intakeError(code: string, message: string): ErrorEnvelopeDto {
   return { code, message };
 }
@@ -244,16 +357,25 @@ export async function stageDecision(
   deps.dispatch({ kind: "intakeReviewDecided", recordId: input.record.recordId });
 }
 
-async function readJson(dir: IntakeDirHandle, name: string): Promise<JsonObject | null> {
+type ReadResult = { readonly value: JsonObject } | { readonly issue: string };
+
+/** Tagged read: an unreadable file is a REPORTED issue, never silently
+ * identical to an absent one (round-1 F3, I12). */
+async function readJson(dir: IntakeDirHandle, name: string): Promise<ReadResult> {
+  let text: string;
   try {
-    const text = await (await (await dir.getFileHandle(name)).getFile()).text();
+    text = await (await (await dir.getFileHandle(name)).getFile()).text();
+  } catch (error) {
+    return { issue: `${name}: unreadable (${String(error)})` };
+  }
+  try {
     const parsed: unknown = JSON.parse(text);
     if (typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)) {
-      return parsed as JsonObject;
+      return { value: parsed as JsonObject };
     }
-    return null;
-  } catch {
-    return null;
+    return { issue: `${name}: not a JSON object` };
+  } catch (error) {
+    return { issue: `${name}: does not parse (${String(error)})` };
   }
 }
 
@@ -272,14 +394,19 @@ export async function scanQueue(dir: IntakeDirHandle, dispatch: Dispatch): Promi
   }
   recordNames.sort();
   const records: IntakeRecordSummaryDto[] = [];
+  const scanIssues: string[] = [];
   for (const name of recordNames) {
+    const recordId = name.slice(0, -".record.json".length);
     const record = await readJson(dir, name);
-    if (record === null) {
+    if ("issue" in record) {
+      scanIssues.push(record.issue);
       continue;
     }
-    const recordId = name.slice(0, -".record.json".length);
     const sidecar = await readJson(dir, `${recordId}.sidecar.json`);
-    records.push(summarize(record, sidecar));
+    if ("issue" in sidecar) {
+      scanIssues.push(sidecar.issue);
+    }
+    records.push(summarize(record.value, "issue" in sidecar ? null : sidecar.value));
   }
   let pendingDecisionFiles = 0;
   try {
@@ -292,5 +419,5 @@ export async function scanQueue(dir: IntakeDirHandle, dispatch: Dispatch): Promi
   } catch {
     // No decisions directory yet: zero staged decisions.
   }
-  dispatch({ kind: "intakeQueueLoaded", records, pendingDecisionFiles });
+  dispatch({ kind: "intakeQueueLoaded", records, pendingDecisionFiles, scanIssues });
 }

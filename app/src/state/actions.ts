@@ -135,6 +135,7 @@ export type Action =
       readonly kind: "intakeQueueLoaded";
       readonly records: readonly IntakeRecordSummaryDto[];
       readonly pendingDecisionFiles: number;
+      readonly scanIssues: readonly string[];
     }
   | {
       readonly kind: "intakeRecordStaged";
@@ -143,6 +144,10 @@ export type Action =
   | {
       readonly kind: "intakeReviewDecided";
       readonly recordId: string;
+    }
+  | {
+      readonly kind: "intakeReviewSelected";
+      readonly recordId: string | null;
     }
   | {
       readonly kind: "intakeFailed";

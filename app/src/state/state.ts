@@ -108,12 +108,20 @@ export type IntakeRecordSummaryDto = {
 export type IntakeStatus = "idle" | "working" | "ready" | "error";
 
 export type IntakeState = {
-  /** Granted FSA queue-directory name; null until the facilitator grants. */
+  /** Granted FSA queue-directory name; null until the facilitator grants.
+   * The live handle itself is infrastructure owned by the state module's
+   * effects layer (round-1 F4), never store data. */
   readonly dirName: string | null;
   readonly status: IntakeStatus;
   readonly records: readonly IntakeRecordSummaryDto[];
   /** Unconsumed decision files staged and awaiting `cn intake apply`. */
   readonly pendingDecisionFiles: number;
+  /** The record open in the review view (round-1 F4: UI selection lives
+   * in the store, not in a component). */
+  readonly reviewRecordId: string | null;
+  /** Per-file scan problems surfaced for I12 visibility (round-1 F3:
+   * "record unreadable" is never silently identical to "no record"). */
+  readonly scanIssues: readonly string[];
   readonly lastError: ErrorEnvelopeDto | null;
 };
 
@@ -123,6 +131,8 @@ export function initialIntakeState(): IntakeState {
     status: "idle",
     records: [],
     pendingDecisionFiles: 0,
+    reviewRecordId: null,
+    scanIssues: [],
     lastError: null,
   };
 }

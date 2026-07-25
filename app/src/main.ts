@@ -72,14 +72,24 @@ function render(): void {
 let loadedTemplate: JsonObject | null = null;
 let unmountIntake: (() => void) | null = null;
 
-/** Mounts the wizard only for facilitator-or-governance viewers - an
- * affordance; the core enforces authority regardless (blueprint
- * section 5). */
-async function mountIntakeIfFacilitator(viewer: { readonly kind: string }): Promise<void> {
-  const roles = await client.viewerRoles(DEMO_GROUP_ID, viewer);
+/** Mounts the wizard only when the loaded group resolves the viewer to
+ * facilitator-or-governance - an affordance; the core enforces authority
+ * regardless (blueprint section 5). Parameterized on the ACTIVE load
+ * (round-1 F11), not demo constants; every interactive load path calls
+ * this after commit, remounting on viewer/group change. The snapshot
+ * build never mounts it (read-only artifact with no worker). */
+async function mountIntakeIfFacilitator(
+  groupId: string,
+  viewer: { readonly kind: string },
+): Promise<void> {
+  const roles = await client.viewerRoles(groupId, viewer);
   const names = Array.isArray(roles["roles"]) ? roles["roles"] : [];
   const allowed = names.some((role) => role === "facilitator" || role === "governance");
-  if (!allowed || unmountIntake !== null) {
+  if (unmountIntake !== null) {
+    unmountIntake();
+    unmountIntake = null;
+  }
+  if (!allowed) {
     return;
   }
   unmountIntake = mountIntakeWizard(intakeElement, {
@@ -103,7 +113,7 @@ async function loadDevDemo(): Promise<void> {
   const viewer = { kind: "person", person: DEMO_VIEWER_PERSON };
   await loadGroup(store, client, DEMO_GROUP_ID, viewer, templateText, await opsResponse.text());
   loadedTemplate = JSON.parse(templateText) as JsonObject;
-  await mountIntakeIfFacilitator(viewer);
+  await mountIntakeIfFacilitator(DEMO_GROUP_ID, viewer);
 }
 
 const onReducedMotion = (event: MediaQueryListEvent): void => {

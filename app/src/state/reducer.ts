@@ -275,6 +275,7 @@ export function reduce(state: AppState, action: Action): AppState {
           status: "ready",
           records: action.records,
           pendingDecisionFiles: action.pendingDecisionFiles,
+          scanIssues: action.scanIssues,
           lastError: null,
         },
       };
@@ -286,6 +287,11 @@ export function reduce(state: AppState, action: Action): AppState {
           status: "ready",
           records: [...state.intake.records, action.record],
         },
+      };
+    case "intakeReviewSelected":
+      return {
+        ...state,
+        intake: { ...state.intake, reviewRecordId: action.recordId },
       };
     case "intakeReviewDecided":
       return {

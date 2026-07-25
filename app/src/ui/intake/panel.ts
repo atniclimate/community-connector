@@ -14,7 +14,14 @@
 
 import type { Action } from "../../state/actions";
 import type { IntakeDirHandle } from "../../state/intake";
-import { guardQueueDirectory, scanQueue, stageDecision, stageSubmission } from "../../state/intake";
+import {
+  getQueueDirectory,
+  grantQueueDirectory,
+  restoreQueueDirectory,
+  scanQueue,
+  stageDecision,
+  stageSubmission,
+} from "../../state/intake";
 import type { Store } from "../../state/store";
 import type {
   IntakeRecordSummaryDto,
@@ -51,8 +58,9 @@ function defaultPicker(): Promise<IntakeDirHandle> {
 
 export function mountIntakeWizard(container: HTMLElement, deps: IntakeWizardDeps): () => void {
   const now = deps.now ?? (() => Date.now());
-  let dir: IntakeDirHandle | null = null;
-  let reviewRecordId: string | null = null;
+  // The FSA handle lives in the state module's effects layer and review
+  // selection lives in the store (round-1 F4); the only component-local
+  // value is DOM housekeeping.
   let unmountForm: (() => void) | null = null;
 
   const dispatch = (action: Action): void => {
@@ -81,14 +89,7 @@ export function mountIntakeWizard(container: HTMLElement, deps: IntakeWizardDeps
 
   async function grantDirectory(): Promise<void> {
     const picked = await (deps.pickDirectory ?? defaultPicker)();
-    const refusal = await guardQueueDirectory(picked);
-    if (refusal !== null) {
-      fail({ code: "IntakeUnsafeDirectory", message: refusal });
-      return;
-    }
-    dir = picked;
-    dispatch({ kind: "intakeDirGranted", dirName: picked.name });
-    await scanQueue(picked, dispatch);
+    await grantQueueDirectory(picked, dispatch);
   }
 
   function renderDir(dirName: string | null): void {
@@ -101,11 +102,28 @@ export function mountIntakeWizard(container: HTMLElement, deps: IntakeWizardDeps
       grant.addEventListener("click", () => {
         grantDirectory().catch(fail);
       });
-      dirRegion.append(grant);
+      const restore = el("button", {
+        text: "Use previously granted folder",
+        attrs: { type: "button" },
+      });
+      restore.addEventListener("click", () => {
+        restoreQueueDirectory(dispatch)
+          .then((restored) => {
+            if (!restored) {
+              fail({
+                code: "IntakeNoSavedFolder",
+                message: "No previously granted folder could be restored; grant one",
+              });
+            }
+          })
+          .catch(fail);
+      });
+      dirRegion.append(grant, restore);
       return;
     }
     const rescan = el("button", { text: "Rescan queue", attrs: { type: "button" } });
     rescan.addEventListener("click", () => {
+      const dir = getQueueDirectory();
       if (dir !== null) {
         scanQueue(dir, dispatch).catch(fail);
       }
@@ -141,6 +159,11 @@ export function mountIntakeWizard(container: HTMLElement, deps: IntakeWizardDeps
         }),
       );
     }
+    for (const issue of intake.scanIssues) {
+      dashRegion.append(
+        el("p", { className: "cn-intake-error", text: `Scan issue: ${issue}` }),
+      );
+    }
     if (intake.lastError !== null) {
       dashRegion.append(
         el("p", { className: "cn-intake-error", text: `Error: ${intake.lastError.message}` }),
@@ -149,12 +172,13 @@ export function mountIntakeWizard(container: HTMLElement, deps: IntakeWizardDeps
   }
 
   function stageFromForm(payload: JsonObject): void {
+    const dir = getQueueDirectory();
     if (dir === null) {
       fail({ code: "IntakeNoDirectory", message: "Grant the queue folder first" });
       return;
     }
     stageSubmission({ client: deps.client, dir, dispatch, now }, payload)
-      .then(() => (dir === null ? Promise.resolve() : scanQueue(dir, dispatch)))
+      .then(() => scanQueue(dir, dispatch))
       .catch(fail);
   }
 
@@ -167,6 +191,7 @@ export function mountIntakeWizard(container: HTMLElement, deps: IntakeWizardDeps
   }
 
   function decide(record: IntakeRecordSummaryDto, decision: unknown): void {
+    const dir = getQueueDirectory();
     if (dir === null) {
       return;
     }
@@ -175,7 +200,7 @@ export function mountIntakeWizard(container: HTMLElement, deps: IntakeWizardDeps
       { client: deps.client, dir, dispatch, now },
       { record, decision: decision as never, reviewer },
     )
-      .then(() => (dir === null ? Promise.resolve() : scanQueue(dir, dispatch)))
+      .then(() => scanQueue(dir, dispatch))
       .catch(fail);
   }
 
@@ -216,7 +241,9 @@ export function mountIntakeWizard(container: HTMLElement, deps: IntakeWizardDeps
   function renderReview(): void {
     reviewRegion.replaceChildren();
     const state = deps.store.getState();
-    const record = state.intake.records.find((entry) => entry.recordId === reviewRecordId);
+    const record = state.intake.records.find(
+      (entry) => entry.recordId === state.intake.reviewRecordId,
+    );
     const groupId = deps.groupId();
     if (record === undefined) {
       return;
@@ -298,8 +325,7 @@ export function mountIntakeWizard(container: HTMLElement, deps: IntakeWizardDeps
       const label = `${record.recordId.slice(0, 8)}... [${record.reviewState ?? "unreadable"}]`;
       const open = el("button", { text: `Review ${label}`, attrs: { type: "button" } });
       open.addEventListener("click", () => {
-        reviewRecordId = record.recordId;
-        renderReview();
+        dispatch({ kind: "intakeReviewSelected", recordId: record.recordId });
       });
       list.append(el("li", {}, [open]));
     }
@@ -312,6 +338,7 @@ export function mountIntakeWizard(container: HTMLElement, deps: IntakeWizardDeps
     renderDashboard();
     renderEntryForm();
     renderRecords();
+    renderReview();
   }
 
   const unsubscribe = deps.store.subscribe(render);
