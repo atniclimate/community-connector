@@ -13,18 +13,19 @@ Blocks:
     "queue_record_version" JSON data marker, and the "secret-encrypted"
     key-envelope marker. These are TRIPWIRES under the I1 process boundary,
     not enforcement: a stripped-marker copy or bypassed hook defeats them
-    (ADR-005 D4 honest-description rule). Rust/TypeScript sources are exempt
-    from the CONTENT markers only - they name the format keys as
-    identifiers; a real staged queue file would never arrive as source.
+    (ADR-005 D4 honest-description rule). Content-marker exemptions are
+    NARROW (round-1 F12): .rs/.ts sources (they name the format keys as
+    identifiers) and the EXPLICITLY LISTED docs that describe the markers -
+    never all markdown. Path rules apply to every file.
 
 Usage:
   pwsh scripts/pii-scan.ps1            # scan working tree (tracked + untracked)
   pwsh scripts/pii-scan.ps1 -Staged    # scan staged changes (pre-commit mode)
-  pwsh scripts/pii-scan.ps1 -SelfTest  # generate marker-bearing fixtures in
-                                       # the session temp dir, assert each is
-                                       # flagged, clean up (proves the
-                                       # tripwires live without ever
-                                       # committing anything marker-shaped)
+  pwsh scripts/pii-scan.ps1 -SelfTest  # write marker-bearing fixtures into the
+                                       # session temp dir and run the REAL scan
+                                       # loop over them (round-1 F12), assert
+                                       # every rule trips plus the exemption
+                                       # negative, then clean up
 
 Exit code 0 = clean (or self-test passed), 1 = violations found (commit is
 blocked in hook mode) or self-test failure. False positives get a specific
@@ -40,10 +41,19 @@ $redPathRx   = '(?i)(^|[\\/])(source_data|research_edges|t1_partners)([\\/]|$)|(
 $queuePathRx = '(?i)\.(record|sidecar)\.json$|\.reviewed$'
 $queueDataRx = '"queue_record_version"\s*:'
 $secretRx    = 'secret-encrypted'
-# Sources naming format keys as identifiers, and docs DESCRIBING the
-# tripwires (content markers only; path rules still apply to everything -
-# a real queue file never arrives as source or markdown).
-$markerContentExemptExt = @('.rs', '.ts', '.md')
+# Sources naming format keys as identifiers (content markers only; path
+# rules still apply). Never a blanket doc exemption.
+$markerContentExemptExt = @('.rs', '.ts')
+# The ONLY docs allowed to carry the marker strings, because they define
+# or record the tripwires themselves (round-1 F12). Any other file - any
+# other markdown included - trips.
+$markerContentExemptFiles = @(
+    'DECISIONS.md',
+    'HANDOFF.md',
+    'docs/adr/ADR-005-remote-intake.md',
+    'docs/blueprints/intake-pipeline.md',
+    'docs/design/facilitator-keygen-ceremony.md'
+)
 
 # Binary or generated formats never scanned for content (paths still checked).
 $skipContentExt = @('.png','.jpg','.jpeg','.gif','.ico','.woff','.woff2','.ttf',
@@ -53,6 +63,7 @@ $skipContentNames = @('package-lock.json','Cargo.lock','pii-allowlist.txt','pii-
 function Test-FileViolations {
     param([string]$RelPath, [string]$Content, [string[]]$Allowed)
     $found = [System.Collections.Generic.List[string]]::new()
+    $normalized = $RelPath -replace '\\', '/'
 
     if ($RelPath -match $redPathRx) {
         $found.Add("RED PATH   $RelPath  (matches predecessor exclusion pattern)")
@@ -78,7 +89,9 @@ function Test-FileViolations {
     foreach ($m in [regex]::Matches($Content, $phoneRx)) {
         $found.Add("PHONE      $RelPath  contains phone-like pattern '$($m.Value)'")
     }
-    if ($markerContentExemptExt -notcontains $ext) {
+    $markerExempt = ($markerContentExemptExt -contains $ext) -or
+                    ($markerContentExemptFiles -contains $normalized)
+    if (-not $markerExempt) {
         if ($Content -match $queueDataRx) {
             $found.Add("QUEUE DATA $RelPath  carries the queue_record_version data marker (staged intake data never enters the repo, ADR-005 D4)")
         }
@@ -89,40 +102,71 @@ function Test-FileViolations {
     return $found
 }
 
+# The ONE scan loop, shared by every mode including the self-test
+# (round-1 F12: the self-test exercises the real path, not a shortcut).
+# $Files: relative paths. $ReadContent: scriptblock(relPath) -> string|$null.
+function Invoke-ScanFiles {
+    param([string[]]$Files, [scriptblock]$ReadContent, [string[]]$Allowed)
+    $all = [System.Collections.Generic.List[string]]::new()
+    foreach ($f in $Files) {
+        if (-not $f) { continue }
+        $content = $null
+        $ext = [System.IO.Path]::GetExtension($f).ToLowerInvariant()
+        if ($skipContentExt -notcontains $ext) {
+            $content = & $ReadContent $f
+        }
+        foreach ($v in (Test-FileViolations -RelPath $f -Content $content -Allowed $Allowed)) {
+            $all.Add($v)
+        }
+    }
+    return $all
+}
+
 if ($SelfTest) {
-    # Positive fixtures are GENERATED here at runtime and removed after:
-    # nothing marker-shaped is ever committed, so the tripwire is proven
-    # live without tripping itself (blueprint section 7).
+    # Positive fixtures are GENERATED here at runtime, written to disk,
+    # scanned through the REAL loop with the working-tree reader, and
+    # removed after: nothing marker-shaped is ever committed, so the
+    # tripwire is proven live without tripping itself.
     $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) "cn-pii-selftest-$([guid]::NewGuid())"
     New-Item -ItemType Directory -Force $tempRoot | Out-Null
     try {
         $cases = @(
-            @{ Name = 'fake.record.json';  Content = '{}';                                        Expect = 'QUEUE PATH' },
-            @{ Name = 'fake.sidecar.json'; Content = '{}';                                        Expect = 'QUEUE PATH' },
-            @{ Name = 'fake.reviewed';     Content = '';                                          Expect = 'QUEUE PATH' },
-            @{ Name = 'payload.json';      Content = '{ "queue_record_version": "9.9.9" }';       Expect = 'QUEUE DATA' },
-            @{ Name = 'envelope.txt';      Content = 'age header: secret-encrypted key follows';  Expect = 'KEY MATTER' },
-            @{ Name = 'contact.md';        Content = 'reach me at realperson@somewhere.org';      Expect = 'EMAIL' }
+            @{ Name = 'fake.record.json';    Content = '{}';                                       Expect = 'QUEUE PATH' },
+            @{ Name = 'fake.sidecar.json';   Content = '{}';                                       Expect = 'QUEUE PATH' },
+            @{ Name = 'fake.reviewed';       Content = 'x';                                        Expect = 'QUEUE PATH' },
+            @{ Name = 'payload.json';        Content = '{ "queue_record_version": "9.9.9" }';      Expect = 'QUEUE DATA' },
+            @{ Name = 'renamed-intake.md';   Content = '{ "queue_record_version": "9.9.9" }';      Expect = 'QUEUE DATA' },
+            @{ Name = 'envelope.txt';        Content = 'age header: secret-encrypted key follows'; Expect = 'KEY MATTER' },
+            @{ Name = 'recovery-note.md';    Content = 'the secret-encrypted usb copy';            Expect = 'KEY MATTER' },
+            @{ Name = 'contact.txt';         Content = 'reach me at realperson@somewhere.org';     Expect = 'EMAIL' }
         )
+        foreach ($case in $cases) {
+            Set-Content -Path (Join-Path $tempRoot $case.Name) -Value $case.Content -NoNewline
+        }
+        # Exemption negative: a QUOTED marker in a .rs source is exempt by
+        # extension - this string WOULD match the regex otherwise.
+        $exemptName = 'record.rs'
+        Set-Content -Path (Join-Path $tempRoot $exemptName) -Value 'let key = "queue_record_version": ;' -NoNewline
+
+        $reader = { param($rel) Get-Content -Raw -ErrorAction SilentlyContinue (Join-Path $tempRoot $rel) }
+        $names = @($cases | ForEach-Object { $_.Name }) + $exemptName
+        $hits = Invoke-ScanFiles -Files $names -ReadContent $reader -Allowed @()
+
         $failures = 0
         foreach ($case in $cases) {
-            $path = Join-Path $tempRoot $case.Name
-            Set-Content -Path $path -Value $case.Content -NoNewline
-            $hits = Test-FileViolations -RelPath $case.Name -Content $case.Content -Allowed @()
-            $matched = @($hits | Where-Object { $_.StartsWith($case.Expect) })
+            $matched = @($hits | Where-Object { $_.StartsWith($case.Expect) -and $_.Contains($case.Name) })
             if ($matched.Count -eq 0) {
                 Write-Host "SELF-TEST FAIL: '$($case.Name)' did not trip the $($case.Expect) rule" -ForegroundColor Red
                 $failures++
             }
         }
-        # A clean source file naming the key as an identifier must NOT trip.
-        $benign = Test-FileViolations -RelPath 'record.rs' -Content 'pub queue_record_version: semver::Version,' -Allowed @()
-        if (@($benign).Count -ne 0) {
-            Write-Host "SELF-TEST FAIL: exempt source tripped: $benign" -ForegroundColor Red
+        $exemptHits = @($hits | Where-Object { $_.Contains($exemptName) })
+        if ($exemptHits.Count -ne 0) {
+            Write-Host "SELF-TEST FAIL: exempt source '$exemptName' tripped: $exemptHits" -ForegroundColor Red
             $failures++
         }
         if ($failures -gt 0) { exit 1 }
-        Write-Host "PII self-test passed: $($cases.Count) positive fixture(s) flagged, exemption holds, fixtures removed."
+        Write-Host "PII self-test passed: $($cases.Count) on-disk fixture(s) flagged through the real scan loop, exemption negative holds, fixtures removed."
         exit 0
     } finally {
         Remove-Item -Recurse -Force $tempRoot -ErrorAction SilentlyContinue
@@ -142,34 +186,25 @@ if (Test-Path $allowPath) {
 
 if ($Staged) {
     $files = @(& git -C $repoRoot diff --cached --name-only --diff-filter=ACMR)
+    $reader = {
+        param($rel)
+        $content = (& git -C $repoRoot show ":$rel" 2>$null) -join "`n"
+        if ($LASTEXITCODE -ne 0) { return $null }
+        return $content
+    }
 } else {
     $tracked   = @(& git -C $repoRoot ls-files)
     $untracked = @(& git -C $repoRoot ls-files --others --exclude-standard)
     $files = @($tracked + $untracked | Sort-Object -Unique)
-}
-
-$violations = [System.Collections.Generic.List[string]]::new()
-
-foreach ($f in $files) {
-    if (-not $f) { continue }
-
-    $content = $null
-    $ext = [System.IO.Path]::GetExtension($f).ToLowerInvariant()
-    if ($skipContentExt -notcontains $ext) {
-        if ($Staged) {
-            $content = (& git -C $repoRoot show ":$f" 2>$null) -join "`n"
-            if ($LASTEXITCODE -ne 0) { $content = $null }
-        } else {
-            $full = Join-Path $repoRoot $f
-            if (Test-Path $full -PathType Leaf) {
-                $content = Get-Content -Raw -ErrorAction SilentlyContinue $full
-            }
-        }
-    }
-    foreach ($v in (Test-FileViolations -RelPath $f -Content $content -Allowed $allowed)) {
-        $violations.Add($v)
+    $reader = {
+        param($rel)
+        $full = Join-Path $repoRoot $rel
+        if (-not (Test-Path $full -PathType Leaf)) { return $null }
+        return Get-Content -Raw -ErrorAction SilentlyContinue $full
     }
 }
+
+$violations = Invoke-ScanFiles -Files $files -ReadContent $reader -Allowed $allowed
 
 if ($violations.Count -gt 0) {
     Write-Host "PII SCAN FAILED - $($violations.Count) violation(s):" -ForegroundColor Red

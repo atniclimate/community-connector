@@ -1568,3 +1568,56 @@ trips its rule plus one exemption negative, and removes them - the
 tripwire is proven live on every full run without anything marker-shaped
 ever entering the repo. Tripwires remain defense in depth under the I1
 process boundary, not enforcement.
+
+## D-076 (2026-07-25) - Implementation adversarial round 1: FAIL, amended
+
+The mandatory round on the steps-1-11 diff (reviewer gpt-5.6-sol; review
+at _reviews/community-connector/2026-07-25_intake-pipeline-impl-round1.md,
+target HEAD 8bcce9a) returned FAIL: four blockers, eight majors. Every
+load-bearing finding was verified against the files before judgment;
+none was rejected. Amendments landed in three commits (d1b5f47 core/CLI,
+9630d1b app, plus the scripts/docs commit carrying this entry):
+
+- F1 (BLOCKER, confirmed against ADR-005 D4 "re-run step 2"): recovery
+  mode is now selected by durable presence - ALL-ABSENT plans re-run the
+  full first-attempt step (preflight + validation gate); only partially
+  appended batches complete under the intent marker; a recovery fold
+  quarantine is a loud halt. Crash-after-denial integration test added.
+- F2 (BLOCKER): decision reviewer must parse as PersonId and equal the
+  authorized --facilitator; mismatches refused (reviewer_mismatch).
+- F3 (BLOCKER): no swallowed IO - directory-flush failures recorded;
+  Windows rename semantics documented honestly; app reads are tagged and
+  scan issues surface on the dashboard.
+- F4 (BLOCKER): review selection lives in the store; the FSA handle is
+  owned by the state module's effects layer; the wizard holds no
+  operational state.
+- F5: stop-the-line halting (pre-pass on halt-class rows incl. the new
+  marker-with-no-files -> HaltLostDecisionState; immediate stop on a
+  failed approval recovery). F6: verify_persisted_plan cross-field
+  checks incl. pre-link batch-digest recomputation. F7: sorted-key
+  canonical digests (Value-tree serialization) in cn-ingest AND the
+  seam, with pinned golden vectors. F8: digest-bound tombstone
+  reconciliation + tamper test. F9: typed submission-schema validator
+  (allowlist, versions, consent shape, caps, control characters) gating
+  every first-attempt approve; empty reject reason ILLEGAL in core.
+  F10: queue format 0.2.0 (reject wire-shape change; no deployed 0.1.0
+  writer existed); nested extras on ApprovalPlanRef/HistoryEntry. F11:
+  lifecycle-parameterized wizard mount + IndexedDB handle persistence
+  landed. F12: the self-test now writes fixtures to disk and runs the
+  REAL scan loop; the blanket .md content exemption is replaced by an
+  explicit five-file doc allowlist (a renamed queue file as .md now
+  trips); the exemption negative uses a quoted marker.
+
+Recorded divergences (not silently claimed): the Windows write primitive
+remains std::fs::rename (MoveFileEx REPLACE_EXISTING without
+WRITE_THROUGH) with the ADR's own durability qualification documented at
+the primitive; the staged-mode reader path of pii-scan is exercised by
+the pre-commit hook itself rather than the self-test; the app still has
+only demo + snapshot load paths, so the wizard's lifecycle binding is
+proven on the demo path. D-068 gate positions after this round:
+canonical-digest golden vectors GREEN; digest-bound tombstone
+reconciliation GREEN; fault-injection EXPANDED (denial-crash, tamper,
+validation arms) but not yet exhaustive per boundary; quiescent
+provenance deployment, provider-bound runbook evidence, and the ceremony
+rehearsal remain OWED - the D-059.8 deploy bar is unchanged and unmet.
+Round 2 (verification) follows this commit.
