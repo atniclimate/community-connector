@@ -4,12 +4,15 @@
 //! behavior: `validate` wraps `cn_schema::parse_template` and prints its
 //! machine-readable validation report (I12); `export` wraps the existing
 //! `cn_api::Api` load + export-snapshot path for a fixture ops log and one
-//! viewer scope. `ingest` and `snapshot` are parked stubs: ingest names the
-//! G-RAT human gate, snapshot names the Phase 2 snapshot-envelope
-//! dependency. No routing semantics, no column mapping, and no new schemas
-//! live in this crate (D-041, D-044.2).
+//! viewer scope; `intake apply` is the native durable owner of the intake
+//! queue (ADR-005 D4) - it executes I/O for cn-ingest's pure verdicts and
+//! holds no trust semantics of its own (I2). `ingest` and `snapshot` are
+//! parked stubs: ingest names the G-RAT human gate, snapshot names the
+//! Phase 2 snapshot-envelope dependency. No routing semantics, no column
+//! mapping, and no new schemas live in this crate (D-041, D-044.2).
 
 mod export;
+mod intake;
 mod validate;
 
 use std::io::Write;
@@ -46,6 +49,11 @@ Commands:
          --group <group-uuid> --viewer <anonymous|person:<person-uuid>>
       Load a fixture ops log through cn-api and print the export-snapshot
       envelope for the given viewer scope.
+  intake apply --queue <queue-root> --ops <ops.jsonl>
+               --group <group-uuid> --facilitator <person-uuid> [--kind <kind-id>]
+      Run the native intake apply transaction (ADR-005 D4): startup
+      recovery, decision-inbox admission, approval planning, the
+      idempotent durable append, and the I12 run report as JSON.
   ingest
       Not available: parked behind the G-RAT human gate.
   snapshot
@@ -76,6 +84,7 @@ pub fn run(args: &[String], out: &mut dyn Write, err: &mut dyn Write) -> std::io
         }
         Some("validate") => validate::run(&args[1..], out, err),
         Some("export") => export::run(&args[1..], out, err),
+        Some("intake") => intake::run(&args[1..], out, err),
         Some("ingest") => stub_ingest(err),
         Some("snapshot") => stub_snapshot(err),
         Some(other) => {

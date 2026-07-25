@@ -6,5 +6,16 @@ publish = false
 
 [dependencies]
 cn-api = { path = "../crates/cn-api" }
+cn-ingest = { path = "../crates/cn-ingest" }
+cn-model = { path = "../crates/cn-model" }
+cn-perm = { path = "../crates/cn-perm" }
 cn-schema = { path = "../crates/cn-schema" }
+cn-store = { path = "../crates/cn-store" }
+fs4 = { version = "1", features = ["sync"] }
+serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+semver = { version = "1", features = ["serde"] }
+uuid = { version = "1", features = ["v7"] }
+
+[dev-dependencies]
+tempfile = "3"

@@ -154,7 +154,7 @@ fn check_step(err: &mut dyn Write, step: &str, envelope: &str) -> std::io::Resul
     }
 }
 
-fn unix_now_ms() -> Result<i64, String> {
+pub(crate) fn unix_now_ms() -> Result<i64, String> {
     let elapsed = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map_err(|clock_err| format!("system clock is before the unix epoch: {clock_err}"))?;

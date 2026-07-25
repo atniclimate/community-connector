@@ -224,6 +224,11 @@ pub fn plan_approval(
         op_ids: ops.iter().map(|op| op.op_id.to_string()).collect(),
         per_op_digests,
         batch_digest,
+        ops: ops
+            .iter()
+            .map(serde_json::to_value)
+            .collect::<Result<_, _>>()
+            .map_err(|err| IngestError::Serialize(err.to_string()))?,
     };
     Ok(ApprovalPlan {
         ops,

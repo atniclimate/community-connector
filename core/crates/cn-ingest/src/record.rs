@@ -184,6 +184,11 @@ pub struct ApprovalPlanRef {
     pub per_op_digests: Vec<String>,
     /// Pre-link batch digest (ADR-005 D5 projection).
     pub batch_digest: String,
+    /// The planned operations verbatim (serialized `Operation` values, in
+    /// batch order). Recovery under a durable intent re-appends the absent
+    /// suffix from THESE bytes: ids and digests are never regenerated
+    /// (ADR-005 D4), and ids/digests alone cannot reconstruct the ops.
+    pub ops: Vec<Value>,
 }
 
 /// Mutable review-state sidecar, rewritten atomically by the native owner.
