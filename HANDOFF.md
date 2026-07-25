@@ -147,16 +147,18 @@ blueprint docs/blueprints/intake-pipeline.md section 9 is the sequence):**
 
 ## The human's queue
 
-1. **D-023 solo correctness pass (D-059.10):** review
-   `docs/design/intake-consent-text-draft-2026-07-24.md` using its built-in
-   checklist (~20 min). NEW: its section 7 lists four wording conflicts the
-   ADR-005 rounds surfaced - the largest is the removal-semantics decision
-   ("taken out of the network" vs the append-only log: no-longer-shown or
-   true erasure - your call). Your sign-off clears the text for
-   build/synthetic use; record it as a DECISIONS entry.
-2. **Committee touchpoint (bundled, D-059.9/10):** when timing becomes known, put
-   the collective-checkpoint ask AND the reviewed consent text to ATNI Climate
-   together. Until the recording exists, August pilots remain CONDITIONAL and all
+1. **D-023 solo correctness pass (D-059.10):** DEFERRED by the human
+   (D-072) - review `docs/design/intake-consent-text-draft-2026-07-24.md`
+   with its built-in checklist when ready; section 7's removal-semantics
+   decision (no-longer-shown vs true erasure) is still yours. In the
+   meantime engineering is AUTHORIZED to wire PLACEHOLDER/DRAFT-marked
+   boilerplate matching real functionality (D-072.1); nothing community-
+   facing ships without your sign-off.
+2. **Committee touchpoint (D-059.9/10, timing resolved by D-072.2):** the
+   collective checkpoint's moment is the CONVENTION (2026-09-14); individual
+   ad hoc demo meetings beforehand can open further authorization pathways -
+   demo-readiness on synthetic data is now a sequencing priority. Until a
+   recorded checkpoint exists, August pilots remain CONDITIONAL and all
    engineering stays on synthetic data.
 3. Standing: G2 Open Eligibility isolation if ever added; G-BACKUP still ACCEPTED,
    not solved (the public remote holds code only, never data - not a backup answer

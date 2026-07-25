@@ -1470,3 +1470,25 @@ still surface). Choices recorded:
 4. **Kind resolution and the pilot default ("person") are single-sourced
    in cn-ingest** (`resolve_kind`, `DEFAULT_PILOT_KIND`); the CLI and
    facade both consume them (was CLI-local per D-070.5).
+
+## D-072 (2026-07-24) - Human rulings: consent boilerplate authorized as draft; checkpoint = convention; ad hoc demos as authorization pathway
+
+The human ruled on the two standing queue items (Q-CHK/Q-TEXT):
+
+1. **Consent text:** the D-023 solo correctness pass will happen later.
+   In the meantime the session is authorized to CREATE boilerplate
+   consent/intake text matching the software's actual functionality and
+   intentions (derived from the 2026-07-24 consent draft package). All
+   such text stays PLACEHOLDER/DRAFT-marked and the CLAUDE.md
+   community-facing-text gate is unchanged: nothing is shown to a
+   community member before human review; the D-023 sign-off remains the
+   bar for build/synthetic -> real use.
+2. **Committee timing:** the collective checkpoint's moment is the
+   convention itself (2026-09-14). Additionally, individual ad hoc
+   meetings where the human demonstrates the software IN ADVANCE can
+   lead to further authorization pathways. Consequences: August internal
+   pilots stay CONDITIONAL (no recorded checkpoint before convention
+   unless an ad hoc pathway produces one); demo-readiness of the wizard
+   + synthetic fixtures becomes a sequencing priority (it directly
+   enables those meetings). Engineering stays on synthetic data
+   throughout - unchanged.

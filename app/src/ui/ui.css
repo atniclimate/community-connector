@@ -265,3 +265,70 @@
     transition: background-color 120ms ease-out, color 120ms ease-out;
   }
 }
+
+/* P3.6 entry form (intake blueprint section 4). Holds at 375px: single
+   column, full-width controls. */
+.cn-entry-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-width: 32rem;
+  color: var(--cn-text-primary, #e6edf7);
+}
+
+.cn-entry-form-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.cn-entry-form-row input,
+.cn-entry-form-row select,
+.cn-entry-form-row textarea {
+  width: 100%;
+  padding: 0.4rem 0.5rem;
+  border: 1px solid var(--cn-text-secondary, #b5c0d0);
+  border-radius: 4px;
+  background: var(--cn-bg-center, #0d1017);
+  color: var(--cn-text-primary, #e6edf7);
+}
+
+.cn-entry-form-error {
+  min-height: 1em;
+  margin: 0;
+  color: var(--cn-accent-focusRing, #ffd38a);
+  font-size: 0.85rem;
+}
+
+.cn-entry-form-visibility {
+  margin: 0;
+  color: var(--cn-text-secondary, #b5c0d0);
+  font-size: 0.85rem;
+}
+
+.cn-entry-form-consent {
+  border: 1px solid var(--cn-text-secondary, #b5c0d0);
+  border-radius: 4px;
+  padding: 0.75rem;
+}
+
+.cn-entry-form-draft-banner {
+  font-weight: 600;
+  color: var(--cn-accent-focusRing, #ffd38a);
+}
+
+.cn-entry-form-affirm {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-start;
+  margin-top: 0.5rem;
+}
+
+.cn-entry-form-submit {
+  align-self: flex-start;
+  padding: 0.5rem 1rem;
+}
+
+.cn-entry-form-submit:disabled {
+  opacity: 0.5;
+}
