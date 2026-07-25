@@ -41,7 +41,7 @@ on the recorded collective checkpoint (D-059.9).
 | Facilitator role blueprint / authority matrix | `docs/blueprints/facilitator-role.md`, `docs/design/authority-matrix.md` |
 | Snapshot scope + byte ledger | `docs/design/snapshot-viewer-scope.md`, `docs/design/snapshot-ledger.md` |
 | Pilot FORM draft (Parts A/C SUPERSEDED) / evidence template / migration recipe | `docs/design/pilot-form-and-template-2026-07-06.md`, `docs/pilot-evidence-template.md`, `docs/cpf-rcn-migration-recipe.md` |
-| Verification battery (11 members) | `scripts/check-all.ps1` (+ `scripts/hooks/pre-commit`) |
+| Verification battery (12 members incl. pii-selftest) | `scripts/check-all.ps1` (+ `scripts/hooks/pre-commit`) |
 | Rust core | `core/crates/cn-{model,schema,store,perm,graph,api,wasm}`, `core/cli` (`cn`) |
 | App | `app/src/{viz,ui,state,wasm,theme}`; snapshot boot reader `app/src/state/snapshot.ts` |
 | Codex adversarial artifacts | out-of-repo review lane `_reviews/community-connector/` under the dev workspace |
@@ -120,21 +120,42 @@ of 11 LANDED, check-all green at each commit:**
   computed in-core). NO approval-write export. The no-leak extension
   test passes on a real projection (trust-granted governance sees the
   hidden candidate; facilitator and anonymous never do).
+- Step 7 (eaa8a13, D-072): P3.6 template-driven entry form - pure model
+  consuming kinds[].attributes[] (R2), advisory-only validation, payload
+  assembly with payload-carried kind; DRAFT consent boilerplate
+  (D-072.1-authorized, section-7 corrections applied, DRAFT banner until
+  D-023) with the structural checkbox gate (D-030).
+- Step 8 (bf02e5f, D-073): FSA create-only queue adapter + intake store
+  slice; cn-api/cn-wasm PURE BUILDERS intake_stage_record /
+  intake_build_decision keep checksum authority in the core - the app
+  never computes a digest; read-back verification on every create;
+  wizard refusal rule for approved_intent/unreadable sidecars.
+- Step 9 (76a0372, D-074): P3.5 facilitator wizard - dir grant + guard,
+  queue dashboard (I12 surface, `cn intake apply` + reload instruction),
+  entry flow, review view with the three read-only core checks, approve/
+  reject-with-reason/set-aside-note/clear-failed as create-only decision
+  files. DecisionType::Reject now carries its REQUIRED reason (D-074.1);
+  new viewer_roles boundary export gates the mount (affordance only).
+- Step 10 (d677e5d, D-075): pii-scan intake tripwires (queue path
+  shapes, queue_record_version + secret-encrypted content markers with
+  .rs/.ts/.md content exemption) + the pii-selftest check-all member
+  (12 members) generating positive fixtures at runtime.
 
 **NOT done - ordered next actions (mandate item 2 continues autonomously;
 blueprint docs/blueprints/intake-pipeline.md section 9 is the sequence):**
-1. Steps 7-9: app - template->form renderer (P3.6), FSA create-only
-   adapter (writes the D-070.3 queue layout), wizard panel (P3.5).
-2. Step 10: pii-scan tripwires (queue/secret markers + runtime-generated
-   positive fixtures). Step 11: synthetic fixtures + docs true-up
-   (MANIFEST refresh owed - new files: cli/src/intake/*, cn-ingest
-   dedup.rs, two new test batteries).
-3. Then the MANDATORY adversarial round on the implementation diff
-   (steps 1-6 are committed but unreviewed: 78e9aae, 661b02c, 73e228b,
-   52e274b, 1db3cd0, b47ab49).
-4. Asana refresh owed for this session's notable progress (ADR-005
-   acceptance + steps 1-6) per the ratified convention - deferred at
-   session close for context budget; do it at the next session close.
+1. Step 11: synthetic intake demo records for both demo groups + docs
+   true-up (MANIFEST refresh owed - new files: cli/src/intake/*,
+   cn-ingest dedup.rs, app forms/ + intake/ modules, four new test
+   batteries). Also deferred there: FSA handle persistence across
+   sessions (IndexedDB; D-074 note).
+2. The MANDATORY adversarial round on the WHOLE implementation diff -
+   steps 1-10 are committed but unreviewed: 78e9aae, 661b02c, 73e228b,
+   52e274b, 1db3cd0, b47ab49, eaa8a13, bf02e5f, 76a0372, d677e5d (plus
+   docs commits). Permission-adjacent at the approval boundary; the
+   round is a blueprint precondition for acceptance.
+3. Asana refresh owed for this arc's notable progress (ADR-005
+   acceptance + blueprint steps 1-10) per the ratified convention -
+   deferred at session close for context budget; do at next close.
 2. **Remote intake relay implementation (per ACCEPTED ADR-005).** Pages form,
    client-side sealed box, Workers+KV relay (receipt ledger, admission
    allowlist), pilot-PC puller (bundle+key pins, crash protocol). The

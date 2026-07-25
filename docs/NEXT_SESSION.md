@@ -19,18 +19,24 @@ carries the reviewer's implementation gates in its test lists. The
 consent draft gained section 7: four wording conflicts for the D-023
 pass - the removal-semantics question (no-longer-shown vs erasure) is a
 human decision. Implementation then proceeded the same day: blueprint
-steps 1-6 of 11 are LANDED and pushed (cn-store durable seam, cn-model
-intake provenance block, cn-ingest queue formats + admission table +
-recovery classification + near-dup + dedup + plan_approval, `cn intake
-apply` - the native durable owner with the full decide -> apply ->
-reload integration round trip - and the read-only cn-api/cn-wasm intake
-facade with the no-leak extension proven on a real projection; check-all
-green at every commit; D-069/D-070/D-071 record the deviations and
-choices incl. the fixed queue file layout the app's FSA adapter will
-write). Next action: steps 7-9, the app half (template->form renderer
-P3.6, FSA create-only adapter, wizard panel P3.5), then tripwires and
-fixtures, then the mandatory adversarial round on the whole
-implementation diff (six commits, unreviewed).
+steps 1-10 of 11 are LANDED and pushed: the whole native pipeline
+(durable seam, provenance block, queue formats + admission + recovery,
+near-dup + dedup + plan_approval, `cn intake apply` with the full
+decide -> apply -> reload round trip), the read-only facade with the
+no-leak extension proven on a real projection, AND the app half - the
+P3.6 template-driven entry form with D-072-authorized DRAFT consent
+boilerplate and the structural checkbox gate, the create-only FSA
+adapter over core-built checksummed bytes (D-073 pure builders), the
+P3.5 facilitator wizard (dashboard, review view with the three core
+checks, decisions as create-only files; reject now carries its required
+reason, D-074), and the pii-scan intake tripwires with the pii-selftest
+member (12-member battery, D-075). The human ruled (D-072): consent
+boilerplate authorized as draft; committee checkpoint = the convention;
+ad hoc demos open authorization pathways, so DEMO-READINESS on
+synthetic data is a sequencing priority. check-all green at every
+commit; D-069..D-075 record every deviation. Next: step 11 (synthetic
+intake demo fixtures + MANIFEST/docs true-up), then the MANDATORY
+adversarial round on the whole ten-commit implementation diff.
 An Asana refresh for this session is owed at the next session close.
 The deploy bar (D-059.8) is unchanged - ADR-005 acceptance satisfied its
 first condition; intake pipeline + keygen ceremony + D-023 remain.
