@@ -19,16 +19,18 @@ carries the reviewer's implementation gates in its test lists. The
 consent draft gained section 7: four wording conflicts for the D-023
 pass - the removal-semantics question (no-longer-shown vs erasure) is a
 human decision. Implementation then proceeded the same day: blueprint
-steps 1-5 of 11 are LANDED and pushed (cn-store durable seam, cn-model
+steps 1-6 of 11 are LANDED and pushed (cn-store durable seam, cn-model
 intake provenance block, cn-ingest queue formats + admission table +
-recovery classification + near-dup + plan_approval, and `cn intake
+recovery classification + near-dup + dedup + plan_approval, `cn intake
 apply` - the native durable owner with the full decide -> apply ->
-reload integration round trip; check-all green at every commit; D-069
-records the populated-EntityCreate deviation, D-070 the step-5 choices
-incl. the fixed queue file layout the app's FSA adapter will write).
-Next action: step 6, the read-only cn-api/cn-wasm intake facade + the
-no-leak extension test, then the app steps, then the mandatory
-adversarial round on the implementation diff.
+reload integration round trip - and the read-only cn-api/cn-wasm intake
+facade with the no-leak extension proven on a real projection; check-all
+green at every commit; D-069/D-070/D-071 record the deviations and
+choices incl. the fixed queue file layout the app's FSA adapter will
+write). Next action: steps 7-9, the app half (template->form renderer
+P3.6, FSA create-only adapter, wizard panel P3.5), then tripwires and
+fixtures, then the mandatory adversarial round on the whole
+implementation diff (six commits, unreviewed).
 An Asana refresh for this session is owed at the next session close.
 The deploy bar (D-059.8) is unchanged - ADR-005 acceptance satisfied its
 first condition; intake pipeline + keygen ceremony + D-023 remain.

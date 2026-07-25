@@ -1444,3 +1444,29 @@ API drift caught by the audit before first compile). Six integration
 tests cover the decide -> apply -> reload round trip, worktree refusal,
 writeless crash replay, stale serialization, approved_intent recovery,
 and the authority-matrix preflight denial. check-all green.
+
+## D-071 (2026-07-24) - Step 6 facade: dedup gap filled, five-arm verdict, shared kind rule
+
+Blueprint step 6 landed (b47ab49): the read-only cn-api/cn-wasm intake
+facade (BOUNDARY_VERSION 0.2.0) with the no-leak extension test proven
+against a REAL projection (trust-granted governance sees the hidden
+graph candidate; facilitator and anonymous never do; queue-side matches
+still surface). Choices recorded:
+
+1. **The blueprint's `dedup.rs` had never landed** (steps 3-4 shipped
+   without it); it exists now. The verdict enum has FIVE arms, not the
+   sketch's four: `transport_conflict` (same receipt id, different
+   ciphertext hash) is distinct from semantic `conflict` because ADR-005
+   D4 gives it different handling (retain relay copy, alert - never a
+   no-op). Blank client-controlled submission ids never match each other.
+2. **Near-dup facade takes a request DTO** carrying the template-driven
+   `name_attrs`/`affiliation_attrs` (templates have no "name role"
+   concept for the core to infer); the graph side is NEVER
+   caller-supplied - it is the viewer's projection computed in-core.
+3. **`validate_record` reuses the plan path** (throwaway ids), so the
+   review UI's report is definitionally identical to the apply-time
+   report (I2). Integrity failures (checksum, unknown major) are typed
+   error envelopes, not validation findings.
+4. **Kind resolution and the pilot default ("person") are single-sourced
+   in cn-ingest** (`resolve_kind`, `DEFAULT_PILOT_KIND`); the CLI and
+   facade both consume them (was CLI-local per D-070.5).

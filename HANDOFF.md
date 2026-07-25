@@ -112,20 +112,28 @@ of 11 LANDED, check-all green at each commit:**
   integration tests incl. the FULL decide -> apply -> reload round trip
   on synthetic data and the authority-matrix preflight denial. Queue
   file layout fixed as the step-8 FSA adapter contract (D-070.3).
+- Step 6 (b47ab49, D-071): read-only cn-api/cn-wasm intake facade
+  (BOUNDARY_VERSION 0.2.0) - intake_validate_record (plan-path reuse,
+  report identical to apply-time), intake_dedup_check (the blueprint's
+  missing dedup module now exists; five-arm verdict incl.
+  transport_conflict), intake_near_duplicates (viewer projection
+  computed in-core). NO approval-write export. The no-leak extension
+  test passes on a real projection (trust-granted governance sees the
+  hidden candidate; facilitator and anonymous never do).
 
 **NOT done - ordered next actions (mandate item 2 continues autonomously;
 blueprint docs/blueprints/intake-pipeline.md section 9 is the sequence):**
-1. Step 6: cn-api/cn-wasm READ-ONLY intake facade + the no-leak extension
-   test (near-dup candidates bounded by the REAL facilitator projection -
-   the step-4 test proves projection-boundedness of the scorer; the
-   facade test proves the projection is the facilitator's).
-2. Steps 7-9: app - template->form renderer (P3.6), FSA create-only
+1. Steps 7-9: app - template->form renderer (P3.6), FSA create-only
    adapter (writes the D-070.3 queue layout), wizard panel (P3.5).
-3. Step 10: pii-scan tripwires (queue/secret markers + runtime-generated
-   positive fixtures). Step 11: synthetic fixtures + docs true-up.
-4. Then the MANDATORY adversarial round on the implementation diff.
-5. Asana refresh owed for this session's notable progress (ADR-005
-   acceptance + steps 1-5) per the ratified convention - deferred at
+2. Step 10: pii-scan tripwires (queue/secret markers + runtime-generated
+   positive fixtures). Step 11: synthetic fixtures + docs true-up
+   (MANIFEST refresh owed - new files: cli/src/intake/*, cn-ingest
+   dedup.rs, two new test batteries).
+3. Then the MANDATORY adversarial round on the implementation diff
+   (steps 1-6 are committed but unreviewed: 78e9aae, 661b02c, 73e228b,
+   52e274b, 1db3cd0, b47ab49).
+4. Asana refresh owed for this session's notable progress (ADR-005
+   acceptance + steps 1-6) per the ratified convention - deferred at
    session close for context budget; do it at the next session close.
 2. **Remote intake relay implementation (per ACCEPTED ADR-005).** Pages form,
    client-side sealed box, Workers+KV relay (receipt ledger, admission
