@@ -143,18 +143,15 @@ of 11 LANDED, check-all green at each commit:**
 
 **NOT done - ordered next actions (mandate item 2 continues autonomously;
 blueprint docs/blueprints/intake-pipeline.md section 9 is the sequence):**
-1. Step 11: synthetic intake demo records for both demo groups + docs
-   true-up (MANIFEST refresh owed - new files: cli/src/intake/*,
-   cn-ingest dedup.rs, app forms/ + intake/ modules, four new test
-   batteries). Also deferred there: FSA handle persistence across
-   sessions (IndexedDB; D-074 note).
-2. The MANDATORY adversarial round on the WHOLE implementation diff -
-   steps 1-10 are committed but unreviewed: 78e9aae, 661b02c, 73e228b,
-   52e274b, 1db3cd0, b47ab49, eaa8a13, bf02e5f, 76a0372, d677e5d (plus
-   docs commits). Permission-adjacent at the approval boundary; the
-   round is a blueprint precondition for acceptance.
-3. Asana refresh owed for this arc's notable progress (ADR-005
-   acceptance + blueprint steps 1-10) per the ratified convention -
+1. The MANDATORY adversarial round on the WHOLE implementation diff -
+   steps 1-11 are committed but unreviewed: 78e9aae, 661b02c, 73e228b,
+   52e274b, 1db3cd0, b47ab49, eaa8a13, bf02e5f, 76a0372, d677e5d, plus
+   the step-11 fixtures commit (all 11 blueprint steps now landed).
+   Permission-adjacent at the approval boundary; the round is a
+   blueprint precondition for acceptance. Deferred polish for later:
+   FSA handle persistence across sessions (IndexedDB; D-074 note).
+2. Asana refresh owed for this arc's notable progress (ADR-005
+   acceptance + blueprint steps 1-11) per the ratified convention -
    deferred at session close for context budget; do at next close.
 2. **Remote intake relay implementation (per ACCEPTED ADR-005).** Pages form,
    client-side sealed box, Workers+KV relay (receipt ledger, admission

@@ -1,0 +1,60 @@
+{
+  "comment": "SYNTHETIC intake demo submissions (blueprint step 11). Inner-payload shape exactly as the P3.6 form emits it; staged at runtime through the wizard. Consent digests are fixture markers; all data synthetic per fixtures/README.md.",
+  "group": "fisheries-committee",
+  "submissions": [
+    {
+      "submission_version": "0.1.0",
+      "submission_id": "b9e6a2a0-0000-7000-8000-000000000201",
+      "form_version": "in-app-draft-2026-07-24",
+      "kind": "person",
+      "consent": {
+        "consent_text_digest": "fixture-consent-digest",
+        "consent_affirmed": true,
+        "consent_affirmed_at": 1753301000000
+      },
+      "captured_at": 1753301000500,
+      "fields": {
+        "display_name": "Heron Slackwater",
+        "contact_email": "heron@example.test",
+        "roles": ["net mending", "youth mentor"],
+        "seasons_active": "year-round"
+      }
+    },
+    {
+      "submission_version": "0.1.0",
+      "submission_id": "b9e6a2a0-0000-7000-8000-000000000202",
+      "form_version": "in-app-draft-2026-07-24",
+      "kind": "person",
+      "consent": {
+        "consent_text_digest": "fixture-consent-digest",
+        "consent_affirmed": true,
+        "consent_affirmed_at": 1753301100000
+      },
+      "captured_at": 1753301100500,
+      "fields": {
+        "display_name": "Alder Grove",
+        "roles": ["smokehouse"],
+        "seasons_active": "fall"
+      },
+      "demo_note": "Near-duplicate demo: token-contains existing graph entities 'Alder Grove 11'/'Alder Grove 13'."
+    },
+    {
+      "submission_version": "0.1.0",
+      "submission_id": "b9e6a2a0-0000-7000-8000-000000000201",
+      "form_version": "in-app-draft-2026-07-24",
+      "kind": "person",
+      "consent": {
+        "consent_text_digest": "fixture-consent-digest",
+        "consent_affirmed": true,
+        "consent_affirmed_at": 1753301200000
+      },
+      "captured_at": 1753301200500,
+      "fields": {
+        "display_name": "Heron Slackwater",
+        "roles": ["net mending", "youth mentor", "canoe family"],
+        "seasons_active": "year-round"
+      },
+      "demo_note": "Dedup demo: REUSES submission_id ...201 with a DIFFERENT payload - the dedup check classifies this as a conflict for facilitator disposition, never a drop."
+    }
+  ]
+}

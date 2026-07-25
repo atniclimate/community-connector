@@ -1,0 +1,73 @@
+{
+  "comment": "SYNTHETIC intake demo submissions (blueprint step 11). Inner-payload shape exactly as the P3.6 form emits it; staged at runtime through the wizard (create-only FSA adapter over the D-073 core builders) - queue-shaped files themselves are never committed (pii-scan tripwire, D-075). Consent digests are fixture markers, not real digests; all data synthetic per fixtures/README.md.",
+  "group": "research-network",
+  "submissions": [
+    {
+      "submission_version": "0.1.0",
+      "submission_id": "b9e6a2a0-0000-7000-8000-000000000101",
+      "form_version": "in-app-draft-2026-07-24",
+      "kind": "person",
+      "consent": {
+        "consent_text_digest": "fixture-consent-digest",
+        "consent_affirmed": true,
+        "consent_affirmed_at": 1753300000000
+      },
+      "captured_at": 1753300000500,
+      "fields": {
+        "display_name": "Rowan Tidepool",
+        "contact_email": "rowan@example.test",
+        "expertise": ["estuary monitoring", "data stewardship"],
+        "career_stage": "early-career"
+      }
+    },
+    {
+      "submission_version": "0.1.0",
+      "submission_id": "b9e6a2a0-0000-7000-8000-000000000102",
+      "form_version": "in-app-draft-2026-07-24",
+      "kind": "person",
+      "consent": {
+        "consent_text_digest": "fixture-consent-digest",
+        "consent_affirmed": true,
+        "consent_affirmed_at": 1753300100000
+      },
+      "captured_at": 1753300100500,
+      "fields": {
+        "display_name": "Cedar Grove",
+        "expertise": ["kelp forests"],
+        "career_stage": "established"
+      },
+      "demo_note": "Near-duplicate demo: token-contains the existing graph entity 'Cedar Grove 1', so the review view surfaces a graph candidate with reasons."
+    },
+    {
+      "submission_version": "0.1.0",
+      "submission_id": "b9e6a2a0-0000-7000-8000-000000000103",
+      "form_version": "in-app-draft-2026-07-24",
+      "kind": "person",
+      "consent": {
+        "consent_text_digest": "fixture-consent-digest",
+        "consent_affirmed": true,
+        "consent_affirmed_at": 1753300200000
+      },
+      "captured_at": 1753300200500,
+      "fields": {
+        "display_name": "Rowan T. Tidepool",
+        "expertise": ["estuary monitoring"]
+      },
+      "demo_note": "Near-duplicate demo: token-contains the first submission's 'Rowan Tidepool', so the review view surfaces a QUEUE candidate."
+    },
+    {
+      "submission_version": "0.1.0",
+      "submission_id": "b9e6a2a0-0000-7000-8000-000000000104",
+      "form_version": "in-app-draft-2026-07-24",
+      "kind": "person",
+      "consent": {
+        "consent_text_digest": "fixture-consent-digest",
+        "consent_affirmed": true,
+        "consent_affirmed_at": 1753300300000
+      },
+      "captured_at": 1753300300500,
+      "fields": {},
+      "demo_note": "Validation demo: missing required display_name - stages reviewable-but-flagged; an approve preflight-fails back to pending, honestly recorded."
+    }
+  ]
+}
