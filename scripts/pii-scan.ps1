@@ -53,6 +53,7 @@ $markerContentExemptFiles = @(
     'HANDOFF.md',
     'docs/adr/ADR-005-remote-intake.md',
     'docs/blueprints/intake-pipeline.md',
+    'docs/blueprints/intake-relay.md',
     'docs/design/facilitator-keygen-ceremony.md'
 )
 

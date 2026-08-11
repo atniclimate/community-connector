@@ -35,6 +35,7 @@ on the recorded collective checkpoint (D-059.9).
 | Machine-local content (NEVER commit) | `_private/` (gitignored): `DEPENDENCIES-local.md`, `PREDECESSOR-EXCLUSIONS.md` |
 | Accepted architecture decisions | `docs/adr/` (ADR-001..005 ALL ACCEPTED; ADR-005 accepted 2026-07-24 after EIGHT adversarial rounds, D-061..D-068) |
 | Intake-pipeline director blueprint (P3.5/P3.6) | `docs/blueprints/intake-pipeline.md` (aligned to accepted ADR-005 through round 8) |
+| Intake-relay director blueprint (remote half) | `docs/blueprints/intake-relay.md` (2026-08-11, implements ADR-005 D2/D3/D6/D8) |
 | ADR-005 review trail (8 rounds) | `_reviews/community-connector/2026-07-24_adr-005-remote-intake*.md` (out-of-repo lane) |
 | Intake/consent text package (DRAFT, pending D-023) | `docs/design/intake-consent-text-draft-2026-07-24.md` |
 | Facilitator keygen ceremony design | `docs/design/facilitator-keygen-ceremony.md` |
@@ -160,12 +161,18 @@ as draft; checkpoint = convention; ad hoc demos open pathways).
    load path (live-browser rehearsal of the full intake flow through the
    real app, not just unit tests), tripwire source/archive bypass
    hardening (optional), and the D-068/D-059.8 deploy gates.
-2. **Remote intake relay implementation (per ACCEPTED ADR-005).** Pages form,
-   client-side sealed box, Workers+KV relay (receipt ledger, admission
-   allowlist), pilot-PC puller (bundle+key pins, crash protocol). The
-   acceptance UNLOCKS building this; the DEPLOY bar (D-059.8) still
-   requires: intake pipeline working + keygen ceremony executed + D-023
-   sign-off on form text.
+2. **Remote intake relay implementation (per ACCEPTED ADR-005).** Director
+   blueprint WRITTEN (docs/blueprints/intake-relay.md, 2026-08-11): 11
+   steps in 5 phases (A crypto foundation, B envelope formats, C relay
+   infrastructure, D puller I/O, E cross-cutting). Covers sealed-box
+   Rust binding + cross-impl test vectors, keygen CLI commands, outer/
+   inner envelope types, Pages form build pipeline under `form/`,
+   Cloudflare Worker under `relay/`, `cn intake pull` CLI command with
+   bundle verification (D8), reconciliation, and deploy runbook draft.
+   Permission-adjacent: gets a MANDATORY adversarial round. The DEPLOY
+   bar (D-059.8) still requires: intake pipeline working + keygen
+   ceremony executed + D-023 sign-off on form text. NEXT: implementation
+   begins at phase A step 1 (sealed-box crypto binding).
 3. **Snapshot data pipeline (D-048 / P2.3-P2.5)** - targets the convention build.
 4. **Phase 4 slimmed (D-056.3):** minimal P4.1 story authoring.
 5. **P1.3 benchmark** deferred to September; record in ADR-004.

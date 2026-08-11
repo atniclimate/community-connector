@@ -4,21 +4,24 @@
 > CLAUDE.md -> HANDOFF.md -> this file. Refresh the Brief at each session
 > end (CLAUDE.md session-end protocol).
 
-## The 60-second brief (refreshed 2026-08-10)
+## The 60-second brief (refreshed 2026-08-11)
 
-**D-080 standing debt 1 (browser IndexedDB/FSA tests) is CLEARED**
-(476116b): 12 new tests covering FSA error paths (read-back mismatch,
-fail-closed IO, unverifiable roots, decisions enumeration failure),
-the full IDB persist/restore lifecycle (five scenarios), and the
-full-state round trip (grant -> stage two submissions -> scan ->
-approve/reject -> verify). 121 app tests total, check-all 12/12 green.
-The remaining D-080 debts: the production interactive load path
-(live-browser rehearsal, owed before pilot use), tripwire hardening
-(optional), and the deploy gates (D-059.8, human-blocked). Next three
-actions: (1) the remote intake relay (build unlocked, deploy barred),
-(2) snapshot data pipeline (convention build), (3) minimal P4.1 story
-authoring. The human's queue is unchanged (D-023 consent review,
-committee checkpoint timing).
+**The remote intake relay director blueprint is WRITTEN**
+(docs/blueprints/intake-relay.md): 11 steps in 5 phases covering the
+full ADR-005 remote path - sealed-box Rust crypto binding with
+cross-impl test vectors, keygen CLI commands (keygen/fingerprint/
+selftest/backup-verify), outer/inner envelope types in cn-ingest,
+Pages form build pipeline under `form/`, Cloudflare Worker relay under
+`relay/`, `cn intake pull` CLI command with D8 bundle verification and
+receipt-ledger reconciliation, and a deploy runbook draft. Permission-
+adjacent: gets a mandatory adversarial round. The deploy bar (D-059.8)
+is unchanged. Next: implementation begins at phase A step 1 (sealed-box
+crypto binding in cn-ingest). The remaining D-080 debts (production
+interactive load path, optional tripwire hardening, deploy gates) are
+tracked separately. The human's queue is unchanged (D-023 consent
+review, committee checkpoint timing).
+
+## The previous brief (refreshed 2026-08-10)
 
 ## The previous brief (refreshed 2026-07-25, end of the implementation-review session)
 
