@@ -967,13 +967,29 @@ fn load_keypair(
     Ok(Ok(Keypair { public, secret }))
 }
 
+/// Overall per-request deadline. ureq sets no global timeout by default, so a
+/// relay that accepts a connection and then never responds would stall the pull
+/// forever - fatal for a scheduled/cron pull. Blobs are single-digit KB and
+/// bundle assets are small, so 30s is generous while still bounding a hang.
+const HTTP_TIMEOUT_GLOBAL_SECS: u64 = 30;
+/// Connect deadline: fail fast on an unreachable relay/Pages origin rather than
+/// waiting out the global timeout on the TCP/TLS handshake alone.
+const HTTP_TIMEOUT_CONNECT_SECS: u64 = 10;
+
 /// Builds the puller's HTTP agent: NO redirect following (a redirect is a
-/// deployment anomaly, surfaced as a non-200 status rather than an error), and
-/// non-2xx returned as a response (the puller decides per status).
+/// deployment anomaly, surfaced as a non-200 status rather than an error),
+/// non-2xx returned as a response (the puller decides per status), and explicit
+/// connect + global timeouts so a hung relay cannot stall a scheduled pull.
 fn build_agent() -> ureq::Agent {
     ureq::Agent::config_builder()
         .max_redirects(0)
         .max_redirects_will_error(false)
+        .timeout_connect(Some(std::time::Duration::from_secs(
+            HTTP_TIMEOUT_CONNECT_SECS,
+        )))
+        .timeout_global(Some(std::time::Duration::from_secs(
+            HTTP_TIMEOUT_GLOBAL_SECS,
+        )))
         .build()
         .into()
 }
