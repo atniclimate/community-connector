@@ -3,15 +3,16 @@
 > This file is the /pickup target and outranks session memory. Reading order for a
 > fresh session: CLAUDE.md, then this file, then PLAN_1.0.md "Current Position" +
 > "Decision Gates", then current-phase ADRs. DECISIONS.md is the durable judgment
-> record (through D-088; D-081..D-086 are the 2026-08-11 relay-implementation
+> record (through D-089; D-081..D-086 are the 2026-08-11 relay-implementation
 > records, D-086 the claim-verifier review dispositions, D-087 the true-up's
 > pii-scan archived-handoff exemption, D-088 the step-9 timestamp-reconciliation
-> fix). Every path below was verified on disk at the 2026-08-11 step-9 true-up.
+> fix, D-089 the steps-1-11 adversarial round acceptance). Every path below was
+> verified on disk at the 2026-08-11 relay close-out.
 > **The repo is PUBLIC** - origin is
 > `https://github.com/atniclimate/community-connector`. The local `main` is
-> **~24 commits ahead of origin and UNPUSHED** (all relay-implementation work,
-> steps 1-11 + the fix-now bucket + the D-088 fix + doc true-ups; run
-> `git rev-list --count origin/main..main` for the exact count); pushing is
+> **~31 commits ahead of origin and UNPUSHED** (all relay-implementation work,
+> steps 1-11 + the D-088 fix + the D-089 adversarial-round fixes + doc true-ups;
+> run `git rev-list --count origin/main..main` for the exact count); pushing is
 > authorized and safe but has not been run this arc. The pre-commit PII scan and
 > I1 are the publication boundary.
 
@@ -183,10 +184,11 @@ as draft; checkpoint = convention; ad hoc demos open pathways).
    PROGRESS (2026-08-11, all unpushed on main, ~21 commits ahead of
    origin incl. true-ups; live per-step ledger = memory
    relay-orchestration-state):
-   **ALL 11 STEPS LANDED. Phases A+B+C+D (steps 1-8) + Phase E
-   steps 9-11 all DONE - see the step-9 and steps-10-11 blocks below.
-   Only the MANDATORY adversarial round on the 1-11 diff remains
-   before acceptance.**
+   **ALL 11 STEPS LANDED + ADVERSARIAL ROUND DONE (D-089,
+   ACCEPT-WITH-FIXES). Phases A+B+C+D (steps 1-8) + Phase E steps
+   9-11 DONE, reviewed, remediated - the remote-intake relay is
+   COMPLETE and accepted. See the round block below for the fix
+   commits and deferred items.**
    Phases A+B+C (steps 1-6):
    - Step 1 sealed-box crypto binding (14b9778, D-081)
    - Step 2 keygen ceremony CLI (4a0b8db)
@@ -252,14 +254,32 @@ as draft; checkpoint = convention; ad hoc demos open pathways).
    points to blueprint section 9; self-containment verdict unchanged + re-verified).
    Follow-up f6e9b1c aligned NOTICE-third-party license status to D-054. Both steps
    produced by community-connector subagents, conductor-verified on disk + committed.
-   Two pre-deploy gaps surfaced by step 10 (into the human queue): no GitHub Pages
-   workflow exists yet; form/vite.config.ts sets no Vite `base` (a Pages project-
-   subpath would 404 assets - fix BEFORE the pinned build).
-   NEXT: **all 11 steps have landed -> the MANDATORY adversarial round on the whole
-   steps 1-11 diff is the sole remaining gate before acceptance** (backlog above +
-   the two step-10 pre-deploy gaps + the D-088 app-review-view residual). Then
-   judgment + acceptance. The DEPLOY bar (D-059.8) stays separate and unmet
-   (keygen ceremony + D-023 still owed).
+   Two pre-deploy gaps surfaced by step 10: the Vite `base` gap is now FIXED (R4-2,
+   base=/community-connector/); STILL OWED is authoring the GitHub Pages deploy
+   workflow (deploy-time), plus the D-089 real-browser smoke gate (below).
+   **MANDATORY ADVERSARIAL ROUND DONE (2026-08-11, D-089): ACCEPT-WITH-FIXES.**
+   Five read-only reviewers (crypto/keygen, puller/bundle, relay, form, durable-
+   owner+D-088+app+e2e), refute-mandate, every material finding conductor-verified
+   on disk. No confidentiality/PII blocker; every security-critical core held
+   (crypto vectors 5/5, zero-trust relay, D1 fence empirically clean via cargo tree,
+   permission model + durable owner). ~22 findings; all clear ones FIXED as four
+   atomic commits + 2 conductor follow-ups: fbcab71 crypto/keygen (R1-1 panic->typed,
+   R1-2 zeroize, R1-3 stderr TTY guard, R1-4 truthful remove_file), bd689c1 puller
+   (R2-1 unbounded-PII-restage dedup fix, R2-3 cursor halt, F7 cap guard, R5-1
+   impossible-date reject), 0ab9e5f relay (R3-1..3-6 I3 loud-fail + ledger schema
+   version + pagination + CORS-on-error + ArrayBuffer), 5b12060 form (R4-1 CSP
+   wasm-unsafe-eval, R4-2 base=/community-connector/, R4-4 vectors label, R4-3/R5-2
+   tests). check-all 12/12, relay 47/47, form 47/47.
+   ROUND DECISIONS: R4-2 target = GitHub Pages project subpath (base set), NOT going
+   public yet; R2-2 (conflict twins not durably linked -> possible wizard double-
+   admit) DEFERRED as a design follow-up (anomaly path; R2-1 closed the restaging
+   half). NEW PRE-DEPLOY GATE (D-089): a REAL-BROWSER smoke of the built form is
+   owed before D-059.8 can clear - the two form defects escaped every automated
+   gate because no one ran the form in a browser.
+   NEXT: the remote-intake relay (steps 1-11) is COMPLETE + accepted. Remaining
+   relay debts are deferred/limitation (see the human's queue). Project-level next
+   actions resume below (snapshot pipeline, Phase 4 story authoring). The DEPLOY bar
+   (D-059.8) stays separate and unmet (keygen ceremony + D-023 + real-browser smoke).
 3. **Snapshot data pipeline (D-048 / P2.3-P2.5)** - targets the convention build.
 4. **Phase 4 slimmed (D-056.3):** minimal P4.1 story authoring.
 5. **P1.3 benchmark** deferred to September; record in ADR-004.

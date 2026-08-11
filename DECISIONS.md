@@ -2197,3 +2197,97 @@ boundaries so the stored payload is single-typed) is deferred, not foreclosed.
 Note: this fix reconciles the timestamp TYPE only; the app-side facilitator review
 view rendering a remote record's timestamps is display-only, outside the e2e assert
 path, and is flagged for the step 9-11 adversarial round.
+
+## D-089 (2026-08-11) - Relay steps 1-11 adversarial round: ACCEPT-WITH-FIXES
+
+Trigger: all 11 relay blueprint steps had landed (D-081..D-088 + steps 9-11), and
+the blueprint mandates an adversarial round on the whole implementation diff before
+acceptance (the relay is permission-adjacent). Ran as a FIVE-reviewer read-only
+panel, each with a refute-it mandate over its slice plus the carried backlog:
+R1 crypto+keygen, R2 puller+bundle+reconcile, R3 relay Worker, R4 form, R5
+durable-owner+D-088+app+e2e. Every material finding was re-verified on disk by the
+conductor before disposition (verify, don't trust the reviewer).
+
+Verdict: ACCEPT-WITH-FIXES. No confidentiality or PII-leak blocker. Every
+security-critical core HELD under refutation: the crypto trust root (JS<->Rust
+sealed-box vectors 5/5, fingerprint parity across all three impls, per-file KDF
+salt/nonce, versioned key file); the zero-trust relay (no plaintext read, no
+oracle to an unauth caller, constant-time auth, correct write ordering, no
+key-namespace escape, 43/43 green); the D1 module fence (EMPIRICALLY clean -
+cargo tree across all nine cn-* crates shows no network/TLS crate); and the
+permission model + durable owner + the Rust side of D-088. The D-088 app-review-
+view residual that partly motivated the round is NOT a defect: the review view
+formats no payload timestamp at all (robust by omission).
+
+The ~22 real findings clustered in three themes; all clear ones were FIXED this
+arc as four atomic commits (fbcab71 crypto/keygen, bd689c1 puller/parser, 0ab9e5f
+relay, 5b12060 form) plus two conductor follow-ups (generator version source, a
+keygen USAGE doc true-up):
+- THEME A, two DEPLOY-BLOCKING form defects the node-only suite structurally could
+  not catch (the form would not run in a browser): R4-1 the CSP `script-src 'self'`
+  blocked the WebAssembly libsodium needs to seal -> added 'wasm-unsafe-eval';
+  R4-2 no Vite base -> absolute /assets/ refs 404 on the Pages project subpath ->
+  base='/community-connector/'.
+- THEME B, I3 silent-failure discipline (the recurring one): R3-1/2/3 the relay
+  swallowed its OWN malformed-credential / ledger-parse / list-truncation ->
+  class-only loud logs + a ledger schema version (I7) + full cursor pagination;
+  R1-1 a Fingerprint::from_str PANIC on multibyte input -> typed error; R1-4 a
+  remove_file that swallowed its result and then lied it succeeded -> truthful;
+  R2-3 a silently-dropped relay cursor -> loud halt; R5-1 the D-088 date parser
+  accepted impossible calendar dates (Feb-31 -> a WRONG epoch) -> reject via a
+  civil-date round-trip.
+- THEME C, conflict-path under-design: R2-1 after a transport conflict, decrypted-
+  PII records RE-STAGED UNBOUNDED on every pull (classify_dedup first-match-wins) ->
+  prefer an exact (receipt, ciphertext_hash) replay before concluding a conflict.
+- Plus hardening carried in the same commits: R1-2 passphrase zeroization, R1-3 a
+  stderr-not-a-TTY guard on the printed secret-key backup, F7 a config cap
+  assertion, R3-4 CORS on /submit error paths, R3-5 raw-ArrayBuffer verbatim
+  storage, R4-4 the vectors version mislabel (+ the generator so a regen stays
+  consistent), and three coverage tests (R4-3 the D-030 consent gate, R5-2
+  envelope.ts ISO-string faithfulness, R3-6 the 404 auth/missing-id identity).
+
+Two decisions made in the round:
+1. R4-2 deploy target = the blueprint's documented GitHub Pages PROJECT subpath, so
+   base='/community-connector/'. The human confirmed the form is NOT ready to be
+   public, so this aligns the form to the plan-of-record WITHOUT committing to going
+   live; base is re-confirmed at real deploy (a custom-domain root site would drop
+   it). The deploy bar (D-059.8) stays unmet.
+2. R2-2 (conflicting records are staged but not durably LINKED, so the facilitator
+   wizard - a separate process reading the queue - could approve BOTH halves and
+   double-admit one conflicted submission) DEFERRED as a design follow-up. It is an
+   anomaly path (only after a transport/semantic conflict), the fix needs a durable
+   conflict marker on the review sidecar plus wizard/apply handling, and R2-1
+   already closes the unbounded-restaging half. Owed before real ingestion of any
+   conflict-prone data.
+
+Deferred / recorded LIMITATIONS (not fixed): R1-5 Argon2id m_cost is unclamped on
+read (offline DoS on a hand-tampered key file); R1-6 an Argon2 doc-vs-impl params
+divergence; R4-5 no build guard against shipping the localhost default relay
+origin; F12 real-HTTP redirect/timeout/non-200 behavior is covered only by mocks +
+one happy-path pull (test debt); R5-3 the review view does not display consent
+evidence directly (I12 completeness); F3 the single-key puller cannot drain
+pre-cutover envelopes post-rotation (D-086, no rotation in pilot scope). Plus the
+two step-10 pre-deploy gaps: no GitHub Pages deploy workflow authored, and the base
+target to be re-confirmed. All are on the human/deploy queue, none blocks pilot-
+readiness on synthetic data.
+
+Verified NOT-A-DEFECT (recorded so they are not re-raised): the D1 fence; F13
+(Degraded-only-on-first-file matches ADR-005 D8 verbatim); R2-4 (the DeletedByMe
+reconcile arm is unreachable in a single run because staging precedes the delete
+journal); the D-088 app-review-view residual; CF-Connecting-IP (the CF edge sets it,
+not client-spoofable, and the fallback fails safe); the constant-time hash compare;
+the blob key-namespace prefix (no escape to ledger:/ratelimit:); and the 409
+form_out_of_date allowlist "oracle" (recipient fingerprints are world-readable by
+design, D3).
+
+Strongest surviving objection: the panel was Claude subagents, not an independent
+external adversary (Codex), and reviewers sharing the implementer's model may share
+its blind spots. Pointedly, the two deploy-blocking form defects escaped EVERY prior
+per-step review AND the node-only test suite because no one had run the built form
+in a real browser - exactly the class of defect the automated gates cannot see.
+Accepted with a named mitigation: the findings are concrete and file:line-verified
+(the conductor re-confirmed the HIGH ones on disk - CSP string, absolute asset refs,
+the dedup ordering, the parser rollover), the fixes are small and independently
+tested (check-all 12/12, relay 47/47, form 47/47), and a REAL-BROWSER smoke of the
+built form is now an explicit pre-deploy gate owed before the D-059.8 bar can clear.
+Nothing ships on the un-browser-tested path while the bar stands.
