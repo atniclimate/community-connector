@@ -2105,3 +2105,35 @@ parse failed" error (never a silent stage-skip). For Call 3, deferring means the
 system cannot rotate keys until the multi-key design lands - but rotation is out
 of pilot scope by construction, and the limitation is now explicit rather than a
 latent surprise mid-rotation.
+
+## D-087 (2026-08-11) - Archived handoffs exempt from pii-scan marker-content rule
+
+Trigger: the 2026-08-11 true-up archived the live `HANDOFF.md` to
+`docs/archive/handoffs/2026-08-11-relay-7-8-dispatched.md`. That handoff's DONE
+history quotes the D-075 tripwire NAMES ("queue_record_version",
+"secret-encrypted") when describing the intake work. `HANDOFF.md` is on the
+pii-scan marker-content-exempt list (D-075: the docs that record the tripwires
+are allowed to name them); the archive directory was not, so pii-scan raised a
+KEY MATTER violation on a byte-for-byte historized copy of an exempt doc.
+
+Options: (a) a per-file allowlist entry each true-up (the email allowlist does
+not cover marker violations anyway, and this recurs every archive); (b) redact
+the marker names from each archived copy (mutilates the faithful history); (c)
+exempt `docs/archive/handoffs/*.md` from the CONTENT-marker rule only. Chose (c):
+an archived handoff IS a historized `HANDOFF.md`, the same document class already
+exempt, so it records the same tripwire names for the same reason. This is not
+the forbidden "exempt all markdown" relaxation - it is one bounded directory of
+historized handoffs. The path, email, and queue-PATH rules still apply to every
+file in it, so real key material or staged queue data could never hide in an
+archived handoff (the exemption skips only the "does this text NAME the markers"
+check, which is exactly what a handoff legitimately does).
+
+Strongest surviving objection: a content exemption is a security-boundary
+loosening, however narrow, and the pii-scan doctrine prefers allowlist entries
+over rule changes. Accepted: the allowlist is email-only and structurally cannot
+clear a marker violation, so the exempt-file list is the only mechanism for this
+false-positive class (it already holds six such docs); the addition is a glob
+over one directory whose contents are, by construction, copies of the already-
+exempt live handoff. `pii-scan -SelfTest` still passes (rules trip, the
+exemption negative holds). D-075's tripwire intent is unchanged for every
+non-handoff file.

@@ -91,8 +91,14 @@ function Test-FileViolations {
     foreach ($m in [regex]::Matches($Content, $phoneRx)) {
         $found.Add("PHONE      $RelPath  contains phone-like pattern '$($m.Value)'")
     }
+    # Archived handoffs are byte-for-byte historized copies of the exempt
+    # HANDOFF.md, so they legitimately record the same tripwire NAMES when they
+    # describe the intake work; exempt them from CONTENT markers only. The path,
+    # email, and queue-PATH rules above still apply to every file, so real key
+    # material or queue data could never hide in one.
     $markerExempt = ($markerContentExemptExt -contains $ext) -or
-                    ($markerContentExemptFiles -contains $normalized)
+                    ($markerContentExemptFiles -contains $normalized) -or
+                    ($normalized -like 'docs/archive/handoffs/*.md')
     if (-not $markerExempt) {
         if ($Content -match $queueDataRx) {
             $found.Add("QUEUE DATA $RelPath  carries the queue_record_version data marker (staged intake data never enters the repo, ADR-005 D4)")

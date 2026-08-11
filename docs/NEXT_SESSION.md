@@ -4,7 +4,37 @@
 > CLAUDE.md -> HANDOFF.md -> this file. Refresh the Brief at each session
 > end (CLAUDE.md session-end protocol).
 
-## The 60-second brief (refreshed 2026-08-11)
+## The 60-second brief (refreshed 2026-08-11, post-7-8 + fix-now bucket)
+
+**Remote intake relay: phases A-D COMPLETE (steps 1-8), reviewed, plus a
+claim-verifier fix-now bucket landed.** Steps 7+8 - the puller `cn intake
+pull` + D8 bundle verification, the biggest step (ureq HTTP in the CLI
+crate ONLY per the D1 fence; full receipts -> fetch -> decrypt -> dedup ->
+stage -> delete loop; D6 reconciliation; I12 report) - landed at 13b8879
+(D-085) with HTTP injected behind a trait/closure and 18+3 tests. An
+independent claim-verifier then confirmed every headline claim and
+surfaced 5 undisclosed issues; all fixed as atomic commits, check-all
+green at each: F1 precondition order, F2 D6 orphan-blob flagging, F11
+timestamp-parse diagnostic, F6 configurable envelope cap, F10 HTTP
+timeouts, F4/F5 conflict + reconciliation + CLI-entrypoint tests, D-086
+dispositions (c39fc70..f92e853). cn crate 52 -> 86 tests. F3 (rotation
+old-key catch-up) is a RECORDED LIMITATION, not built - the binding D3
+cutoff stands; multi-key puller design owed before any real rotation.
+Local `main` is **18 commits ahead of origin, unpushed** (incl. this
+true-up). **NEXT: step 9
+(form-to-graph e2e on synthetic data) is DISPATCH-READY** - a
+comprehensive Opus-4.8-xhigh prompt is drafted at the conductor scratchpad
+(`prompt-step9-e2e-remote-intake.md`); an additive, opt-in e2e that seals
+via the form's real crypto -> local relay -> real-HTTP `cn intake pull`
+(partially closes F12) -> approve -> `cn intake apply` -> `cn export` ->
+assert entity in graph, reusing the proven
+`intake_apply.rs::approve_decide_apply_reload_round_trip` back-half. Then
+steps 10 (deploy runbook) + 11 (docs true-up), then the mandatory
+adversarial round on the whole diff (9 items + step-7/8 residuals + F3).
+The human's queue is unchanged (D-023, committee checkpoint). Deploy bar
+(D-059.8) unmet.
+
+## The previous brief (refreshed 2026-08-11, 7+8 dispatched)
 
 **Remote intake relay: phases A-C COMPLETE (steps 1-6), phase D
 DISPATCHED (steps 7+8).** All six landed steps are reviewed and
@@ -130,9 +160,15 @@ ADR-005 adversarial round, then the P3.5/P3.6 intake pipeline.
    pass on docs/design/intake-consent-text-draft-2026-07-24.md (checklist
    inside, ~20 minutes, record as a DECISIONS entry), and (b) any news on
    committee timing for the bundled checkpoint + consent-text presentation.
-3. If autonomous: check HANDOFF.md for relay step status. If steps 7+8 have
-   landed, review completion report, then draft step 9 prompt (form-to-graph
-   e2e test). If steps 7+8 haven't landed, wait for completion report.
+3. If autonomous (conductor seat): steps 1-8 are LANDED + reviewed + fix-now
+   bucket applied (HANDOFF "State of play"). Step 9 is DISPATCH-READY - the
+   Opus-4.8-xhigh prompt is drafted at the conductor scratchpad
+   (`prompt-step9-e2e-remote-intake.md`; if that scratchpad is gone, re-derive
+   from HANDOFF's step-9 summary + blueprint section 8 step 9). Dispatch step 9
+   to a parallel Opus 4.8 session (or review its output if already in flight),
+   then sequence steps 10 (deploy runbook) + 11 (docs true-up), then the
+   MANDATORY adversarial round on the whole diff. Progress claims are grounded
+   in tool results (files/tests/receipts), never a worker's say-so.
 4. Re-arm the 8:00 AM safety cron if the usage-failover directive stands.
 
 ## Remaining open questions (defaults keep autonomous work unblocked)

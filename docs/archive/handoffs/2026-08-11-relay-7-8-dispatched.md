@@ -3,15 +3,11 @@
 > This file is the /pickup target and outranks session memory. Reading order for a
 > fresh session: CLAUDE.md, then this file, then PLAN_1.0.md "Current Position" +
 > "Decision Gates", then current-phase ADRs. DECISIONS.md is the durable judgment
-> record (through D-087; D-081..D-086 are the 2026-08-11 relay-implementation
-> records, D-086 the claim-verifier review dispositions, D-087 the true-up's
-> pii-scan archived-handoff exemption). Every path below was verified on disk at
-> the 2026-08-11 true-up. **The repo is PUBLIC** - origin is
-> `https://github.com/atniclimate/community-connector`. The local `main` is
-> **18 commits ahead of origin and UNPUSHED** (all relay-implementation work,
-> steps 1-8 + the fix-now bucket + this true-up; run `git status` for the exact
-> count); pushing is authorized and safe but has not been run this arc. The
-> pre-commit PII scan and I1 are the publication boundary.
+> record (through D-060; D-057..D-060 are the 2026-07-24 execution, sweep, grill,
+> and first-push records). Every path below was verified on disk at the 2026-07-24
+> true-up. **THE REPO IS NOW PUBLIC** - origin is
+> `https://github.com/atniclimate/community-connector` and every pushed commit is
+> world-readable. The pre-commit PII scan and I1 are the publication boundary.
 
 ## What this project is
 
@@ -31,7 +27,7 @@ on the recorded collective checkpoint (D-059.9).
 |---|---|
 | Durable contract (mission, R1-R10, gates, autonomy) | `CLAUDE.md` |
 | Invariants I1-I12 (review standard) | `AGENTS.md` |
-| Decision register (D-001..D-087) | `DECISIONS.md` |
+| Decision register (D-001..D-060) | `DECISIONS.md` |
 | Execution Plan v2 (accepted D-039; reconciled 2026-07-24) | `docs/PROJECT_PLAN.md` section 3 |
 | Route map to 1.0 (v1.1, tracked) | `PLAN_1.0.md` |
 | Repo inventory snapshot (descriptive, 2026-07-24) | `MANIFEST.md` |
@@ -48,8 +44,6 @@ on the recorded collective checkpoint (D-059.9).
 | Pilot FORM draft (Parts A/C SUPERSEDED) / evidence template / migration recipe | `docs/design/pilot-form-and-template-2026-07-06.md`, `docs/pilot-evidence-template.md`, `docs/cpf-rcn-migration-recipe.md` |
 | Verification battery (12 members incl. pii-selftest) | `scripts/check-all.ps1` (+ `scripts/hooks/pre-commit`) |
 | Rust core | `core/crates/cn-{model,schema,store,perm,graph,api,wasm}`, `core/cli` (`cn`) |
-| Remote-intake relay code (steps 1-8) | puller + D8 verify `core/cli/src/intake/{pull,bundle}.rs` (+ tests `core/cli/tests/intake_{pull,pull_cli,bundle}.rs`); Worker `relay/`; Pages form `form/`; crypto binding `core/crates/cn-ingest/src/{crypto,envelope,dedup,reconcile,consent}.rs` |
-| Relay orchestration ledger (live per-step status) | project memory `relay-orchestration-state` + "State of play" below |
 | App | `app/src/{viz,ui,state,wasm,theme}`; snapshot boot reader `app/src/state/snapshot.ts` |
 | Codex adversarial artifacts | out-of-repo review lane `_reviews/community-connector/` under the dev workspace |
 | Prior handoffs | `docs/archive/handoffs/` |
@@ -178,11 +172,9 @@ as draft; checkpoint = convention; ad hoc demos open pathways).
    Permission-adjacent: gets a MANDATORY adversarial round. The DEPLOY
    bar (D-059.8) still requires: intake pipeline working + keygen
    ceremony executed + D-023 sign-off on form text.
-   PROGRESS (2026-08-11, all unpushed on main, 18 commits ahead of
-   origin incl. this true-up; live per-step ledger = memory
-   relay-orchestration-state):
-   **Phases A+B+C+D COMPLETE (steps 1-8 landed, reviewed, confirmed).**
-   Phases A+B+C (steps 1-6):
+   PROGRESS (2026-08-11, all unpushed on main, 10 commits ahead of
+   origin; live per-step ledger = memory relay-orchestration-state):
+   Phases A+B+C COMPLETE (steps 1-6 all landed, reviewed, confirmed):
    - Step 1 sealed-box crypto binding (14b9778, D-081)
    - Step 2 keygen ceremony CLI (4a0b8db)
    - Step 3 envelope formats (69fc557)
@@ -190,49 +182,22 @@ as draft; checkpoint = convention; ad hoc demos open pathways).
    - Step 5 Worker relay in relay/ (3975a77, D-084): 26 files, 43 tests
    - Step 6 Pages form in form/ (d0f6c6a, D-083): template-driven,
      libsodium sealed-box, D8 manifest pipeline, 42 tests
-   Phase D (steps 7-8, the biggest step - the puller):
-   - Steps 7+8 `cn intake pull` CLI + D8 bundle verification (13b8879,
-     D-085): ureq HTTP client in the CLI crate ONLY (D1 fence proven by
-     cargo tree - no network/tls crate in any cn-* crate); config parse,
-     preconditions, main loop (receipts -> fetch -> transport-dedup ->
-     fingerprint -> STANDARD-base64 decode -> open -> consent -> semantic-
-     dedup -> stage SubmissionSource::Remote -> delete-after-verified-stage),
-     D6 reconciliation, I12 report. HTTP injected behind RelayHttp + a
-     fetch closure; 18 injected-core tests + 3 date-parser units.
-   - Steps 7+8 REVIEWED by an independent claim-verifier: every headline
-     claim re-ran green; it surfaced 5 undisclosed issues. FIX-NOW BUCKET
-     landed as atomic commits (check-all green at each): F1 precondition
-     order (c39fc70), F2 D6 orphan-blob flagging (702af71), F11 timestamp-
-     parse diagnostic (a2927cb), F6 configurable envelope cap (283ecd4),
-     F10 HTTP timeouts (bdc17d3), F4/F5 conflict + reconciliation + CLI-
-     entrypoint tests (8db4ad5), D-086 dispositions (f92e853). cn crate
-     52 -> 86 tests. F3 (rotation old-key catch-up) recorded as a LIMITATION
-     not built (D-086) - binding D3 cutoff stands; multi-key puller design
-     owed before any real rotation.
-   Check-all green at every commit; Sonnet 5 reviews confirmed steps 1-6,
-   the claim-verifier confirmed 7-8.
-   ADVERSARIAL-ROUND BACKLOG (still HELD until all 11 steps land): 9
-   items from steps 2/4/5/6 (2 step 2: passphrase zeroization gap + silent
-   cleanup; 1 step 4: missing test combo; 5 step 5: silent CREDENTIAL_HASH
-   misconfig, silent ledger parse failure, receipts pagination, CF-
-   Connecting-IP trust boundary, 404-identity regression gap; 1 step 6:
-   GitHub-vs-Cloudflare Pages naming slip) PLUS step 7-8 residuals (F7 8 MiB
-   read cap >> envelope cap; F12 real ureq wiring untested; F13 Degraded-on-
-   first-file-only; F14 implicit conflict link; cursor forward-compat) PLUS
-   F3 rotation limitation.
-   NEXT: **step 9 (form-to-graph e2e on synthetic data) is DISPATCH-READY** -
-   a comprehensive Opus-4.8-xhigh prompt is drafted at the conductor
-   scratchpad (`prompt-step9-e2e-remote-intake.md`; ephemeral - re-derive
-   from blueprint section 8 step 9 + the summary here if gone). Its shape:
-   an ADDITIVE, opt-in (NOT check-all, per the no-Node-in-CI precedent) e2e
-   that seals a synthetic submission via the form's real crypto -> POSTs to
-   a locally-run relay (wrangler dev, or a faithful mock) -> `cn intake pull`
-   over REAL HTTP (partially closes F12) -> approve decision -> `cn intake
-   apply` -> `cn export` -> asserts the entity in the graph. Reuses the
-   proven back-half `intake_apply.rs::approve_decide_apply_reload_round_trip`;
-   the new part is the remote front-half. Plus a manual browser-procedure
-   doc. Then steps 10 (deploy runbook draft) + 11 (docs true-up) are
-   sequential, then the MANDATORY adversarial round on the whole diff.
+   Check-all green at each; Sonnet 5 subagent reviews CONFIRMED every
+   claim in every step's completion report. Nine adversarial items
+   accumulated (2 step 2: passphrase zeroization gap + silent cleanup;
+   1 step 4: missing test combo; 5 step 5: silent CREDENTIAL_HASH
+   misconfiguration, silent ledger parse failure, receipts pagination,
+   CF-Connecting-IP trust boundary, 404-identity regression test gap;
+   1 step 6: GitHub-vs-Cloudflare Pages naming slip in commit/comments).
+   DISPATCHED: steps 7+8 combined (puller CLI `cn intake pull` + D8
+   bundle verification module) - running in Opus 4.8; prompt at conductor
+   scratchpad prompt-step7-8-puller-cli-bundle.md. These are Phase D and
+   the biggest step: HTTP client (ureq) in CLI crate only (D1 fence),
+   config parsing, precondition checks, main loop (receipts -> fetch ->
+   decrypt -> validate -> stage -> delete), reconciliation via
+   classify_receipt, I12 run report. After 7+8 land: steps 9-11 are
+   sequential (e2e test, deploy runbook, docs true-up). The MANDATORY
+   adversarial round stays HELD until all 11 land.
 3. **Snapshot data pipeline (D-048 / P2.3-P2.5)** - targets the convention build.
 4. **Phase 4 slimmed (D-056.3):** minimal P4.1 story authoring.
 5. **P1.3 benchmark** deferred to September; record in ADR-004.
