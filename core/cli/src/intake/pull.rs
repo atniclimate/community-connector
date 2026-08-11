@@ -87,6 +87,22 @@ pub struct PullConfig {
     pub blob_ttl_seconds: i64,
     /// Maximum pull interval (seconds); ceremony/ops provenance.
     pub max_pull_interval_seconds: i64,
+    /// Outer-envelope size cap in bytes for `OuterEnvelope::parse`. Defaults to
+    /// `DEFAULT_MAX_ENVELOPE_BYTES` (8 KiB) but MUST be set to at least the
+    /// relay's deploy-configured `MAX_BLOB_SIZE_BYTES`: the two caps are
+    /// configured independently, and a puller cap BELOW the relay's would
+    /// silently reject a valid, consented submission the relay accepted (D-086;
+    /// the deploy runbook pins the relation). Must also stay <= the puller's HTTP
+    /// read cap; see F7, deferred to the adversarial round.
+    #[serde(default = "default_max_envelope_bytes")]
+    pub max_envelope_bytes: usize,
+}
+
+/// Serde default for [`PullConfig::max_envelope_bytes`]: the conservative 8 KiB
+/// baseline, so a config written before this field existed still parses (I7
+/// unknown-minor tolerance) and behaves as before.
+fn default_max_envelope_bytes() -> usize {
+    DEFAULT_MAX_ENVELOPE_BYTES
 }
 
 /// The off-repo ceremony pin of the D8 manifest (blueprint 6.3 `manifest_pin`).
@@ -431,8 +447,9 @@ fn process_receipt(
     }
     let is_transport_conflict = !delete_allowed;
 
-    // (d) parse the outer envelope (size already relay-capped; re-checked here).
-    let outer = match OuterEnvelope::parse(&body, DEFAULT_MAX_ENVELOPE_BYTES) {
+    // (d) parse the outer envelope (size already relay-capped; re-checked here
+    // against the puller's configured cap, which must be >= the relay's).
+    let outer = match OuterEnvelope::parse(&body, config.max_envelope_bytes) {
         Ok(outer) => outer,
         Err(err) => {
             main.errors.push(format!(

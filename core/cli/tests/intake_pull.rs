@@ -592,3 +592,48 @@ fn unparseable_arrived_at_is_diagnosed_in_reconciliation() {
     // Blob absent + no local record + unknown age -> IntegrityAlert (D-082).
     assert_eq!(summary.report["reconciliation"]["integrity_alert"], 1);
 }
+
+// 12. The envelope cap is a config knob: a submission over the 8 KiB default is
+// rejected under the default but stages once the cap is raised (F6 - a puller
+// cap below the relay's would silently drop a valid consented submission).
+#[test]
+fn envelope_cap_is_configurable() {
+    let s = setup(&[DIGEST]);
+    let mut inner = make_inner("sub-big", DIGEST);
+    inner.fields.insert(
+        "bio".to_string(),
+        serde_json::Value::String("x".repeat(12_000)),
+    );
+    let outer = seal_outer(&s.kp.public, &s.fp, &inner);
+    assert!(
+        outer.len() > 8192,
+        "the test envelope must exceed the 8 KiB default cap"
+    );
+
+    // Default cap (8 KiB): rejected as oversized, not staged.
+    let mock = MockRelay::new().with_receipt("rcpt-big", None, Some(outer.clone()));
+    let default_run =
+        execute_pull(&s.config, &s.kp, &s.queue, &mock, degraded_fetch(), NOW_MS).expect("pull");
+    assert_eq!(
+        default_run.report["main_loop"]["staged"], 0,
+        "oversized under the default cap"
+    );
+    assert!(
+        default_run.report["main_loop"]["errors"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|e| e.as_str().unwrap().contains("outer envelope parse failed"))
+    );
+
+    // Raised cap: the same submission stages.
+    let mut raised = s.config.clone();
+    raised.max_envelope_bytes = 65_536;
+    let mock2 = MockRelay::new().with_receipt("rcpt-big", None, Some(outer));
+    let raised_run =
+        execute_pull(&raised, &s.kp, &s.queue, &mock2, degraded_fetch(), NOW_MS).expect("pull");
+    assert_eq!(
+        raised_run.report["main_loop"]["staged"], 1,
+        "raising the cap stages the larger submission"
+    );
+}
