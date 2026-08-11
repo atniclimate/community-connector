@@ -2,8 +2,8 @@
 
 This file records licenses of third-party assets shipped with or embedded in
 Community Navigator build artifacts. It does NOT choose or imply a license for
-this project itself - the project license is a human gate (see CLAUDE.md,
-"Human gates") and remains undecided.
+this project itself - the project license was a human gate, now resolved:
+PolyForm Noncommercial 1.0.0 (D-054), whose text lives in `LICENSE.md`.
 
 | Asset | Version | License | Purpose |
 |---|---|---|---|
