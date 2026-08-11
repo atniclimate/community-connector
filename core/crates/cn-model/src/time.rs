@@ -51,6 +51,16 @@ pub fn parse_iso8601_utc_to_unix_ms(text: &str) -> Option<i64> {
     }
 
     let days = days_from_civil(year, month, day);
+    // Reject calendar-impossible dates (Feb 31, Feb 29 in a common year, Apr 31,
+    // ...). The month/day range check above is month-agnostic, and
+    // `days_from_civil` NORMALIZES an impossible date to a valid nearby one (e.g.
+    // 2024-02-31 -> 2024-03-02) rather than failing - which would silently yield a
+    // WRONG epoch and break the "None on any deviation" contract (D-088: malformed
+    // still fails). Round-trip the serial day back to a civil date; if it does not
+    // equal the input, the date does not exist.
+    if civil_from_days(days) != (year, month, day) {
+        return None;
+    }
     let secs = days * 86_400 + hour * 3600 + minute * 60 + second;
     Some(secs * 1000 + millis)
 }
@@ -95,6 +105,26 @@ fn days_from_civil(year: i64, month: u32, day: u32) -> i64 {
     era * 146_097 + doe - 719_468
 }
 
+/// Howard Hinnant's `civil_from_days`: the exact inverse of [`days_from_civil`]
+/// over valid dates (days since 1970-01-01 -> `(year, month, day)`). Used only to
+/// round-trip-validate a parsed date: an impossible input maps forward to a
+/// serial day whose canonical civil form is a DIFFERENT (valid) date, so the
+/// mismatch rejects it. Kept local to this crate rather than reaching into the
+/// CLI's `keymat.rs` copy (cn-model has no dependency on the CLI crate).
+fn civil_from_days(days: i64) -> (i64, u32, u32) {
+    let z = days + 719_468;
+    let era = (if z >= 0 { z } else { z - 146_096 }) / 146_097;
+    let doe = z - era * 146_097; // [0, 146096]
+    let year_of_era = (doe - doe / 1460 + doe / 36524 - doe / 146_096) / 365; // [0, 399]
+    let year = year_of_era + era * 400;
+    let doy = doe - (365 * year_of_era + year_of_era / 4 - year_of_era / 100); // [0, 365]
+    let mp = (5 * doy + 2) / 153; // [0, 11]
+    let day = (doy - (153 * mp + 2) / 5 + 1) as u32; // [1, 31]
+    let month = (if mp < 10 { mp + 3 } else { mp - 9 }) as u32; // [1, 12]
+    let year = if month <= 2 { year + 1 } else { year };
+    (year, month, day)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -129,6 +159,12 @@ mod tests {
         assert_eq!(parse_iso8601_utc_to_unix_ms("2000-01-01 00:00:00Z"), None); // space, no T
         assert_eq!(parse_iso8601_utc_to_unix_ms("2000-1-01T00:00:00Z"), None); // short month
         assert_eq!(parse_iso8601_utc_to_unix_ms("2000-01-01T25:00:00Z"), None); // hour 25
+        // Calendar-impossible dates: in-range day/month, but the date does not
+        // exist. days_from_civil would NORMALIZE these into a wrong epoch (R5-1),
+        // so the round-trip must reject them rather than return Some.
+        assert_eq!(parse_iso8601_utc_to_unix_ms("2023-02-29T00:00:00Z"), None); // Feb 29, common year
+        assert_eq!(parse_iso8601_utc_to_unix_ms("2024-02-30T00:00:00Z"), None); // Feb 30
+        assert_eq!(parse_iso8601_utc_to_unix_ms("2024-04-31T00:00:00Z"), None); // Apr 31 (30-day month)
     }
 
     #[test]

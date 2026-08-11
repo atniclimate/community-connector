@@ -130,6 +130,20 @@ pub fn parse_config(bytes: &[u8]) -> Result<PullConfig, String> {
             config.config_version
         ));
     }
+    // F7: the envelope cap must not exceed the HTTP response read cap. If it did,
+    // an oversized body would be truncated to MAX_RESPONSE_BYTES at read time, the
+    // size gate would then pass on the truncated bytes, and parse would fail -
+    // turning a valid, consented submission into an unstageable loud error. Reject
+    // the config here so the misconfiguration is caught before any pull runs.
+    if config.max_envelope_bytes as u64 > MAX_RESPONSE_BYTES {
+        return Err(format!(
+            "puller config max_envelope_bytes ({}) exceeds the HTTP response read cap \
+             MAX_RESPONSE_BYTES ({MAX_RESPONSE_BYTES}); a cap above the read cap would let an \
+             oversized body be silently truncated before the size gate - lower \
+             max_envelope_bytes to at most {MAX_RESPONSE_BYTES} (F7, I3)",
+            config.max_envelope_bytes
+        ));
+    }
     Ok(config)
 }
 
@@ -176,6 +190,14 @@ struct ReceiptRow {
 struct ReceiptListing {
     #[serde(default)]
     receipts: Vec<ReceiptRow>,
+    /// Forward-compat pagination cursor. The relay does not paginate today, but
+    /// the field is part of the response contract. If it is ever present and
+    /// non-null, later pages exist that this puller does not follow: the run must
+    /// fail LOUD (I3) rather than silently process only page 1 and drop every
+    /// later receipt. A `null` (or absent) cursor deserializes to `None` and
+    /// means "no further pages".
+    #[serde(default)]
+    cursor: Option<String>,
 }
 
 /// Main-loop tallies (I12 report `main_loop`).
@@ -336,6 +358,13 @@ fn fetch_receipts(relay: &dyn RelayHttp, config: &PullConfig) -> Result<Vec<Rece
         200 => {
             let listing: ReceiptListing = serde_json::from_slice(&body)
                 .map_err(|err| format!("GET /receipts returned unparseable JSON: {err}"))?;
+            if let Some(cursor) = &listing.cursor {
+                return Err(format!(
+                    "GET /receipts returned a pagination cursor ({cursor:?}) but this puller does \
+                     not yet follow cursors; halting rather than silently processing only page 1 \
+                     and dropping every later receipt (I3)"
+                ));
+            }
             Ok(listing.receipts)
         }
         404 => Err(

@@ -198,6 +198,9 @@ struct MockRelay {
     blobs: RefCell<HashMap<String, Vec<u8>>>,
     deletes: RefCell<Vec<String>>,
     get_calls: RefCell<usize>,
+    /// Forward-compat pagination cursor the `/receipts` body reports (None -> the
+    /// body carries `"cursor": null`, the no-more-pages case).
+    cursor: Option<String>,
 }
 
 impl MockRelay {
@@ -207,6 +210,7 @@ impl MockRelay {
             blobs: RefCell::new(HashMap::new()),
             deletes: RefCell::new(Vec::new()),
             get_calls: RefCell::new(0),
+            cursor: None,
         }
     }
 
@@ -216,6 +220,13 @@ impl MockRelay {
         if let Some(bytes) = blob {
             self.blobs.borrow_mut().insert(id.to_string(), bytes);
         }
+        self
+    }
+
+    /// Makes `/receipts` report a non-null pagination cursor (a relay that
+    /// paginated), which the puller must refuse to follow silently.
+    fn with_cursor(mut self, cursor: &str) -> Self {
+        self.cursor = Some(cursor.to_string());
         self
     }
 
@@ -261,7 +272,7 @@ impl RelayHttp for MockRelay {
                     serde_json::Value::Object(row)
                 })
                 .collect();
-            let body = serde_json::json!({ "receipts": receipts, "cursor": null });
+            let body = serde_json::json!({ "receipts": receipts, "cursor": self.cursor.clone() });
             return Ok((200, serde_json::to_vec(&body).unwrap()));
         }
         match self.blobs.borrow().get(&blob_id(url)) {
@@ -753,5 +764,75 @@ fn reconciliation_classifies_unpulled_with_half_ttl_warning() {
             .as_i64()
             .unwrap()
             > 1
+    );
+}
+
+// 17. Pagination cursor (R2-3): a non-null `/receipts` cursor means the relay
+// paginated and later pages exist. The puller does not follow cursors, so it
+// halts LOUDLY rather than silently processing only page 1 and dropping the
+// rest.
+#[test]
+fn nonnull_receipts_cursor_halts_loudly() {
+    let s = setup(&[DIGEST]);
+    let inner = make_inner("sub-cursor", DIGEST);
+    let outer = seal_outer(&s.kp.public, &s.fp, &inner);
+    let mock = MockRelay::new()
+        .with_receipt("rcpt-cursor", None, Some(outer))
+        .with_cursor("page-2-token");
+
+    let err = match execute_pull(&s.config, &s.kp, &s.queue, &mock, degraded_fetch(), NOW_MS) {
+        Ok(_) => panic!("a paginated listing must halt the run, not succeed"),
+        Err(err) => err,
+    };
+    assert!(
+        err.contains("cursor") && err.contains("page 1"),
+        "the halt names the pagination cursor and the page-1 risk: {err}"
+    );
+    // The run halted at listing, before any receipt: nothing staged.
+    assert_eq!(record_count(&s.queue), 0);
+}
+
+// 18. Config guard (F7): a max_envelope_bytes above the fixed HTTP read cap is
+// rejected at parse time (a cap above the read cap would let an oversized body
+// be truncated before the size gate, turning a valid submission into an
+// unstageable loud error). At the cap it parses; one byte over is rejected.
+#[test]
+fn config_rejects_envelope_cap_above_read_cap() {
+    const READ_CAP: usize = 8 * 1024 * 1024;
+    let base = serde_json::json!({
+        "config_version": "0.1.0",
+        "key_dir": "keys",
+        "key_fingerprint_pin": "3f9a-0000-0000-0000-0000-0000-0000-0000",
+        "relay_origin": RELAY,
+        "credential_path": "cred.txt",
+        "pages_origin": PAGES,
+        "manifest_path": "dist.manifest.json",
+        "manifest_pin": {
+            "manifest_hash": "deadbeef",
+            "commit_sha": "abc123",
+            "pinned_at": "2026-08-11T00:00:00Z",
+            "pinned_by": "test",
+        },
+        "known_consent_digests": [DIGEST],
+        "blob_ttl_seconds": 86400,
+        "max_pull_interval_seconds": 3600,
+    });
+
+    // Exactly at the read cap: accepted.
+    let mut at_cap = base.clone();
+    at_cap["max_envelope_bytes"] = serde_json::json!(READ_CAP);
+    assert!(
+        parse_config(&serde_json::to_vec(&at_cap).unwrap()).is_ok(),
+        "a cap equal to the read cap is allowed"
+    );
+
+    // One byte over: rejected loudly, naming the knob and the read cap.
+    let mut over_cap = base;
+    over_cap["max_envelope_bytes"] = serde_json::json!(READ_CAP + 1);
+    let err = parse_config(&serde_json::to_vec(&over_cap).unwrap())
+        .expect_err("a cap above the read cap must be rejected");
+    assert!(
+        err.contains("max_envelope_bytes") && err.contains("read cap"),
+        "the rejection names the offending knob and the read cap: {err}"
     );
 }

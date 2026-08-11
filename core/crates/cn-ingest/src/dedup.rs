@@ -96,15 +96,25 @@ pub enum DedupVerdict {
 /// Transport first, then semantic; an empty `submission_id` never matches
 /// (client-controlled - two blank ids are not the same submission).
 pub fn classify_dedup(new: &DedupKey, existing: &[DedupKey]) -> DedupVerdict {
-    for key in existing {
-        if let (Some(receipt), Some(existing_receipt)) = (&new.receipt_id, &key.receipt_id)
-            && receipt == existing_receipt
-        {
-            return if new.ciphertext_hash == key.ciphertext_hash {
-                DedupVerdict::TransportReplay
-            } else {
-                DedupVerdict::TransportConflict
-            };
+    // Transport arm first. A conflict is concluded only after scanning ALL keys
+    // that share the receipt id: an exact `(receipt_id, ciphertext_hash)` replay
+    // outranks any hash-mismatching sibling. Once a prior TransportConflict has
+    // staged two records under one receipt id (the old hash and the new one), a
+    // later pull of the new hash must classify as a REPLAY against the matching
+    // sibling; returning on the first (older, mismatching) key instead would
+    // re-stage a fresh duplicate every pull, unbounded (R2-1).
+    if let Some(receipt) = &new.receipt_id {
+        let mut receipt_id_seen = false;
+        for key in existing {
+            if key.receipt_id.as_ref() == Some(receipt) {
+                receipt_id_seen = true;
+                if new.ciphertext_hash == key.ciphertext_hash {
+                    return DedupVerdict::TransportReplay;
+                }
+            }
+        }
+        if receipt_id_seen {
+            return DedupVerdict::TransportConflict;
         }
     }
     for key in existing {
@@ -117,4 +127,42 @@ pub fn classify_dedup(new: &DedupKey, existing: &[DedupKey]) -> DedupVerdict {
         }
     }
     DedupVerdict::Fresh
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn transport_replay_outranks_a_conflicting_sibling() {
+        // R2-1 regrowth regression: after a transport conflict has staged TWO
+        // records under one receipt id (old hash + new hash), a subsequent pull
+        // of the new hash must classify as a REPLAY against the matching sibling,
+        // NOT re-classify as a fresh TransportConflict off the older, mismatching
+        // key first - which would stage yet another duplicate every pull.
+        let existing = vec![
+            DedupKey::transport("R", "H_old"),
+            DedupKey::transport("R", "H_new"),
+        ];
+        let new = DedupKey::transport("R", "H_new");
+        assert_eq!(
+            classify_dedup(&new, &existing),
+            DedupVerdict::TransportReplay
+        );
+    }
+
+    #[test]
+    fn transport_conflict_only_when_no_sibling_hash_matches() {
+        // A receipt id present with NO matching ciphertext hash is still a genuine
+        // TransportConflict (the "only if NONE matches" half of the fix).
+        let existing = vec![
+            DedupKey::transport("R", "H_old"),
+            DedupKey::transport("R", "H_older"),
+        ];
+        let new = DedupKey::transport("R", "H_new");
+        assert_eq!(
+            classify_dedup(&new, &existing),
+            DedupVerdict::TransportConflict
+        );
+    }
 }
