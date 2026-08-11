@@ -8,10 +8,33 @@ and lives outside the tracked tree in `_private/`, gitignored. This doc is
 subordinate to HANDOFF.md and DECISIONS.md. Docs use hyphens, never em dashes,
 per CLAUDE.md and AGENTS.md I10.)
 
+(true-up note 2026-08-11: re-verified after the remote-intake relay work
+landed, blueprint steps 1-11. That work added three in-project npm project
+roots (`form/`, `relay/`, `scripts/`) and new crates.io/npm registry packages;
+it added no new reference to any file or directory outside the project root.
+The self-containment verdict is UNCHANGED. The new registry packages fall
+OUTSIDE this audit's documented scope - it tracks external-path references,
+not the package inventory - so they are NOT catalogued here; see the Scope
+note below for where the authoritative dependency list lives.)
+
 Scope: every reference in the repo to a file or directory outside the project
 root, verified and classified. Installed programs and toolchains are out of
 scope except the single Runtime Notes paragraph. Fixtures are synthetic; no
 file contents are quoted beyond what path classification needs.
+
+Scope note - registry packages are OUT of scope here. This is a path-reference
+audit, not a package inventory. Crates.io crates and npm packages are fetched
+by a package manager from in-project manifests; they are not references to a
+file or directory outside the root, so they are not enumerated in this
+document. The authoritative per-dependency impact list for the remote-intake
+relay work (new crates and npm packages with purpose) is
+`docs/blueprints/intake-relay.md` section 9 "Dependency impact"; the in-tree
+manifests (`core/cli/Cargo.toml`, `core/crates/cn-ingest/Cargo.toml`,
+`form/package.json`, `relay/package.json`, `scripts/package.json`, each with a
+lockfile) are the ground truth. Licenses of third-party assets that SHIP to
+users live in `docs/NOTICE-third-party.md`. What this audit does track for that
+work is below: it added no external-path reference, and the four in-project npm
+project roots and the Cargo workspace remain registry-only.
 
 ## Summary
 
@@ -21,20 +44,39 @@ file contents are quoted beyond what path classification needs.
 - Remotes: at the original 2026-07-11 audit the repository had no git remotes
   (D-026, an accepted single-machine risk). On 2026-07-24 the human
   conditionally opened the remote/publishing gate for exactly one path - the
-  public remote `atniclimate/community-connector` - with preconditions before
-  any push: license in-repo, the D-055 pre-publish sweep passed, and core
-  stability (D-053/D-055; CLAUDE.md gate-status notes). All other gates stand
-  unchanged.
+  public remote `atniclimate/community-connector` - and the first push was
+  executed the same day (D-060). As of the 2026-08-11 true-up the single remote
+  `origin` = `https://github.com/atniclimate/community-connector.git` is
+  configured and the repo is public and continuously pushable; there are still
+  no other remotes, no `objects/info/alternates`, and a single worktree at the
+  root (no borrowed object store, no linked working tree outside the root). The
+  public remote holds code only - it is not a backup for operational or pilot
+  data (G-BACKUP / D-026 remains ACCEPTED). All other gates stand unchanged.
 - Every candidate external path was verified at audit time: all exist. Zero
   broken references.
 - All build and runtime inputs are either in-project or fetched by a package
-  manager (crates.io, npm registry). Nothing outside the root is consumed by a
-  build or at runtime. The only external references are documentary (sibling
-  repos named in prose).
+  manager (crates.io, npm registry). No FILE outside the root is consumed by a
+  build or at runtime. The only external-path references are documentary
+  (sibling repos named in prose). The build/test inputs now span four
+  in-project npm project roots (`app/`, `form/`, `relay/`, `scripts/`) plus the
+  Cargo workspace; all remain registry-only (verified below).
+- New runtime-egress posture (does not add an external-path reference). The
+  remote-intake relay work introduces OUTBOUND network to external origins: the
+  native `cn intake pull` puller (CLI binary only) fetches from the Worker relay
+  and Pages origins, and the deployed `form/`/`relay/` talk to those origins.
+  This is not a filesystem reference and does not lower the self-containment
+  class: it is inert until the D-059.8 deploy bar clears, the origins are
+  supplied by an OFF-REPO puller config (no external origin is hardcoded in
+  tracked source - verified), and ADR-005 D1's module fence keeps the sole HTTP
+  client (`ureq`) in the `cn` CLI binary, never in any `cn-*` core crate or the
+  app. The app runtime still fetches only same-origin `/fixtures/...`.
 - The app imports the wasm-pack output `core/crates/cn-wasm/pkg/cn_wasm.js`,
   which is in-project but gitignored build output. It is not an external
   dependency; it is a restore-time rebuild step
-  (`wasm-pack build crates/cn-wasm --target web`).
+  (`wasm-pack build crates/cn-wasm --target web`). Likewise `form/dist/` and the
+  three new `node_modules/` (`form/`, `relay/`, `scripts/`) are gitignored,
+  rebuildable, in-project build artifacts, not external dependencies; the D8
+  deploy manifest `form/dist.manifest.json` IS tracked as a provenance record.
 
 ## Findings
 
@@ -85,14 +127,28 @@ neither is needed to build, test, or run this project.
 **SELF-CONTAINED.**
 
 The project builds and runs with no file outside its root. Rust inputs live
-under `core/`, TypeScript inputs under `app/`, synthetic data under
+under `core/`, TypeScript inputs under `app/` and now also `form/` (the static
+Pages form) and `relay/` (the Cloudflare Worker), synthetic data under
 `fixtures/`, and schemas under `schemas/`. External code dependencies are
-pulled from crates.io and the npm registry via in-project manifests
-(`core/Cargo.toml` workspace + per-crate `Cargo.toml`, `app/package.json` +
-`app/package-lock.json`), not from sibling directories. The only external
-references found are documentary: sibling repos named in prose, and
-user-profile tooling for the optional Codex CLI (`$CODEX_HOME`). None is
-consumed by a build or at runtime, and none is broken.
+pulled from crates.io and the npm registry via in-project manifests - the
+`core/Cargo.toml` workspace + per-crate `Cargo.toml`, and now four npm project
+roots each with its own lockfile: `app/package.json`, `form/package.json`,
+`relay/package.json`, and the manual-run `scripts/package.json` - not from
+sibling directories. The only external references found are documentary:
+sibling repos named in prose, and user-profile tooling for the optional Codex
+CLI (`$CODEX_HOME`). None is consumed by a build or at runtime, and none is
+broken.
+
+Third-party runtime code vendored into the new surfaces (registry packages, in
+scope only as a self-containment note, not enumerated as external-path
+references): `form/` vendors `libsodium-wrappers` as its ONLY runtime
+dependency (it seals submissions in-browser); `relay/` vendors no runtime npm
+package (it uses the platform Web Crypto API; its npm deps are dev-only -
+`wrangler`, `@cloudflare/vitest-pool-workers`, `@cloudflare/workers-types`);
+and `scripts/` vendors `libsodium-wrappers` for the manual cross-implementation
+crypto test-vector generator (not part of check-all). The full per-dependency
+list with purpose is `docs/blueprints/intake-relay.md` section 9; shipped-asset
+licenses are `docs/NOTICE-third-party.md`.
 
 What keeps it from being fully hermetic (does not lower the class, but worth
 noting):
@@ -101,12 +157,17 @@ noting):
   `core/crates/cn-wasm/pkg/`. A restore from tracked files alone must run
   `wasm-pack build` before the app builds. This is in-project and rebuildable,
   so it does not affect the verdict.
-- History durability: until the first push to the conditionally opened public
-  remote (preconditions above), git history exists only locally. Mitigation is
-  machine-local operational practice, recorded outside the repo (`_private/`,
-  gitignored). The public remote, once pushed, holds code only - it is not a
-  backup answer for operational or pilot data (G-BACKUP / D-026 remains
-  ACCEPTED, per HANDOFF.md).
+- A restore must also run `npm install` (or `npm ci`) in each of the four npm
+  roots (`app/`, `form/`, `relay/`, `scripts/`) to repopulate the gitignored
+  `node_modules/`, and `form/`'s build regenerates the gitignored `form/dist/`.
+  All are in-project, rebuildable from tracked manifests and lockfiles, so none
+  affects the verdict.
+- History durability: git history is now mirrored to the public remote
+  `origin` (first push D-060, 2026-07-24); before that it existed only locally.
+  The public remote holds code only - it is not a backup answer for operational
+  or pilot data (G-BACKUP / D-026 remains ACCEPTED, per HANDOFF.md). Any
+  machine-local mirror remains operational practice recorded outside the repo
+  (`_private/`, gitignored).
 
 ## Runtime Notes
 
@@ -174,4 +235,39 @@ lives in the machine-local supplement (`_private/`, gitignored).
   symlinks/junctions; no UNC (`\\server`) paths; no cloud-drive or
   `/mnt`-style mounts; no path-shaped values inside the JSON/JSONL fixtures or
   schemas. Cron mentions are Claude Code scheduled-agent wake hooks, not
-  filesystem references.
+  filesystem references. (Superseded 2026-08-11 for `.sh`: see the true-up
+  below - in-project `.sh`/`.mjs` scripts now exist and carry no external
+  tether.)
+
+### True-up re-verification (2026-08-11, on-disk, remote-intake relay work)
+
+Re-checked against the tree and manifests after blueprint steps 1-11 landed;
+verdict CONFIRMED unchanged (SELF-CONTAINED). No new external-path reference was
+introduced.
+
+- **Three new npm lockfiles are registry-only.** `form/package-lock.json`,
+  `relay/package-lock.json`, and `scripts/package-lock.json` have only
+  `https://` `resolved` entries (97, 160, and 2 respectively); zero `file:` /
+  `link:` / `git+` / `portal:`. Joins `app/`'s clean graph.
+- **Cargo graph still in-tree.** The workspace gained crates.io registry
+  packages (sealed-box/crypto, HTTP client, ceremony helpers - see
+  `docs/blueprints/intake-relay.md` section 9), but still no `git =`,
+  `[patch]`, `[replace]`, or `registry =` anywhere under `core/`; every `path =`
+  dep is an in-`core/` sibling crate.
+- **No external origin hardcoded in tracked source.** The relay/Pages origins
+  the puller and form talk to come from an off-repo puller config; a scan of
+  `form/src`, `relay/src`, and `core/cli/src` found no committed `workers.dev`
+  or `github.io` origin (only placeholders like `<worker>` / `<org>`). ADR-005
+  D1's module fence holds: the HTTP client lives only in the `cn` CLI crate.
+- **New build artifacts are gitignored and rebuildable.** `form/dist/` and the
+  `node_modules/` under `form/`, `relay/`, and `scripts/` are gitignored;
+  `form/dist.manifest.json` (the D8 deploy manifest) is tracked as provenance.
+- **In-project scripts, not tethers.** New `.sh`/`.mjs`/`.ps1` scripts under
+  `scripts/` and `scripts/e2e/` (form build, crypto-vector generator,
+  remote-intake e2e drivers) and the `core/cli/examples/` Rust example carry no
+  absolute or external path; they resolve in-root. This supersedes the older
+  "no `.sh`" observation above.
+- **Git tether re-check.** One remote `origin` (the public
+  `atniclimate/community-connector`, D-060); no `objects/info/alternates`;
+  single worktree at the root. No borrowed object store, no linked working tree
+  outside the root.
