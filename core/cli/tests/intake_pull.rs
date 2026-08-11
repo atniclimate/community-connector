@@ -535,6 +535,7 @@ fn report_has_all_expected_fields() {
         "expired",
         "oldest_unpulled_age_secs",
         "half_ttl_warning",
+        "warnings",
     ] {
         assert!(
             report["reconciliation"].get(key).is_some(),
@@ -567,4 +568,27 @@ fn orphan_blob_is_flagged_but_still_staged() {
     );
     // The intact ciphertext is still pulled and staged - no consented data lost.
     assert_eq!(summary.report["main_loop"]["staged"], 1);
+}
+
+// 11. A present-but-unparseable arrived_at is diagnosed, not silently degraded.
+#[test]
+fn unparseable_arrived_at_is_diagnosed_in_reconciliation() {
+    let s = setup(&[DIGEST]);
+    // Blob-absent (None) receipt with a garbage timestamp: it is skipped by the
+    // main loop and reaches reconciliation, where the age cannot be computed.
+    let mock = MockRelay::new().with_receipt("rcpt-badts", Some("not-a-timestamp"), None);
+
+    let summary =
+        execute_pull(&s.config, &s.kp, &s.queue, &mock, degraded_fetch(), NOW_MS).expect("pull");
+    let warnings = summary.report["reconciliation"]["warnings"]
+        .as_array()
+        .unwrap();
+    assert!(
+        warnings
+            .iter()
+            .any(|w| w.as_str().unwrap().contains("did not parse")),
+        "the unparseable arrived_at is surfaced, not silently degraded"
+    );
+    // Blob absent + no local record + unknown age -> IntegrityAlert (D-082).
+    assert_eq!(summary.report["reconciliation"]["integrity_alert"], 1);
 }

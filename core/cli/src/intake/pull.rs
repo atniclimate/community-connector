@@ -193,6 +193,10 @@ struct Reconciliation {
     expired: usize,
     oldest_unpulled_age_secs: Option<i64>,
     half_ttl_warning: bool,
+    /// Diagnostics that would otherwise be invisible - notably a present-but-
+    /// unparseable `arrived_at`, which forces age-unknown and can mislead a
+    /// receipt into IntegrityAlert (I3-adjacent: never a silent degrade).
+    warnings: Vec<String>,
 }
 
 /// Runs one pull against injected HTTP (the testable core; `run` wires the real
@@ -640,11 +644,25 @@ fn reconcile(
         ..Reconciliation::default()
     };
     for row in &listing {
-        let age = row
-            .arrived_at
-            .as_deref()
-            .and_then(parse_iso8601_utc_to_unix_ms)
-            .map(|ms| now_secs - ms.div_euclid(1000));
+        // An ABSENT arrived_at is a legitimate unknown (age None, no warning); a
+        // PRESENT-but-unparseable one must be surfaced (I3): it silently forces
+        // age-unknown, which the D6 classifier turns into an IntegrityAlert
+        // (D-082) that would otherwise look like a real integrity fault.
+        let age = match row.arrived_at.as_deref() {
+            None => None,
+            Some(text) => match parse_iso8601_utc_to_unix_ms(text) {
+                Some(ms) => Some(now_secs - ms.div_euclid(1000)),
+                None => {
+                    recon.warnings.push(format!(
+                        "receipt {}: arrived_at {text:?} did not parse; age unknown, so any \
+                         blob-absent classification falls to IntegrityAlert rather than Expired \
+                         (D-082) - investigate the timestamp, not necessarily the blob",
+                        row.receipt_id
+                    ));
+                    None
+                }
+            },
+        };
         let obs = ReceiptObservation {
             local_transport_record: staged_ids.contains(&row.receipt_id),
             local_delete_journal: delete_journal.contains(&row.receipt_id),
