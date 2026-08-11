@@ -140,12 +140,17 @@ pub struct PullSummary {
 }
 
 /// A parsed receipt row from `GET /receipts` (relay `receipts.ts`). Only the
-/// fields the puller consumes; the rest are ignored.
+/// fields the puller consumes; the rest are ignored. `has_ledger` and `has_blob`
+/// are INDEPENDENT presence flags over the union of the two KV prefixes - the
+/// relay surfaces both precisely so the puller can spot the orphan case
+/// (has_blob without has_ledger; ADR-005 D6, receipts.ts comment).
 #[derive(Debug, Clone, Deserialize)]
 struct ReceiptRow {
     receipt_id: String,
     #[serde(default)]
     has_blob: bool,
+    #[serde(default)]
+    has_ledger: bool,
     #[serde(default)]
     arrived_at: Option<String>,
 }
@@ -167,6 +172,11 @@ struct MainLoop {
     transport_conflicts: usize,
     semantic_replays: usize,
     semantic_conflicts: usize,
+    /// Receipts listed with a blob but NO ledger entry: the D6 orphan anomaly
+    /// (a relay ledger-write crash after the blob write). The blob is still
+    /// pulled and staged - no consented data is dropped - but the fault is
+    /// surfaced here and in `warnings`.
+    orphan_blobs: usize,
     errors: Vec<String>,
     warnings: Vec<String>,
     blobs_deleted: usize,
@@ -338,6 +348,19 @@ fn process_receipt(
 ) -> Result<(), String> {
     let receipt_id = &row.receipt_id;
     let origin = config.relay_origin.trim_end_matches('/');
+
+    // D6 orphan check: a blob with NO ledger entry is the relay's ledger-write
+    // crash signature (the relay lists both prefixes so the puller can see it -
+    // receipts.ts). Surface it as a counted anomaly, then STILL process the blob
+    // below: the ciphertext is intact and its consented submission must not be
+    // dropped over a relay bookkeeping fault.
+    if !row.has_ledger {
+        main.orphan_blobs += 1;
+        main.warnings.push(format!(
+            "receipt {receipt_id}: ORPHAN BLOB - a blob with no ledger entry (relay ledger-write \
+             crash signature, ADR-005 D6); pulling it anyway, the ciphertext is intact"
+        ));
+    }
 
     // (a) fetch the blob.
     let (status, body) = match relay.get(&format!("{origin}/blob/{receipt_id}")) {

@@ -182,10 +182,11 @@ fn read_one_record(queue: &Path) -> serde_json::Value {
     serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap()
 }
 
-/// An injectable relay: serves `/receipts` from `order` (has_blob computed live
-/// from the blob store), `/blob/:id` from the store, and records deletes.
+/// An injectable relay: serves `/receipts` from `order` (id, arrived_at,
+/// has_ledger; has_blob computed live from the blob store), `/blob/:id` from the
+/// store, and records deletes.
 struct MockRelay {
-    order: Vec<(String, Option<String>)>,
+    order: Vec<(String, Option<String>, bool)>,
     blobs: RefCell<HashMap<String, Vec<u8>>>,
     deletes: RefCell<Vec<String>>,
     get_calls: RefCell<usize>,
@@ -203,10 +204,17 @@ impl MockRelay {
 
     fn with_receipt(mut self, id: &str, arrived: Option<&str>, blob: Option<Vec<u8>>) -> Self {
         self.order
-            .push((id.to_string(), arrived.map(str::to_string)));
+            .push((id.to_string(), arrived.map(str::to_string), true));
         if let Some(bytes) = blob {
             self.blobs.borrow_mut().insert(id.to_string(), bytes);
         }
+        self
+    }
+
+    /// A receipt whose blob is present but ledger absent (the D6 orphan case).
+    fn with_orphan(mut self, id: &str, blob: Vec<u8>) -> Self {
+        self.order.push((id.to_string(), None, false));
+        self.blobs.borrow_mut().insert(id.to_string(), blob);
         self
     }
 }
@@ -222,13 +230,16 @@ impl RelayHttp for MockRelay {
             let receipts: Vec<serde_json::Value> = self
                 .order
                 .iter()
-                .map(|(id, arrived)| {
+                .map(|(id, arrived, has_ledger)| {
                     let mut row = serde_json::Map::new();
                     row.insert(
                         "receipt_id".to_string(),
                         serde_json::Value::String(id.clone()),
                     );
-                    row.insert("has_ledger".to_string(), serde_json::Value::Bool(true));
+                    row.insert(
+                        "has_ledger".to_string(),
+                        serde_json::Value::Bool(*has_ledger),
+                    );
                     row.insert(
                         "has_blob".to_string(),
                         serde_json::Value::Bool(self.blobs.borrow().contains_key(id)),
@@ -505,6 +516,7 @@ fn report_has_all_expected_fields() {
         "transport_conflicts",
         "semantic_replays",
         "semantic_conflicts",
+        "orphan_blobs",
         "errors",
         "warnings",
         "blobs_deleted",
@@ -530,4 +542,29 @@ fn report_has_all_expected_fields() {
         );
     }
     assert_eq!(report["preconditions"]["key_pin"], "match");
+}
+
+// 10. Orphan blob (has_blob, no has_ledger): D6 anomaly flagged, still staged.
+#[test]
+fn orphan_blob_is_flagged_but_still_staged() {
+    let s = setup(&[DIGEST]);
+    let inner = make_inner("sub-orphan", DIGEST);
+    let outer = seal_outer(&s.kp.public, &s.fp, &inner);
+    let mock = MockRelay::new().with_orphan("rcpt-orphan", outer);
+
+    let summary =
+        execute_pull(&s.config, &s.kp, &s.queue, &mock, degraded_fetch(), NOW_MS).expect("pull");
+    assert_eq!(
+        summary.report["main_loop"]["orphan_blobs"], 1,
+        "the orphan (blob without ledger) is counted"
+    );
+    let warnings = summary.report["main_loop"]["warnings"].as_array().unwrap();
+    assert!(
+        warnings
+            .iter()
+            .any(|w| w.as_str().unwrap().contains("ORPHAN BLOB")),
+        "the orphan anomaly is surfaced as a warning"
+    );
+    // The intact ciphertext is still pulled and staged - no consented data lost.
+    assert_eq!(summary.report["main_loop"]["staged"], 1);
 }
