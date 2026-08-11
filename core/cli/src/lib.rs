@@ -12,7 +12,7 @@
 //! mapping, and no new schemas live in this crate (D-041, D-044.2).
 
 mod export;
-mod intake;
+pub mod intake;
 mod validate;
 
 use std::io::Write;
@@ -57,6 +57,10 @@ Commands:
   intake keygen | fingerprint | selftest | backup verify
       Offline keygen-ceremony tooling for the remote relay (ADR-005 D3).
       Run `cn intake` for the per-subcommand usage.
+  intake pull --config <path> --queue <queue-root>
+      Pull, decrypt, and stage remote sealed submissions from the relay
+      (ADR-005 D1/D6). The only networked subcommand; the HTTP client is
+      scoped to the CLI crate (module fence). Run `cn intake` for details.
   ingest
       Not available: parked behind the G-RAT human gate.
   snapshot

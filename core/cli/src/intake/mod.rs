@@ -8,15 +8,19 @@
 //! decision - admission, planning, authorization, fold acceptance, and the
 //! sealed-box/key-file logic - lives in the core crates (I2). This module is
 //! argument marshalling and dispatch only. The keygen family is offline by
-//! construction: no network I/O anywhere in this module tree (ceremony section
-//! 3 point 4); the HTTP client arrives later in the `cn intake pull` step,
-//! scoped to the CLI crate even then.
+//! construction (ceremony section 3 point 4); the ONE component that crosses the
+//! network boundary is `pull` (the remote puller, blueprint section 6), whose
+//! HTTP client stays scoped to this CLI crate and never enters a cn-* crate
+//! (ADR-005 D1 module fence). The D8 bundle verification `pull` depends on lives
+//! in `bundle`, also CLI-only for the same reason.
 
 mod apply;
 mod backup;
+pub mod bundle;
 mod fingerprint;
 mod keygen;
 mod keymat;
+pub mod pull;
 mod queue;
 mod selftest;
 
@@ -60,8 +64,19 @@ Subcommands:
       Either way it derives the public half, prints the fingerprint, and runs
       the round trip.
 
+  pull --config <path> --queue <queue-root>
+      Pull remote submissions from the relay (blueprint section 6; ADR-005
+      D1/D3/D4/D6). Verifies the pinned deploy bundle (D8), then for each
+      sealed blob: transport-dedup, fetch, decrypt, consent-check,
+      semantic-dedup, stage a QueueRecord with SubmissionSource::Remote into
+      <queue-root> (the same queue `intake apply` owns), and delete the relay
+      blob only after verified staging. Prompts for the key passphrase; emits
+      an I12 run report (JSON on stdout). This is the ONLY networked
+      subcommand; the HTTP client is CLI-scoped (D1 module fence).
+
 The keygen family makes no network calls and writes no secret material to any
-tool-created file (ceremony design sections 3-5).";
+tool-created file (ceremony design sections 3-5); `pull` is the sole networked
+subcommand.";
 
 pub(crate) fn run(
     args: &[String],
@@ -74,6 +89,7 @@ pub(crate) fn run(
         Some("fingerprint") => fingerprint::run(&args[1..], out, err),
         Some("selftest") => selftest::run(&args[1..], out, err),
         Some("backup") => backup::run(&args[1..], out, err),
+        Some("pull") => pull::run(&args[1..], out, err),
         Some(other) => {
             writeln!(err, "error: unknown intake subcommand '{other}'")?;
             writeln!(err, "{USAGE}")?;

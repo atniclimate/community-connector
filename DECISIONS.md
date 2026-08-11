@@ -1971,3 +1971,75 @@ and its correctness is transitively proven - the isolation-sensitive tests
 leaked between cases. The pinned versions (wrangler ^4.120.1, pool ^0.21.0,
 `@cloudflare/workers-types` ^5.x, typescript ^6.0.3) live in relay/package.json
 and enter DEPENDENCIES.md at the step-11 docs true-up, not incrementally here.
+
+## D-085 (2026-08-11) - `cn intake pull` CLI + D8 bundle verification (Phase D steps 7-8)
+
+Trigger: implementing the native puller (`core/cli/src/intake/pull.rs`) and the
+D8 bundle-verification module (`bundle.rs`, blueprint intake-relay section 6 and
+8; ADR-005 D1/D3/D4/D6/D8) surfaced five calls the ADR/blueprint leave open.
+
+Call 1 - `manifest_path` config field (blueprint 6.3 extension). The D8 manifest
+is written OUTSIDE the deploy root and is NOT served by Pages (D8 no-deploy
+rule), so the puller cannot fetch its CONTENT (the file list) from the origin;
+it must read the local ceremony-pinned manifest file. Blueprint 6.3's config
+spec pins only `manifest_hash`, not a path to the file. Options: (a) an implicit
+path convention (e.g. `<key_dir>/dist.manifest.json`); (b) add an explicit
+`manifest_path`. Chose (b): a clean, minimal field the ceremony operator sets
+alongside the keys and config, avoiding a hidden convention. `manifest_pin.
+manifest_hash` still guards that file against substitution (verify_bundle hashes
+the file's exact bytes and compares BEFORE parsing it), so the added path widens
+no trust surface.
+
+Call 2 - in-memory (single-run) delete journal. The blueprint names a "local
+delete-journal entry" for the D6 `DeletedByMe` reconciliation class without
+fixing a persisted format. Chose an in-memory `HashSet<String>` of receipt ids
+deleted THIS run. Reconciliation runs in the same process immediately after the
+main loop, so `DeletedByMe` is correct within a run. Across runs: a blob this
+run deleted whose ledger also expired simply will not appear next run; one whose
+ledger persists classifies `Expired` (age past TTL+margin) - both correct
+end-states. A persisted cross-run journal buys only a transient, self-correcting
+distinction (`DeletedByMe` vs `Expired`) for one interval, at the cost of a new
+durable format and its own corruption modes. Deferred; recorded so a future need
+(e.g. suppressing re-solicit for a just-deleted receipt) reopens it deliberately.
+
+Call 3 - `CONSISTENCY_MARGIN_SECS = 300`. Reconciliation's expiry threshold is
+`blob_ttl_seconds + margin`; the D6 classifier treats a blob-absent receipt at
+or past that threshold as cleanly `Expired`, below it as an `IntegrityAlert`.
+KV is eventually consistent, so a receipt that JUST crossed its TTL may briefly
+still be listed, or a fresh ledger may briefly precede its blob. Five minutes is
+generous for KV convergence at pilot scale and matches the ledger-TTL margin the
+Worker already builds in (step 5). A too-small margin cries false alerts at the
+TTL boundary; a too-large one delays a real "blob vanished early" alarm - 300s
+sits comfortably in between for a pilot.
+
+Call 4 - `--queue <path>` as a CLI arg, not a config field. Blueprint 6.1 leaves
+the queue-root source open ("add `--queue`, or add `queue_root` to PullConfig").
+Chose `--queue`, matching `cn intake apply`'s exact interface: the puller and the
+applier operate on the SAME queue root under the SAME single-instance lock, so
+one flag spelling for both is the operator-muscle-memory win. The config still
+holds every OTHER puller path (key_dir, credential_path, manifest_path); only the
+queue root - the one path shared with a sibling subcommand - is a flag.
+
+Call 5 - testable core split + a widened CLI test surface. `execute_pull` is a
+pure-ish core (queue lock, bundle verify, main loop, reconciliation) taking an
+injected `&dyn RelayHttp` and a `fetch` closure; `run` does only the out-of-band
+loading (config, credential, passphrase-decrypted key) and wires the real ureq
+clients. To let `core/cli/tests/intake_{bundle,pull}.rs` inject closures/mocks at
+the Rust level (the whole point of the `fetch`/`RelayHttp` seams - a subprocess
+cannot receive a closure), `intake` is now `pub mod` and `bundle`/`pull` expose
+their test-facing items as `pub`. The CLI crate is `publish = false`, so widening
+its API costs no semver surface; the alternative (spawning the binary against a
+throwaway local HTTP server) could not exercise the transport-error -> Degraded
+path or the "relay never contacted on a bundle halt" assertion.
+
+Strongest surviving objection: Call 1's `manifest_path` and Call 4's `--queue`
+both mean the ceremony/ops surface now spans a config file AND a CLI flag AND a
+key directory - three places an operator can misconfigure. Accepted: the deploy
+runbook (step 10) enumerates all three in one checklist, and each fails LOUD and
+early (unreadable manifest -> `BundleResult::Failed` halt; unsafe/missing queue
+root -> `refuse_unsafe_root` refusal; key-pin mismatch -> halt before any network
+call), so a misconfiguration never silently degrades into wrong behavior. For
+Call 2, the in-memory journal means a `DeletedByMe` signal does not survive a
+crash mid-run, but a crashed run stages nothing it did not also verify and
+deletes nothing it did not also stage, so the next run re-derives the same
+classification from durable facts (the staged records and the relay listing).

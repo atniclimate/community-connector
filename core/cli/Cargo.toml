@@ -24,6 +24,16 @@ rpassword = "7.5.4"           # hidden-echo passphrase prompt on a real TTY
 base32 = "0.5.1"              # printed-backup codec (secret key -> transcribable text)
 crc32fast = "1.5.0"           # typo-detectable check line for the printed backup
 
+# Puller I/O (docs/blueprints/intake-relay.md section 6; ADR-005 D1). The ONE
+# component that crosses the module fence: the HTTP client lives in the CLI
+# crate ONLY, never in any cn-* core crate. ureq is blocking + pure-Rust TLS
+# (rustls, vendored roots, no OpenSSL build dependency). sha2/base64 are already
+# transitive via cn-ingest; the puller uses them DIRECTLY (ciphertext hashing,
+# outer-envelope ciphertext decode), so they are direct deps here too.
+ureq = "3"                    # blocking HTTP client for the relay + bundle fetch
+sha2 = "0.10"                 # SHA-256 over ciphertext bytes and the pinned manifest
+base64 = "0.22"               # STANDARD decode of the outer-envelope ciphertext (D-083)
+
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Storage_FileSystem"] }
 
