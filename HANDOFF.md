@@ -171,8 +171,17 @@ as draft; checkpoint = convention; ad hoc demos open pathways).
    bundle verification (D8), reconciliation, and deploy runbook draft.
    Permission-adjacent: gets a MANDATORY adversarial round. The DEPLOY
    bar (D-059.8) still requires: intake pipeline working + keygen
-   ceremony executed + D-023 sign-off on form text. NEXT: implementation
-   begins at phase A step 1 (sealed-box crypto binding).
+   ceremony executed + D-023 sign-off on form text.
+   PROGRESS (2026-08-11, all unpushed on main; live per-step ledger =
+   memory relay-orchestration-state): Phases A+B COMPLETE - step 1
+   sealed-box crypto binding (14b9778, D-081), step 2 keygen ceremony CLI
+   (4a0b8db), step 3 envelope formats (69fc557), step 4 puller core logic
+   - transport dedup key + D6 receipt classifier + consent-digest check
+   (2df3fdd, D-082); check-all 12/12 green at each. NEXT: step 5
+   (Cloudflare Worker relay under relay/) + step 6 (Pages form under
+   form/) - independent pair; then steps 7+8 (`cn intake pull` CLI + D8
+   bundle verification), then 9-11 (e2e test, deploy runbook, docs
+   true-up). The MANDATORY adversarial round stays HELD until all 11 land.
 3. **Snapshot data pipeline (D-048 / P2.3-P2.5)** - targets the convention build.
 4. **Phase 4 slimmed (D-056.3):** minimal P4.1 story authoring.
 5. **P1.3 benchmark** deferred to September; record in ADR-004.
