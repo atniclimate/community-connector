@@ -54,6 +54,9 @@ Commands:
       Run the native intake apply transaction (ADR-005 D4): startup
       recovery, decision-inbox admission, approval planning, the
       idempotent durable append, and the I12 run report as JSON.
+  intake keygen | fingerprint | selftest | backup verify
+      Offline keygen-ceremony tooling for the remote relay (ADR-005 D3).
+      Run `cn intake` for the per-subcommand usage.
   ingest
       Not available: parked behind the G-RAT human gate.
   snapshot

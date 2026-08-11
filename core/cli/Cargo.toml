@@ -17,6 +17,13 @@ serde_json = "1"
 semver = { version = "1", features = ["serde"] }
 uuid = { version = "1", features = ["v7"] }
 
+# Keygen-ceremony tooling (docs/blueprints/intake-relay.md section 3). CLI-only
+# UX/ceremony helpers, deliberately NOT in any cn-* crate (blueprint section 9
+# keeps base32 out of the persisted-format logic); none pulls a network stack.
+rpassword = "7.5.4"           # hidden-echo passphrase prompt on a real TTY
+base32 = "0.5.1"              # printed-backup codec (secret key -> transcribable text)
+crc32fast = "1.5.0"           # typo-detectable check line for the printed backup
+
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Storage_FileSystem"] }
 
