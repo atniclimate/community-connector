@@ -1,0 +1,189 @@
+/*
+ * Remote intake form styling. Class-based only (no inline styles), so the CSP
+ * needs no style 'unsafe-inline'. Layout holds at 375px (R9). System font
+ * stack - no web fonts, keeping the build dependency-closed (D8). Colors meet
+ * WCAG AA contrast on the light background.
+ */
+
+:root {
+  --cn-bg: #ffffff;
+  --cn-fg: #1a1a1a;
+  --cn-muted: #55595f;
+  --cn-accent: #0b5c46;
+  --cn-accent-fg: #ffffff;
+  --cn-border: #b7bcc2;
+  --cn-error: #a11a1a;
+  --cn-draft-bg: #fff4d6;
+  --cn-draft-fg: #5a4300;
+  --cn-panel: #f4f6f8;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--cn-bg);
+  color: var(--cn-fg);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+}
+
+#app {
+  max-width: 34rem;
+  margin: 0 auto;
+  padding: 1rem;
+}
+
+.cn-form-title,
+.cn-confirmation h1,
+.cn-fatal h1 {
+  font-size: 1.4rem;
+  margin: 0.25rem 0 0.75rem;
+}
+
+.cn-form-draft-banner {
+  background: var(--cn-draft-bg);
+  color: var(--cn-draft-fg);
+  border: 1px solid #e0c66a;
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem;
+  font-weight: 600;
+  margin: 0 0 1rem;
+}
+
+.cn-form-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin-bottom: 1rem;
+}
+
+.cn-form-row label {
+  font-weight: 600;
+}
+
+.cn-form input[type="text"],
+.cn-form input[type="date"],
+.cn-form select,
+.cn-form textarea {
+  width: 100%;
+  max-width: 100%;
+  padding: 0.55rem 0.6rem;
+  font: inherit;
+  color: inherit;
+  background: var(--cn-bg);
+  border: 1px solid var(--cn-border);
+  border-radius: 6px;
+}
+
+.cn-form input:focus-visible,
+.cn-form select:focus-visible,
+.cn-form textarea:focus-visible,
+.cn-form button:focus-visible {
+  outline: 3px solid var(--cn-accent);
+  outline-offset: 1px;
+}
+
+.cn-form [aria-invalid="true"] {
+  border-color: var(--cn-error);
+}
+
+.cn-form-error {
+  color: var(--cn-error);
+  font-size: 0.9rem;
+  margin: 0;
+  min-height: 1.1rem;
+}
+
+.cn-form-consent {
+  border: 1px solid var(--cn-border);
+  border-radius: 8px;
+  background: var(--cn-panel);
+  padding: 0.75rem 1rem;
+  margin: 0 0 1rem;
+}
+
+.cn-form-consent legend {
+  font-weight: 700;
+  padding: 0 0.4rem;
+}
+
+.cn-form-consent p {
+  margin: 0.5rem 0;
+}
+
+.cn-form-affirm {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.cn-form-affirm input {
+  margin-top: 0.35rem;
+  width: 1.15rem;
+  height: 1.15rem;
+  flex: 0 0 auto;
+}
+
+.cn-form-affirm label {
+  font-weight: 600;
+}
+
+.cn-form-submit,
+.cn-form-retry {
+  font: inherit;
+  font-weight: 600;
+  padding: 0.6rem 1.1rem;
+  border: 1px solid var(--cn-accent);
+  border-radius: 6px;
+  background: var(--cn-accent);
+  color: var(--cn-accent-fg);
+  cursor: pointer;
+}
+
+.cn-form-submit[disabled] {
+  background: var(--cn-muted);
+  border-color: var(--cn-muted);
+  cursor: not-allowed;
+}
+
+.cn-form-retry {
+  margin-top: 0.5rem;
+}
+
+.cn-form-status {
+  margin-top: 1rem;
+}
+
+.cn-form-status p {
+  margin: 0.25rem 0;
+}
+
+.cn-form-footer {
+  margin-top: 1.5rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--cn-border);
+  color: var(--cn-muted);
+  font-size: 0.85rem;
+  font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  word-break: break-all;
+}
+
+.cn-confirmation,
+.cn-fatal {
+  padding: 1rem 0;
+}
+
+.cn-hidden {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}

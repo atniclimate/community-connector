@@ -1869,3 +1869,51 @@ tick, both keep the margin as the real safety buffer, and the reserved-for-
 early-ambiguity role of the alert state is preserved either way. The classifier
 is pure and stateless, so revisiting the tick later is a one-line change plus a
 test flip.
+
+## D-083 (2026-08-11) - Pages intake form: outer-envelope base64 variant + build tooling (Phase C step 6)
+
+Trigger: implementing the Pages intake form (`form/`, blueprint intake-relay
+section 4; ADR-005 D2/D3/D8) surfaced two calls the ADR/blueprint leave open,
+one of which a LATER, different session depends on.
+
+Call 1 - outer-envelope base64 variant (a cross-session dependency). `envelope.rs`
+deliberately keeps `OuterEnvelope.ciphertext` an opaque, undecoded string
+("decoded only by the puller's crypto binding"); that decode is step 7's job, in
+a future session, and nothing committed yet pins which base64 variant the outer
+envelope uses (standard vs URL-safe, padded vs unpadded). Options: (a) standard
+padded, RFC 4648 s4 (libsodium `sodium.base64_variants.ORIGINAL`); (b) URL-safe;
+(c) unpadded forms. Chose (a). Rationale: `crypto.rs` already uses
+`base64::engine::general_purpose::STANDARD` for its OTHER base64 fields (the
+key-file salt/nonce/ciphertext), so standard-padded gives the whole crypto
+surface ONE variant a future Rust reader expects, rather than two. The form
+encodes with `sodium.to_base64(bytes, ORIGINAL)`; step 7's Rust decode must use
+the STANDARD engine to match. Recorded here so step 7 does not have to
+reverse-engineer it from minified JS.
+
+Call 2 - build tooling: Vite multi-file, NOT vite-plugin-singlefile. Blueprint
+4.3 leans minimal but explicitly permits Vite; the prompt recommended Vite +
+singlefile. Deviation from singlefile: the blueprint CSP is
+`script-src 'self'; style-src 'self'`, which cleanly admits EXTERNAL same-origin
+assets but NOT inline scripts (inline needs a hash or 'unsafe-inline', a weaker
+CSP). A fully-inlined single file would therefore force either an inline-script
+hash workflow or 'unsafe-inline'; multi-file (index.html + assets/*.js +
+assets/*.css) keeps the blueprint's exact CSP verbatim and matches D8's
+multi-file manifest model (D8 lists "every deployable file"). Vite's
+content-hashed asset filenames are deterministic per source commit + lockfile,
+verified empirically by the double-build byte-identical check in
+`scripts/build-form.ps1 -CheckReproducible`. libsodium's WASM is embedded as
+base64 inside the JS chunk (the standard `libsodium-wrappers` build), so the
+bundle stays dependency-closed with no runtime fetch (D3/D8) despite being
+multi-file. `libsodium-wrappers@0.7.15` is the form's ONLY runtime dependency.
+
+Strongest surviving objection: Call 1 leaves interop UNVERIFIED until step 7 -
+this step ships an encoder with no Rust decoder to round-trip against, so a
+variant mismatch would only surface later. Accepted: the choice is recorded
+explicitly (not left implicit), the encoder is exercised by the sealed-box
+wrapper tests (base64 round-trip; a committed standard-base64 fixture ciphertext
+decodes to the right length under ORIGINAL, cross-checking the variant against
+the libsodium.js generator's `Buffer.toString('base64')`), and full
+cross-language interop is blueprint step 9's e2e job by design. For Call 2, a
+single-file artifact is marginally simpler to reason about as "one pinned blob,"
+but the manifest already pins the whole multi-file set with equal strength, so
+nothing is lost.

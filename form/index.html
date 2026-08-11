@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!--
+      CSP as a <meta> tag: GitHub Pages serves static files with no mechanism to
+      set custom HTTP response headers, so header-based CSP would be a no-op on
+      this host (blueprint 4.1). The connect-src origin below is substituted at
+      build time (vite.config.ts) with the one allowed connect destination - the
+      relay. The meta tag lives inside the same HTML the D8 bundle-hash pin
+      covers, so tampering with the CSP is caught by the same manifest check.
+      No service worker (D8 prohibition); no analytics; no third-party requests.
+    -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; connect-src %CN_RELAY_ORIGIN%; script-src 'self'; style-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'"
+    />
+    <title>Community Navigator - Intake (DRAFT)</title>
+  </head>
+  <body>
+    <main id="app"></main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

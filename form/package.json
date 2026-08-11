@@ -1,0 +1,22 @@
+{
+  "name": "community-navigator-form",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Community Navigator remote intake form (Pages static build artifact; relay blueprint step 6, ADR-005 D2/D3/D8). Attendee-facing, template-driven, seals submissions in-browser to the facilitator public key with libsodium crypto_box_seal. Separate build from app/; shares no runtime code with it. libsodium-wrappers is the ONLY runtime dependency.",
+  "scripts": {
+    "dev": "vite",
+    "typecheck": "tsc --noEmit",
+    "build": "vite build",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "libsodium-wrappers": "0.7.15"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.0",
+    "typescript": "^6.0.3",
+    "vite": "^7.3.6",
+    "vitest": "4.1.10"
+  }
+}

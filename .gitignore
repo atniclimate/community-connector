@@ -8,6 +8,10 @@ dist-smoke/
 .vite/
 *.tsbuildinfo
 
+# Remote intake form D8 deploy manifest: a build output pinned off-repo at
+# deploy time (ADR-005 D8) and recorded in DECISIONS.md, never committed.
+form/dist.manifest.json
+
 # Codex scratch space
 .codex/
 
