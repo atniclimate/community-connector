@@ -97,7 +97,10 @@ async function main() {
       'core/crates/cn-ingest/tests/crypto_vectors.rs.',
     algorithm: 'crypto_box_seal (X25519 + XSalsa20-Poly1305, BLAKE2b nonce)',
     fingerprint_algorithm: 'blake2b-256(public_key)[..16], 8 lowercase hex groups of 4',
-    libsodium_wrappers_version: sodium.SODIUM_VERSION_STRING,
+    // The npm wrapper package version (matches the field name and the pin in
+    // form/package.json + scripts/package.json). NOT sodium.SODIUM_VERSION_STRING,
+    // which is the bundled libsodium C-library version and mislabels the field.
+    libsodium_wrappers_version: require('libsodium-wrappers/package.json').version,
     keypair: {
       seed_utf8: SEED_TEXT,
       public_key_hex: Buffer.from(keypair.publicKey).toString('hex'),

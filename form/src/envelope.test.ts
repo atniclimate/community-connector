@@ -97,3 +97,27 @@ describe("OuterEnvelope construction (must match cn-ingest envelope.rs OuterEnve
     expect(fromBase64(outer.ciphertext).length).toBe(plaintextLen + SEALED_BOX_OVERHEAD);
   });
 });
+
+describe("e2e faithfulness: envelope.ts is the single source for the D-088 string convention (R5-2)", () => {
+  // scripts/e2e/seal-submission.mjs MIRRORS buildInnerPayload inline rather than
+  // importing it (the shipped form uses extensionless relative imports that do
+  // not resolve under plain Node ESM). So a revert of captured_at /
+  // consent_affirmed_at to epoch NUMBERS would still seal and pass the e2e,
+  // failing only later at the Rust puller's InnerPayload::parse (both are
+  // `String`). This pins the ISO-string convention at the REAL source
+  // (form/src/envelope.ts) so such drift fails a form test first. It asserts
+  // through the JSON.stringify boundary the seal path actually crosses - numbers
+  // survive JSON serialization as numbers - matching what the puller decrypts.
+  it("keeps captured_at and consent_affirmed_at as JSON strings across serialization", () => {
+    const serialized = JSON.parse(JSON.stringify(buildInnerPayload({
+      submissionId: "00000000-0000-4000-8000-000000000000",
+      formVersion: "remote-draft-2026-08-11",
+      kind: "person",
+      fields: { display_name: "Synthetic Person" },
+      consentTextDigest: "ae5f7cc0d740726e81785919d1dbe6ad715895c94da278610da354d730bcd36c",
+      consentAffirmed: true,
+    })));
+    expect(typeof serialized.captured_at).toBe("string");
+    expect(typeof serialized.consent.consent_affirmed_at).toBe("string");
+  });
+});

@@ -1,7 +1,7 @@
 /**
  * Vite config for the remote intake form (relay blueprint step 6; ADR-005
  * D2/D3/D8). This is a SEPARATE Vite project from app/ - it deploys to
- * Cloudflare Pages, not the app build. It shares no runtime code with app/.
+ * GitHub Pages, not the app build. It shares no runtime code with app/.
  *
  * Build-time configuration is injected as compile-time constants via `define`
  * (the same mechanism app/vite.config.ts uses for __CN_SNAPSHOT_MODE__). This
@@ -64,6 +64,13 @@ const templatePath = process.env["CN_FORM_TEMPLATE_PATH"] ?? DEFAULT_TEMPLATE_PA
 const templateJson = readFileSync(templatePath, "utf8");
 
 export default defineConfig({
+  // Deploy target is the blueprint's documented pages_origin
+  // https://<org>.github.io/community-connector - a GitHub Pages PROJECT
+  // subpath - so built asset refs must be prefixed with the repo name; without
+  // this, absolute /assets/... URLs 404 under the subpath. RE-CONFIRM `base`
+  // against the FINAL deploy target before shipping: a custom-domain ROOT site
+  // would instead need base: "/" (drop this).
+  base: "/community-connector/",
   define: {
     __CN_FORM_PUBLIC_KEY_HEX__: JSON.stringify(publicKeyHex),
     __CN_FORM_KEY_FINGERPRINT__: JSON.stringify(keyFingerprint),

@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import type { JsonObject } from "./json";
-import { buildFields, fieldValue, formModel, type FormAttr } from "./model";
+import { buildFields, canSubmit, fieldValue, formModel, type FormAttr } from "./model";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -125,5 +125,36 @@ describe("buildFields", () => {
     });
     // media never appears (family_canoe_photo was excluded from attrs).
     expect(Object.keys(fields)).not.toContain("family_canoe_photo");
+  });
+});
+
+describe("canSubmit (D-030 structural consent gate)", () => {
+  // canSubmit is the sole gate render.ts consults before enabling seal/submit
+  // (render.ts:200). The invariant under test: no field state can substitute for
+  // an unaffirmed consent - you cannot reach a submit/seal with consent off.
+  const required: FormAttr = {
+    id: "display_name",
+    attrType: "text",
+    required: true,
+    values: [],
+    defaultVisibility: null,
+  };
+
+  it("returns false when consent is NOT affirmed, even with every field valid", () => {
+    expect(canSubmit([required], { display_name: "Synthetic Person" }, false)).toBe(false);
+  });
+
+  it("returns true only when consent IS affirmed and fields pass advisory checks", () => {
+    expect(canSubmit([required], { display_name: "Synthetic Person" }, true)).toBe(true);
+  });
+
+  it("stays false when consent is affirmed but a required field is empty", () => {
+    expect(canSubmit([required], { display_name: "" }, true)).toBe(false);
+  });
+
+  it("keeps the consent gate dominant over field validity (D-030)", () => {
+    // A fully-valid form and a wholly-empty form both fail with consent off.
+    expect(canSubmit([required], { display_name: "Synthetic Person" }, false)).toBe(false);
+    expect(canSubmit([], {}, false)).toBe(false);
   });
 });

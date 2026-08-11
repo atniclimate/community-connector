@@ -11,10 +11,16 @@
       relay. The meta tag lives inside the same HTML the D8 bundle-hash pin
       covers, so tampering with the CSP is caught by the same manifest check.
       No service worker (D8 prohibition); no analytics; no third-party requests.
+      script-src adds 'wasm-unsafe-eval': libsodium-wrappers compiles and
+      instantiates its WebAssembly module, which the WebAssembly-CSP integration
+      blocks under a bare script-src 'self' (the form cannot seal). This keyword
+      permits WASM compile/instantiate ONLY - it does NOT enable arbitrary JS
+      eval() ('unsafe-eval') or inline scripts ('unsafe-inline'), so the posture
+      is preserved.
     -->
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; connect-src %CN_RELAY_ORIGIN%; script-src 'self'; style-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'"
+      content="default-src 'self'; connect-src %CN_RELAY_ORIGIN%; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'"
     />
     <title>Community Navigator - Intake (DRAFT)</title>
   </head>
