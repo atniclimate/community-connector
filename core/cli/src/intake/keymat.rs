@@ -22,6 +22,7 @@ use base32::Alphabet;
 use cn_ingest::{
     IngestError, KeyMetadata, Keypair, SECRET_KEY_LEN, SecretKey, generate_keypair, open, seal,
 };
+use zeroize::Zeroizing;
 
 /// Minimum passphrase word count (ceremony design section 4: a diceware-style
 /// phrase of at least 6 words). Enforced at generation so a too-weak passphrase
@@ -46,10 +47,12 @@ pub(crate) const PRINT_BACKUP_CHECK_PREFIX: &str = "print-backup check: ";
 /// unconfirmed typo during generation IS a lost-key event the operator would
 /// not discover until too late. On any rejection the caller has written nothing
 /// to disk yet - nothing reaches the filesystem.
-pub(crate) fn read_new_passphrase(err: &mut dyn Write) -> Result<String, String> {
+pub(crate) fn read_new_passphrase(err: &mut dyn Write) -> Result<Zeroizing<String>, String> {
     let first = prompt_secret(err, "Enter a new intake-key passphrase (>= 6 words): ")?;
     let confirm = prompt_secret(err, "Confirm the passphrase: ")?;
-    if first != confirm {
+    // Deref to compare the inner strings: Zeroizing wraps them so both copies
+    // (and confirm) are wiped on drop, matching cn-ingest's zeroized key material.
+    if *first != *confirm {
         return Err("passphrase entries did not match; nothing was written".to_string());
     }
     if first.split_whitespace().count() < MIN_PASSPHRASE_WORDS {
@@ -66,7 +69,7 @@ pub(crate) fn read_new_passphrase(err: &mut dyn Write) -> Result<String, String>
 pub(crate) fn read_existing_passphrase(
     err: &mut dyn Write,
     purpose: &str,
-) -> Result<String, String> {
+) -> Result<Zeroizing<String>, String> {
     prompt_secret(err, &format!("Enter the passphrase to {purpose}: "))
 }
 
@@ -80,22 +83,28 @@ pub(crate) fn read_existing_passphrase(
 /// default reads `/dev/tty`/`CONIN$`, not stdin, so it alone cannot serve the
 /// non-interactive path; this branch supplies it (I3: a closed stdin is a loud
 /// error, never a silent empty passphrase).
-fn prompt_secret(err: &mut dyn Write, prompt: &str) -> Result<String, String> {
+fn prompt_secret(err: &mut dyn Write, prompt: &str) -> Result<Zeroizing<String>, String> {
     write!(err, "{prompt}")
         .map_err(|io_err| format!("cannot write passphrase prompt: {io_err}"))?;
     err.flush()
         .map_err(|io_err| format!("cannot flush passphrase prompt: {io_err}"))?;
     if std::io::stdin().is_terminal() {
-        rpassword::read_password().map_err(|io_err| format!("cannot read passphrase: {io_err}"))
+        rpassword::read_password()
+            .map(Zeroizing::new)
+            .map_err(|io_err| format!("cannot read passphrase: {io_err}"))
     } else {
-        let mut line = String::new();
+        // The untrimmed read buffer holds the passphrase too, so it is zeroized
+        // on drop alongside the returned copy.
+        let mut line = Zeroizing::new(String::new());
         let read = std::io::stdin()
             .read_line(&mut line)
             .map_err(|io_err| format!("cannot read passphrase from stdin: {io_err}"))?;
         if read == 0 {
             return Err("no passphrase available on stdin (input closed)".to_string());
         }
-        Ok(line.trim_end_matches(['\r', '\n']).to_string())
+        Ok(Zeroizing::new(
+            line.trim_end_matches(['\r', '\n']).to_string(),
+        ))
     }
 }
 

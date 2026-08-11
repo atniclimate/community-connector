@@ -514,6 +514,17 @@ fn decode_hex(s: &str) -> Result<Vec<u8>, IngestError> {
             detail: "hex string has an odd length".into(),
         });
     }
+    // Reject non-ASCII before byte-slicing. A byte-length guard upstream (e.g.
+    // Fingerprint::from_str's 4-BYTE group check) can admit a multibyte char, so
+    // `&s[i..i + 2]` below could otherwise land on a non-char boundary and PANIC.
+    // A hex string is ASCII by definition, so any non-ASCII byte is simply an
+    // invalid hex character - surfaced through the same loud typed error path
+    // this function already uses for a bad hex digit (I3), never a panic.
+    if !s.is_ascii() {
+        return Err(IngestError::KeyFile {
+            detail: "invalid hex character".into(),
+        });
+    }
     (0..s.len())
         .step_by(2)
         .map(|i| {
@@ -604,6 +615,17 @@ mod tests {
                 .parse::<Fingerprint>()
                 .is_err()
         ); // group too short
+    }
+
+    #[test]
+    fn fingerprint_from_str_rejects_multibyte_groups_without_panicking() {
+        // Each group is a 3-byte char ('\u{20ac}', the euro sign) plus 'A', so
+        // it satisfies the BYTE-length guard (len() == 4) yet is not 4 ASCII hex
+        // chars. Eight such groups keep the group count and total byte length
+        // valid, driving execution into decode_hex - which must reject loudly
+        // rather than byte-slice across a char boundary and panic (I3).
+        let s = "\u{20ac}A-\u{20ac}A-\u{20ac}A-\u{20ac}A-\u{20ac}A-\u{20ac}A-\u{20ac}A-\u{20ac}A";
+        assert!(s.parse::<Fingerprint>().is_err());
     }
 
     #[test]

@@ -45,8 +45,9 @@ Subcommands:
       Generate an X25519 intake keypair OFFLINE. Prompts for a >= 6-word
       passphrase (with confirmation), writes create-only public.json and
       secret.json (secret passphrase-encrypted) to <dir>, prints the
-      fingerprint banner and the plaintext printed-backup block to stderr
-      (never to any file), and an I12 metadata report to stdout.
+      fingerprint banner to stderr and - on an interactive terminal ONLY -
+      the plaintext printed-backup block (withheld when stderr is redirected,
+      never to any file), and an I12 metadata report to stdout.
 
   fingerprint <public.json>
       Print the fingerprint of a public key file (deterministic; no clock).

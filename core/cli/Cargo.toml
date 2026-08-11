@@ -23,6 +23,7 @@ uuid = { version = "1", features = ["v7"] }
 rpassword = "7.5.4"           # hidden-echo passphrase prompt on a real TTY
 base32 = "0.5.1"              # printed-backup codec (secret key -> transcribable text)
 crc32fast = "1.5.0"           # typo-detectable check line for the printed backup
+zeroize = "1"                 # wipe the facilitator passphrase heap on drop (matches cn-ingest's SecretKey zeroize)
 
 # Puller I/O (docs/blueprints/intake-relay.md section 6; ADR-005 D1). The ONE
 # component that crosses the module fence: the HTTP client lives in the CLI

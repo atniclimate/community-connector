@@ -15,6 +15,17 @@ const PASS: &str = "correct horse battery staple river delta";
 const BASE32_PREFIX: &str = "print-backup base32: ";
 const CHECK_PREFIX: &str = "print-backup check: ";
 
+/// A synthetic printed-backup sheet for the deterministic 32-byte key
+/// `[1, 2, ..., 32]` (test-only; never operational), computed once with the same
+/// RFC4648-base32 + CRC-32 codec keymat.rs uses, so `backup verify --from-print`
+/// decodes it end to end. keygen now WITHHOLDS the plaintext backup block when
+/// stderr is not a TTY (R1-3) - which is exactly how this suite spawns `cn` - so
+/// the from-print tests can no longer harvest a live block from keygen's stderr
+/// and use this fixed sheet instead. Any 32 bytes are a valid X25519 secret, so
+/// the recovered pair still round-trips the self-test vector.
+const SYNTH_PRINT_BASE32: &str = "AEBAGBAFAYDQQCIKBMGA2DQPCAIREEYUCULBOGAZDINRYHI6D4QA";
+const SYNTH_PRINT_CHECK: &str = "87e6ec25";
+
 /// Spawns the real `cn` binary, feeds `stdin_data`, and collects the output.
 /// Write errors are ignored: a command that refuses BEFORE reading stdin (a
 /// create-only refusal, a usage error) closes the pipe early, which is not a
@@ -59,14 +70,6 @@ fn stdout_json(output: &Output) -> serde_json::Value {
             stderr(output)
         )
     })
-}
-
-fn line_after(haystack: &str, prefix: &str) -> String {
-    haystack
-        .lines()
-        .find_map(|line| line.strip_prefix(prefix))
-        .unwrap_or_else(|| panic!("no '{prefix}' line in:\n{haystack}"))
-        .to_string()
 }
 
 /// Runs a successful keygen into `keys`, returning its (exit-checked) output.
@@ -233,21 +236,16 @@ fn backup_verify_corrupt_secret_fails_loudly() {
 #[test]
 fn from_print_flipped_checksum_is_rejected_before_reconstruction() {
     let dir = tempfile::tempdir().expect("tempdir");
-    let keys = dir.path().join("keys");
-    let kg = keygen(&keys);
-    let err_text = stderr(&kg);
-    let base32 = line_after(&err_text, BASE32_PREFIX);
-    let check = line_after(&err_text, CHECK_PREFIX);
 
-    // Flip one hex digit of the check line: a mistyped sheet.
-    let mut check_chars: Vec<char> = check.chars().collect();
+    // Flip one hex digit of the valid check line: a mistyped sheet.
+    let mut check_chars: Vec<char> = SYNTH_PRINT_CHECK.chars().collect();
     check_chars[0] = if check_chars[0] == '0' { '1' } else { '0' };
     let bad_check: String = check_chars.into_iter().collect();
 
     let sheet = dir.path().join("sheet.txt");
     std::fs::write(
         &sheet,
-        format!("{BASE32_PREFIX}{base32}\n{CHECK_PREFIX}{bad_check}\n"),
+        format!("{BASE32_PREFIX}{SYNTH_PRINT_BASE32}\n{CHECK_PREFIX}{bad_check}\n"),
     )
     .expect("write sheet");
 
@@ -386,21 +384,13 @@ fn selftest_key_dir_rejects_mismatched_pair() {
 #[test]
 fn backup_verify_from_print_round_trip() {
     let dir = tempfile::tempdir().expect("tempdir");
-    let keys = dir.path().join("keys");
-    let kg = keygen(&keys);
-    let fingerprint = stdout_json(&kg)["fingerprint"]
-        .as_str()
-        .expect("fp")
-        .to_string();
 
-    // Transcribe the stderr printed-backup block into a file, verbatim.
-    let err_text = stderr(&kg);
-    let base32 = line_after(&err_text, BASE32_PREFIX);
-    let check = line_after(&err_text, CHECK_PREFIX);
+    // A valid synthetic sheet (fixed key `[1..=32]`), independent of keygen's
+    // now-withheld stderr block (R1-3).
     let sheet = dir.path().join("sheet.txt");
     std::fs::write(
         &sheet,
-        format!("{BASE32_PREFIX}{base32}\n{CHECK_PREFIX}{check}\n"),
+        format!("{BASE32_PREFIX}{SYNTH_PRINT_BASE32}\n{CHECK_PREFIX}{SYNTH_PRINT_CHECK}\n"),
     )
     .expect("write sheet");
 
@@ -415,8 +405,14 @@ fn backup_verify_from_print_round_trip() {
     let report = stdout_json(&bv);
     assert_eq!(report["mode"], "print");
     assert_eq!(
-        report["fingerprint"], fingerprint,
-        "the printed backup recovers the SAME key keygen produced"
+        report["result"], "passed",
+        "the printed backup decodes and round-trips the self-test vector"
+    );
+    let fingerprint = report["fingerprint"].as_str().expect("fingerprint");
+    assert_eq!(
+        fingerprint.split('-').count(),
+        8,
+        "recovered key fingerprint is 8 dash groups: {fingerprint}"
     );
 }
 
@@ -426,16 +422,23 @@ fn keygen_never_writes_secret_material_to_a_file() {
     let keys = dir.path().join("keys");
     let kg = keygen(&keys);
     let err_text = stderr(&kg);
-    let base32 = line_after(&err_text, BASE32_PREFIX);
 
-    // The plaintext printed-backup blob and the passphrase must never appear in
-    // any file the tool created (ceremony section 5; I1).
+    // This suite spawns `cn` with a piped (non-TTY) stderr, so keygen WITHHOLDS
+    // the plaintext printed-backup block rather than leaking it to a redirected
+    // stream (R1-3): the block never reaches stderr, and keygen says why.
+    assert!(
+        !err_text.contains(BASE32_PREFIX),
+        "the plaintext backup block must be withheld on a non-TTY stderr:\n{err_text}"
+    );
+    assert!(
+        err_text.contains("not an interactive terminal"),
+        "keygen explains why the printed backup was withheld:\n{err_text}"
+    );
+
+    // The passphrase and the printed-backup markers must never appear in any
+    // file the tool created (ceremony section 5; I1).
     for name in ["public.json", "secret.json"] {
         let contents = std::fs::read_to_string(keys.join(name)).expect("read key file");
-        assert!(
-            !contents.contains(&base32),
-            "{name} must not contain the plaintext printed-backup blob"
-        );
         assert!(
             !contents.contains(PASS),
             "{name} must not contain the passphrase"

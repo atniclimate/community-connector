@@ -12,9 +12,12 @@
 //! file the tool creates - the printed backup exists only on paper under
 //! physical security, so the passphrase and the print backup never share a
 //! failure mode (ceremony section 5). Auto-saving it anywhere would defeat that.
+//! To hold that line even under an innocent `2> run.log`, the plaintext backup
+//! block is WITHHELD entirely when stderr is not an interactive terminal (R1-3):
+//! a redirected stderr therefore never captures the raw key.
 
 use std::fs::{self, OpenOptions};
-use std::io::Write;
+use std::io::{IsTerminal, Write};
 use std::path::{Path, PathBuf};
 
 use serde_json::json;
@@ -114,11 +117,22 @@ fn run_keygen(out_dir: &str, err: &mut dyn Write) -> Result<KeygenOutcome, Strin
     // a disclosure - only a usability wart, which the cleanup removes.
     create_new_file(&public_path, &public_bytes)?;
     if let Err(message) = create_new_file(&secret_path, &secret_bytes) {
-        let _ = fs::remove_file(&public_path);
-        return Err(format!(
-            "{message}; removed the just-written '{}' so a retry stays create-only",
-            public_path.display()
-        ));
+        // Best-effort rollback of the public half, but report the removal
+        // truthfully: if it FAILS, a retry would hit the create-only refusal on
+        // the stray public.json, so the operator must remove it by hand (I3 - do
+        // not claim a cleanup that did not happen).
+        return Err(match fs::remove_file(&public_path) {
+            Ok(()) => format!(
+                "{message}; removed the just-written '{}' so a retry stays create-only",
+                public_path.display()
+            ),
+            Err(remove_err) => format!(
+                "{message}; ALSO could not remove the just-written '{}' ({remove_err}) - \
+                 remove that file by hand before retrying, or keygen's create-only check \
+                 will refuse the next run",
+                public_path.display()
+            ),
+        });
     }
 
     let (print_base32, print_check) = keymat::encode_print_backup(&keypair.secret);
@@ -177,6 +191,44 @@ fn write_fingerprint_banner(err: &mut dyn Write, fingerprint: &str) -> std::io::
 }
 
 fn write_print_backup_block(err: &mut dyn Write, base32: &str, check: &str) -> std::io::Result<()> {
+    // The block below IS the plaintext secret key. If stderr is not an
+    // interactive terminal it is being redirected to a file or pipe (e.g.
+    // `cn intake keygen 2> run.log`), which would persist the raw key off-screen
+    // and directly contradict this tool's "writes to NO file" guarantee. Refuse
+    // to print it in that case rather than leaking the key to a redirected
+    // stream (R1-3). The keypair is already written; only the on-screen paper
+    // backup is withheld, so this is a loud message, not a hard failure.
+    if !std::io::stderr().is_terminal() {
+        writeln!(err)?;
+        writeln!(
+            err,
+            "--- PRINTED BACKUP - WITHHELD (stderr is not an interactive terminal) ---"
+        )?;
+        writeln!(
+            err,
+            "Refusing to print the plaintext secret-key backup to a redirected stream: writing"
+        )?;
+        writeln!(
+            err,
+            "it to a file or pipe would persist the raw key off-screen, defeating the paper-only"
+        )?;
+        writeln!(
+            err,
+            "backup that keeps the passphrase and the printed key from sharing a failure mode."
+        )?;
+        writeln!(
+            err,
+            "The keypair WAS written. Re-run 'cn intake keygen' directly at an interactive"
+        )?;
+        writeln!(
+            err,
+            "terminal to display the printed backup for transcription (ceremony step 10)."
+        )?;
+        return writeln!(
+            err,
+            "-----------------------------------------------------------------------------"
+        );
+    }
     writeln!(err)?;
     writeln!(
         err,
