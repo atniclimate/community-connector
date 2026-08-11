@@ -200,11 +200,29 @@ pub fn execute_pull(
     now_ms: i64,
 ) -> Result<PullSummary, String> {
     // Preconditions 3-4: queue root outside any worktree/cloud-sync, single
-    // native-mutator lock (shared with `cn intake apply`).
+    // native-mutator lock (shared with `cn intake apply`). Held for the whole
+    // run via `_lock`.
     let root = queue::refuse_unsafe_root(queue_root)?;
     let paths = QueuePaths::new(&root);
     let _lock = queue::acquire_lock(&paths)?;
+    run_locked(config, keypair, &paths, relay, bundle_fetch, now_ms)
+}
 
+/// The pull run once the queue root is validated and the lock is held (blueprint
+/// 6.1 preconditions 5-7 + the main loop + reconciliation). Split from
+/// [`execute_pull`] so `run` can acquire the lock BEFORE prompting for the key
+/// passphrase - an unsafe root or a held lock must fail fast, never after the
+/// operator has typed a passphrase or the secret key has been decrypted into
+/// memory (blueprint 6.1 precondition order). Tests still exercise the whole
+/// path through `execute_pull`.
+fn run_locked(
+    config: &PullConfig,
+    keypair: &Keypair,
+    paths: &QueuePaths,
+    relay: &dyn RelayHttp,
+    bundle_fetch: impl Fn(&str) -> HttpResult,
+    now_ms: i64,
+) -> Result<PullSummary, String> {
     // Precondition 5 re-asserted: the loaded key must match the pin. `run`
     // already checked the on-disk public key; re-checking the constructed pair
     // keeps the report field honest and lets the core be tested without file I/O.
@@ -221,7 +239,7 @@ pub fn execute_pull(
     let preconditions = json!({
         "config_version": config.config_version.to_string(),
         "key_pin": "match",
-        "queue_root": root.display().to_string(),
+        "queue_root": paths.root().display().to_string(),
         "bundle_check": serde_json::to_value(&bundle).map_err(|err| err.to_string())?,
     });
 
@@ -236,7 +254,7 @@ pub fn execute_pull(
 
     // Main loop.
     let mut main = MainLoop::default();
-    let mut existing_keys = scan_dedup_keys(&paths)?;
+    let mut existing_keys = scan_dedup_keys(paths)?;
     let mut delete_journal: HashSet<String> = HashSet::new();
 
     let listing = fetch_receipts(relay, config)?;
@@ -249,7 +267,7 @@ pub fn execute_pull(
         process_receipt(
             config,
             keypair,
-            &paths,
+            paths,
             relay,
             &key_fp,
             now_ms,
@@ -261,7 +279,7 @@ pub fn execute_pull(
     }
 
     // Post-loop reconciliation (blueprint 6.1 post-loop; D6 precedence).
-    let recon = reconcile(config, &paths, relay, now_ms, &delete_journal)?;
+    let recon = reconcile(config, paths, relay, now_ms, &delete_journal)?;
 
     let failure = !main.errors.is_empty()
         || main.transport_conflicts > 0
@@ -717,7 +735,29 @@ pub(crate) fn run(
         return Ok(Exit::Failure);
     }
 
-    // Load + pin-check the public key, then decrypt the secret and cross-check.
+    // Preconditions 3-4 FIRST (fail-fast, blueprint 6.1 order): validate the
+    // queue root and take the single-mutator lock BEFORE prompting for the
+    // passphrase or decrypting the secret - an unsafe root or a held lock must
+    // never cost the operator a passphrase entry or a needless key decrypt.
+    let root = match queue::refuse_unsafe_root(Path::new(&parsed.queue)) {
+        Ok(root) => root,
+        Err(message) => {
+            writeln!(err, "error: {message}")?;
+            return Ok(Exit::Failure);
+        }
+    };
+    let paths = QueuePaths::new(&root);
+    let _lock = match queue::acquire_lock(&paths) {
+        Ok(lock) => lock,
+        Err(message) => {
+            writeln!(err, "error: {message}")?;
+            return Ok(Exit::Failure);
+        }
+    };
+
+    // Preconditions 5-6: load + pin-check the public key, then decrypt the
+    // secret and cross-check (the passphrase prompt happens only now that the
+    // lock is held).
     let keypair = match load_keypair(&config, err)? {
         Ok(keypair) => keypair,
         Err(exit) => return Ok(exit),
@@ -740,14 +780,7 @@ pub(crate) fn run(
     let bundle_agent = agent.clone();
     let bundle_fetch = move |url: &str| bundle_get(&bundle_agent, url);
 
-    match execute_pull(
-        &config,
-        &keypair,
-        Path::new(&parsed.queue),
-        &relay,
-        bundle_fetch,
-        now_ms,
-    ) {
+    match run_locked(&config, &keypair, &paths, &relay, bundle_fetch, now_ms) {
         Ok(summary) => {
             super::emit_report(out, &summary.report)?;
             if summary.failure {
