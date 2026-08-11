@@ -2043,3 +2043,65 @@ Call 2, the in-memory journal means a `DeletedByMe` signal does not survive a
 crash mid-run, but a crashed run stages nothing it did not also verify and
 deletes nothing it did not also stage, so the next run re-derives the same
 classification from durable facts (the staged records and the relay listing).
+
+## D-086 (2026-08-11) - Puller claim-verifier review dispositions (relay steps 7-8)
+
+Trigger: an independent claim-verifier pass over the steps 7-8 landing (13b8879)
+confirmed every headline claim by re-running the battery (fmt/clippy/test/pii
+green, counts exact, module fence clean, Cargo.lock additive, D-085 accurate) and
+surfaced issues the worker's self-review missed. Six were fixed as atomic commits
+(F1 precondition order, F2 D6 orphan-blob flagging, F11 timestamp-parse
+diagnostic, F6 configurable envelope cap, F10 HTTP timeouts, F4/F5 conflict +
+reconciliation + CLI-entrypoint tests). Three dispositions need a durable record;
+the rest are queued for the mandatory adversarial round.
+
+Call 1 - F6 config-shape change (`max_envelope_bytes`). The puller previously
+capped the outer envelope at the fixed `DEFAULT_MAX_ENVELOPE_BYTES` (8 KiB),
+independent of the relay's deploy-configured `MAX_BLOB_SIZE_BYTES`. A puller cap
+BELOW the relay's silently rejects a valid, consented submission the relay
+accepted - lost consented data over a config mismatch (privacy). Options: (a)
+leave it fixed and document "never raise the relay cap"; (b) add a config knob.
+Chose (b): a new `max_envelope_bytes` field on `PullConfig`, serde-defaulting to
+8 KiB so a config written before the field existed still parses and behaves
+identically (I7 unknown-minor tolerance). This extends blueprint 6.3's config
+shape (as `manifest_path` did in D-085). BINDING deploy-runbook constraint (step
+10): puller `max_envelope_bytes` >= relay `MAX_BLOB_SIZE_BYTES`. The relation to
+the puller's own 8 MiB HTTP read cap (a raise above it would be silently
+truncated by the read) is F7, deferred to the round.
+
+Call 2 - F8 semantic-conflict blob retention (was only in commit text). On a
+semantic Conflict (same submission id, different bytes) the puller stages BOTH
+copies and does NOT delete the relay blob - identical to the transport-conflict
+rule, which the blueprint states explicitly. The blueprint spells out retention
+only for the transport case; extending it to the semantic case is the
+conservative choice: a conflict is an anomaly demanding facilitator attention
+(ADR-005 D4 "never a drop"), and retaining the relay-side ciphertext preserves
+the evidence for out-of-band re-pull/inspection rather than deleting it the
+instant both copies are staged. Cost: the blob lingers to its TTL. Accepted for
+the pilot; the round may revisit whether a staged-both conflict should delete.
+
+Call 3 - F3 rotation old-key catch-up: recorded limitation, NOT built. ADR-005 D3
+rotation has two halves. The enforceable cutoff (the relay admission allowlist
+rejects new submissions to a retired key) is the binding D3 outcome and it is
+implemented (step 5). The puller's old-key CATCH-UP (decrypting
+already-submitted-but-not-yet-pulled envelopes for one TTL after a cutover) is
+NOT: `PullConfig` is single-key (one `key_dir`, one `key_fingerprint_pin`,
+exact-match rejection), and post-cutover an old-key run hard-fails bundle verify
+(the manifest pins the new key's fingerprint). Options: (a) build a multi-key
+puller now (multi-key config, try-each-key decrypt, per-key bundle verification,
+rotation-window semantics); (b) record the limitation and defer. Chose (b): the
+pilot uses a single key with no rotation before the convention, so multi-key
+support is speculative generality (YAGNI) touching ADR-005 D3. Recorded here and
+as an adversarial-round item; ANY real rotation requires the multi-key puller
+design FIRST. This does not weaken the binding cutoff, which stands.
+
+Strongest surviving objection: Call 1 adds yet another operator-tunable to a
+surface (D-085) already spanning a config file, CLI flags, and a key directory,
+and a mis-set `max_envelope_bytes` (e.g. below the relay cap, or above the read
+cap) reintroduces the exact silent-drop the knob exists to prevent. Accepted: the
+default is the safe 8 KiB, the field's doc-comment and the deploy runbook both
+pin the >= relation, and the failure mode is a loud per-receipt "outer envelope
+parse failed" error (never a silent stage-skip). For Call 3, deferring means the
+system cannot rotate keys until the multi-key design lands - but rotation is out
+of pilot scope by construction, and the limitation is now explicit rather than a
+latent surprise mid-rotation.
