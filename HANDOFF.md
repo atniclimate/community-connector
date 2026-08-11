@@ -3,15 +3,17 @@
 > This file is the /pickup target and outranks session memory. Reading order for a
 > fresh session: CLAUDE.md, then this file, then PLAN_1.0.md "Current Position" +
 > "Decision Gates", then current-phase ADRs. DECISIONS.md is the durable judgment
-> record (through D-087; D-081..D-086 are the 2026-08-11 relay-implementation
+> record (through D-088; D-081..D-086 are the 2026-08-11 relay-implementation
 > records, D-086 the claim-verifier review dispositions, D-087 the true-up's
-> pii-scan archived-handoff exemption). Every path below was verified on disk at
-> the 2026-08-11 true-up. **The repo is PUBLIC** - origin is
+> pii-scan archived-handoff exemption, D-088 the step-9 timestamp-reconciliation
+> fix). Every path below was verified on disk at the 2026-08-11 step-9 true-up.
+> **The repo is PUBLIC** - origin is
 > `https://github.com/atniclimate/community-connector`. The local `main` is
-> **18 commits ahead of origin and UNPUSHED** (all relay-implementation work,
-> steps 1-8 + the fix-now bucket + this true-up; run `git status` for the exact
-> count); pushing is authorized and safe but has not been run this arc. The
-> pre-commit PII scan and I1 are the publication boundary.
+> **~21 commits ahead of origin and UNPUSHED** (all relay-implementation work,
+> steps 1-9 + the fix-now bucket + the D-088 fix + true-ups; run
+> `git rev-list --count origin/main..main` for the exact count); pushing is
+> authorized and safe but has not been run this arc. The pre-commit PII scan and
+> I1 are the publication boundary.
 
 ## What this project is
 
@@ -178,10 +180,12 @@ as draft; checkpoint = convention; ad hoc demos open pathways).
    Permission-adjacent: gets a MANDATORY adversarial round. The DEPLOY
    bar (D-059.8) still requires: intake pipeline working + keygen
    ceremony executed + D-023 sign-off on form text.
-   PROGRESS (2026-08-11, all unpushed on main, 18 commits ahead of
-   origin incl. this true-up; live per-step ledger = memory
+   PROGRESS (2026-08-11, all unpushed on main, ~21 commits ahead of
+   origin incl. true-ups; live per-step ledger = memory
    relay-orchestration-state):
-   **Phases A+B+C+D COMPLETE (steps 1-8 landed, reviewed, confirmed).**
+   **Phases A+B+C+D COMPLETE (steps 1-8 landed, reviewed, confirmed);
+   Phase E step 9 (form-to-graph e2e) DONE and PASSING - see the
+   step-9 block below. Steps 10-11 remain.**
    Phases A+B+C (steps 1-6):
    - Step 1 sealed-box crypto binding (14b9778, D-081)
    - Step 2 keygen ceremony CLI (4a0b8db)
@@ -220,19 +224,29 @@ as draft; checkpoint = convention; ad hoc demos open pathways).
    read cap >> envelope cap; F12 real ureq wiring untested; F13 Degraded-on-
    first-file-only; F14 implicit conflict link; cursor forward-compat) PLUS
    F3 rotation limitation.
-   NEXT: **step 9 (form-to-graph e2e on synthetic data) is DISPATCH-READY** -
-   a comprehensive Opus-4.8-xhigh prompt is drafted at the conductor
-   scratchpad (`prompt-step9-e2e-remote-intake.md`; ephemeral - re-derive
-   from blueprint section 8 step 9 + the summary here if gone). Its shape:
-   an ADDITIVE, opt-in (NOT check-all, per the no-Node-in-CI precedent) e2e
-   that seals a synthetic submission via the form's real crypto -> POSTs to
-   a locally-run relay (wrangler dev, or a faithful mock) -> `cn intake pull`
-   over REAL HTTP (partially closes F12) -> approve decision -> `cn intake
-   apply` -> `cn export` -> asserts the entity in the graph. Reuses the
-   proven back-half `intake_apply.rs::approve_decide_apply_reload_round_trip`;
-   the new part is the remote front-half. Plus a manual browser-procedure
-   doc. Then steps 10 (deploy runbook draft) + 11 (docs true-up) are
-   sequential, then the MANDATORY adversarial round on the whole diff.
+   **Step 9 DONE (2026-08-11, commits 897b568 + 4bc00a4).** The form-to-graph
+   e2e harness (built by the prior post-true-up session, left uncommitted;
+   finished + landed this session) PASSES end to end: seal via the form's real
+   crypto -> POST to a local `wrangler dev` relay -> `cn intake pull` over REAL
+   HTTP (partially closes F12) -> approve (opt-in `emit-approve-decision`
+   example) -> `cn intake apply` -> `cn export` -> entity visible. It is
+   ADDITIVE and opt-in (NOT check-all; needs Node/libsodium + a running Worker):
+   `scripts/e2e-remote-intake.ps1` (+ `.sh`, `scripts/e2e/*.mjs`,
+   `core/cli/examples/emit-approve-decision.rs`), with the manual browser
+   Verified-bundle counterpart at `docs/runbooks/e2e-remote-intake.md`.
+   **It caught a REAL shipped defect (D-088):** the durable owner (`approval.rs`)
+   demanded integer timestamps while the remote form emits ISO strings, so no
+   remote submission could be approved (and the consent instant would zero).
+   Fixed in 897b568 - `approval.rs` now coerces both conventions; the ISO parser
+   moved to `cn-model::parse_iso8601_utc_to_unix_ms` (shared with the puller);
+   cn-ingest regression test added. RESIDUAL from D-088 (folded into the
+   adversarial backlog): the app-side facilitator review view renders a remote
+   record's timestamps display-only and was NOT exercised by the e2e - check it
+   handles ISO strings.
+   NEXT: **step 10 (deploy runbook draft `docs/runbooks/intake-relay-deploy.md`)**
+   then **step 11 (docs true-up: MANIFEST/DEPENDENCIES for new crates/dirs)**,
+   both sequential and NOT gated on deploy, then the MANDATORY adversarial round
+   on the whole steps 1-11 diff (backlog above), judgment, acceptance.
 3. **Snapshot data pipeline (D-048 / P2.3-P2.5)** - targets the convention build.
 4. **Phase 4 slimmed (D-056.3):** minimal P4.1 story authoring.
 5. **P1.3 benchmark** deferred to September; record in ADR-004.
