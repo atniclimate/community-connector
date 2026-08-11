@@ -8,21 +8,25 @@
 //! network code may ever enter this crate (ADR-005 D1 module fence).
 
 pub mod approval;
+pub mod consent;
 pub mod crypto;
 pub mod decision;
 pub mod dedup;
 pub mod envelope;
 pub mod near_dup;
+pub mod reconcile;
 pub mod record;
 pub mod recovery;
 mod version;
 
 pub use approval::*;
+pub use consent::*;
 pub use crypto::*;
 pub use decision::*;
 pub use dedup::*;
 pub use envelope::*;
 pub use near_dup::*;
+pub use reconcile::*;
 pub use record::*;
 pub use recovery::*;
 pub use version::{IngestError, QUEUE_RECORD_VERSION, canonical_digest, new_uuid_v7};

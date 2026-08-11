@@ -46,6 +46,29 @@ impl DedupKey {
             payload_hash: record.payload_hash.clone(),
         }
     }
+
+    /// Builds the PRE-DECRYPT transport dedup key from the only two facts the
+    /// puller holds before it can decrypt: the relay `receipt_id` and the
+    /// `ciphertext_hash` it computed locally over the fetched blob (blueprint
+    /// intake-relay 6.1 step 2 - the transport dedup check runs BEFORE
+    /// decryption, so a full [`RemoteContext`] does not yet exist:
+    /// `RemoteContext::key_used` is only knowable after a successful open).
+    /// The semantic fields are deliberately empty - `submission_id` and
+    /// `payload_hash` come from the decrypted inner payload - and an empty
+    /// `submission_id` never matches in [`classify_dedup`], so this key
+    /// exercises ONLY the transport arm. It runs unchanged through the same
+    /// [`classify_dedup`] as a record-derived key; no parallel comparison
+    /// path exists.
+    ///
+    /// [`RemoteContext`]: crate::RemoteContext
+    pub fn transport(receipt_id: &str, ciphertext_hash: &str) -> Self {
+        Self {
+            receipt_id: Some(receipt_id.to_string()),
+            ciphertext_hash: Some(ciphertext_hash.to_string()),
+            submission_id: String::new(),
+            payload_hash: String::new(),
+        }
+    }
 }
 
 /// Typed dedup outcome (ADR-005 D4). Replays are recorded no-ops (I12);

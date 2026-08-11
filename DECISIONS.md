@@ -1831,3 +1831,41 @@ is a thin module behind our own PublicKey/SecretKey/Keypair types, so a future
 swap to a rand_core-0.9 `crypto_box` (or dryoc) touches one file and re-runs the
 same vectors. The interop guarantee - the thing that is expensive to get wrong -
 is the property the fixture locks down regardless of which crate provides it.
+
+## D-082 (2026-08-11) - Puller receipt-classification boundary rules (Phase B step 4)
+
+Trigger: implementing the D6 reconciliation classifier (`cn-ingest`
+`reconcile::classify_receipt`, blueprint intake-relay section 6.1 post-loop)
+required two calls the ADR-005 D6 precedence text leaves unstated - the exact
+TTL+margin boundary and the meaning of a missing age. Both decide whether a
+receipt is flagged EXPIRED (a claim that drives a broadcast re-solicit) versus
+INTEGRITY-ALERT (an ambiguous state re-checked next run), so neither can be left
+to an accidental inequality.
+
+Call 1 - boundary direction. ADR-005 D6 says blob-absent "before" TTL+margin is
+an alert and "after" is expired; it is silent at the exact instant age ==
+threshold. Options: (a) `age >= threshold` -> expired (boundary is expired);
+(b) `age > threshold` -> expired (boundary is alert). Chose (a). The threshold
+IS blob-TTL + consistency-margin, and per D6 the margin exists precisely so that
+"expiry classification only becomes eligible after blob TTL + consistency
+margin, which by construction leaves at least one full pull cadence" - the
+margin is the conservatism buffer. At exactly the threshold that buffer is fully
+elapsed, so the expiry claim is already evidence-backed; `>=` also stops a
+receipt sitting exactly on the boundary from lingering in perpetual alert. This
+matches the step-4 test contract ("age at/over TTL+margin -> expired").
+
+Call 2 - missing/unknown age with the blob absent. Options: default to expired,
+or default to integrity-alert. Chose integrity-alert. Expiry is a positive claim
+that the observation window has fully elapsed; without an age we cannot assert
+that, and D6 frames the alert as exactly the "ambiguity is stated and
+investigated, re-checked once next run before alarming" state - the honest bucket
+for an observation we cannot yet trust. Defaulting the other way would
+manufacture an unevidenced expiry (and an unwarranted re-solicit).
+
+Strongest surviving objection: call 1's strict-`>` alternative is equally
+defensible under a literal reading of "eligible AFTER" the margin, and the two
+differ only at a measure-zero instant. Accepted: the difference is one boundary
+tick, both keep the margin as the real safety buffer, and the reserved-for-
+early-ambiguity role of the alert state is preserved either way. The classifier
+is pure and stateless, so revisiting the tick later is a one-line change plus a
+test flip.

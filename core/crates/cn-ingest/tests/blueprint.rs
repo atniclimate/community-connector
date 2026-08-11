@@ -1775,3 +1775,192 @@ fn envelope_golden_vectors_pin_the_format() {
         "inner payload canonical digest domain"
     );
 }
+
+// --- puller core logic: transport dedup key extraction (blueprint 6.1 step 2) ---
+
+#[test]
+fn transport_dedup_key_is_pre_decrypt_pair() {
+    // The key the puller builds BEFORE decrypting carries only the two facts it
+    // holds at that point; the semantic fields stay empty until decryption.
+    let key = DedupKey::transport("receipt-x", "ct-x");
+    assert_eq!(key.receipt_id.as_deref(), Some("receipt-x"));
+    assert_eq!(key.ciphertext_hash.as_deref(), Some("ct-x"));
+    assert!(
+        key.submission_id.is_empty(),
+        "submission_id is unknown pre-decrypt"
+    );
+    assert!(
+        key.payload_hash.is_empty(),
+        "payload_hash is unknown pre-decrypt"
+    );
+}
+
+#[test]
+fn transport_dedup_key_runs_through_classify_dedup() {
+    // Compose the pre-decrypt key with the REAL classifier - no parallel
+    // comparison path. Existing state is the staged remote record
+    // (receipt-1 / ct-hash).
+    let existing = vec![DedupKey::from_record(&remote_record())];
+
+    // Same (receipt_id, ciphertext_hash) - recorded transport no-op.
+    assert_eq!(
+        classify_dedup(&DedupKey::transport("receipt-1", "ct-hash"), &existing),
+        DedupVerdict::TransportReplay
+    );
+
+    // Same receipt_id, DIFFERENT ciphertext hash - loud transport conflict.
+    assert_eq!(
+        classify_dedup(
+            &DedupKey::transport("receipt-1", "substituted-ct"),
+            &existing
+        ),
+        DedupVerdict::TransportConflict
+    );
+
+    // A receipt_id matching nothing existing is Fresh - and the blank
+    // submission_id must NOT produce a false semantic match against the
+    // existing record's non-empty "sub-1".
+    assert_eq!(
+        classify_dedup(&DedupKey::transport("receipt-unknown", "any-ct"), &existing),
+        DedupVerdict::Fresh
+    );
+}
+
+#[test]
+fn transport_dedup_key_agrees_with_from_record() {
+    // Round-trip sanity: the pre-decrypt key for a receipt agrees with the key
+    // extracted from the QueueRecord that same receipt eventually becomes, and
+    // the composition the puller relies on (skip an already-staged receipt
+    // before decrypting) yields the transport-replay verdict.
+    let staged = remote_record();
+    let post_stage = DedupKey::from_record(&staged);
+    let pre_decrypt = DedupKey::transport(
+        post_stage
+            .receipt_id
+            .as_deref()
+            .expect("remote record has a receipt id"),
+        post_stage
+            .ciphertext_hash
+            .as_deref()
+            .expect("remote record has a ciphertext hash"),
+    );
+    assert_eq!(pre_decrypt.receipt_id, post_stage.receipt_id);
+    assert_eq!(pre_decrypt.ciphertext_hash, post_stage.ciphertext_hash);
+    assert_eq!(
+        classify_dedup(&pre_decrypt, &[post_stage]),
+        DedupVerdict::TransportReplay,
+        "pre-decrypt key skips the already-staged receipt"
+    );
+}
+
+// --- puller core logic: receipt classification (blueprint 6.1 post-loop; D6) ---
+
+fn obs(
+    local_transport_record: bool,
+    local_delete_journal: bool,
+    relay_blob_present: bool,
+    age: Option<i64>,
+    ttl_margin_threshold: i64,
+) -> ReceiptObservation {
+    ReceiptObservation {
+        local_transport_record,
+        local_delete_journal,
+        relay_blob_present,
+        age,
+        ttl_margin_threshold,
+    }
+}
+
+#[test]
+fn receipt_classification_arms() {
+    // Local transport record present -> staged.
+    assert_eq!(
+        classify_receipt(&obs(true, false, false, None, 10)),
+        ReceiptClass::Staged
+    );
+    // Local delete-journal entry (no transport record) -> deleted-by-me.
+    assert_eq!(
+        classify_receipt(&obs(false, true, false, None, 10)),
+        ReceiptClass::DeletedByMe
+    );
+    // No local record, blob present -> unpulled.
+    assert_eq!(
+        classify_receipt(&obs(false, false, true, None, 10)),
+        ReceiptClass::Unpulled
+    );
+    // No local record, blob absent, age under TTL+margin -> integrity alert.
+    assert_eq!(
+        classify_receipt(&obs(false, false, false, Some(5), 10)),
+        ReceiptClass::IntegrityAlert
+    );
+    // No local record, blob absent, age past TTL+margin -> expired.
+    assert_eq!(
+        classify_receipt(&obs(false, false, false, Some(20), 10)),
+        ReceiptClass::Expired
+    );
+}
+
+#[test]
+fn receipt_classification_precedence_local_facts_win() {
+    // Precedence is the whole point: a receipt that is BOTH locally staged AND
+    // blob-absent-past-TTL (and even flagged deleted) must classify staged,
+    // never expired - the strongly-consistent local fact outranks everything.
+    assert_eq!(
+        classify_receipt(&obs(true, true, false, Some(9_999), 10)),
+        ReceiptClass::Staged
+    );
+    // Delete-journal (no transport record) outranks blob-absent-past-TTL.
+    assert_eq!(
+        classify_receipt(&obs(false, true, false, Some(9_999), 10)),
+        ReceiptClass::DeletedByMe
+    );
+    // With no local record, blob PRESENT outranks a past-threshold age: a blob
+    // we can still see is unpulled, not expired.
+    assert_eq!(
+        classify_receipt(&obs(false, false, true, Some(9_999), 10)),
+        ReceiptClass::Unpulled
+    );
+}
+
+#[test]
+fn receipt_classification_boundary_and_unknown_age() {
+    // Boundary (age == threshold) -> expired (D-082): the threshold already
+    // bakes in the consistency margin, so `>=` treats a receipt exactly at the
+    // threshold as drained rather than perpetually alerting.
+    assert_eq!(
+        classify_receipt(&obs(false, false, false, Some(10), 10)),
+        ReceiptClass::Expired,
+        "age == TTL+margin is expired"
+    );
+    // Unknown age with the blob absent -> integrity alert, never expired
+    // (D-082): expiry is a claim that needs evidence the window fully elapsed.
+    assert_eq!(
+        classify_receipt(&obs(false, false, false, None, 10)),
+        ReceiptClass::IntegrityAlert,
+        "no age means no expiry claim"
+    );
+}
+
+// --- puller core logic: consent-digest recognition (blueprint 6.1 step 9) ---
+
+#[test]
+fn consent_digest_recognition() {
+    let known = vec!["digest-a".to_string(), "digest-b".to_string()];
+
+    // Present in a non-empty known list -> Known.
+    assert_eq!(
+        check_consent_digest("digest-b", &known),
+        ConsentDigestVerdict::Known
+    );
+    // Absent from a non-empty known list -> Unknown (a warning, not a halt).
+    assert_eq!(
+        check_consent_digest("digest-z", &known),
+        ConsentDigestVerdict::Unknown
+    );
+    // Empty known list (the pre-D-023 pilot-realistic case) -> Unknown, never
+    // a panic or error.
+    assert_eq!(
+        check_consent_digest("digest-a", &[]),
+        ConsentDigestVerdict::Unknown
+    );
+}
