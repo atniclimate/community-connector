@@ -23,6 +23,7 @@
     "3d-force-graph": "^1.80.0",
     "ajv": "^8.20.0",
     "ajv-formats": "^3.0.1",
+    "fake-indexeddb": "^6.2.5",
     "three-forcegraph": "^1.43.4",
     "troika-three-text": "0.52.4",
     "typescript": "^6.0.3",

@@ -281,6 +281,90 @@ describe("grantQueueDirectory (round-1 F4: the effects layer owns the handle)", 
   });
 });
 
+describe("createOnly read-back mismatch (D-080 debt 1)", () => {
+  it("throws IntakeReadBackMismatch when the file reads back differently", async () => {
+    // A minimal dir whose handle writes fine but reads back corrupted data.
+    const dir: IntakeDirHandle = {
+      name: "queue",
+      getFileHandle: (name: string, options?: { readonly create?: boolean }) => {
+        if (!options?.create) {
+          return Promise.reject(new Error(`NotFound: ${name}`));
+        }
+        return Promise.resolve({
+          getFile: () => Promise.resolve({ text: () => Promise.resolve("CORRUPTED") }),
+          createWritable: () => Promise.resolve({
+            write: () => Promise.resolve(),
+            close: () => Promise.resolve(),
+          }),
+        });
+      },
+      getDirectoryHandle: () => Promise.reject(new Error("NotFound")),
+      keys: async function* () {},
+    };
+    await expect(createOnly(dir, "test.json", '{"ok":true}')).rejects.toMatchObject({
+      code: "IntakeReadBackMismatch",
+    });
+  });
+});
+
+describe("exists() fail-closed on IO errors (D-080 debt 1)", () => {
+  it("throws IntakeIoError when getFileHandle throws a non-NotFound error", async () => {
+    const dir = new FakeDir("queue");
+    dir.getFileHandle = (name: string, options?: { readonly create?: boolean }) => {
+      if (!options?.create) {
+        return Promise.reject(new Error("SecurityError: blocked by policy"));
+      }
+      return new FakeDir("queue").getFileHandle(name, options);
+    };
+    await expect(createOnly(dir, "test.json", "{}")).rejects.toMatchObject({
+      code: "IntakeIoError",
+    });
+  });
+});
+
+describe("guardQueueDirectory refuses unverifiable roots (D-080 debt 1)", () => {
+  it("refuses when .git probe throws a non-NotFound error", async () => {
+    const dir = new FakeDir("queue");
+    dir.getDirectoryHandle = (name: string) => {
+      if (name === ".git") {
+        return Promise.reject(new Error("SecurityError: blocked"));
+      }
+      return Promise.reject(new Error(`NotFound: ${name}`));
+    };
+    const result = await guardQueueDirectory(dir);
+    expect(result).toContain("unverifiable");
+  });
+});
+
+describe("scanQueue decisions enumeration failure (D-080 debt 1)", () => {
+  it("reports the failure instead of treating it as zero decisions", async () => {
+    const dir = new FakeDir("queue");
+    dir.files.set(
+      "rec-1.record.json",
+      JSON.stringify({ record_id: "rec-1", payload: {}, record_checksum: "rc" }),
+    );
+    dir.files.set(
+      "rec-1.sidecar.json",
+      JSON.stringify({ review_state: "pending", decision_generation: 0 }),
+    );
+    // Provide a decisions dir whose keys() throws during iteration.
+    const badDecisions = new FakeDir("decisions");
+    badDecisions.keys = async function* () {
+      throw new Error("DOMException: IO error during enumeration");
+    };
+    dir.dirs.set("decisions", badDecisions);
+    const { actions, dispatch } = collect();
+    await scanQueue(dir, dispatch);
+    const loaded = actions.at(-1);
+    if (loaded?.kind !== "intakeQueueLoaded") {
+      throw new Error("expected intakeQueueLoaded");
+    }
+    expect(loaded.pendingDecisionFiles).toBe(0);
+    expect(loaded.scanIssues.some((i) => i.includes("enumeration failed"))).toBe(true);
+    expect(loaded.records).toHaveLength(1);
+  });
+});
+
 describe("scanQueue issue surfacing (round-1 F3)", () => {
   it("reports unreadable records and sidecars instead of silently dropping them", async () => {
     const dir = new FakeDir("queue");
