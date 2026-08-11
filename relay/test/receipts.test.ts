@@ -85,7 +85,7 @@ describe("GET /receipts", () => {
   it("surfaces a ledger-without-blob receipt (already deleted or expired)", async () => {
     await env.INTAKE_BLOBS.put(
       "ledger:gone-1",
-      JSON.stringify({ receipt_id: "gone-1", size: 42, arrived_at: "2026-08-11T00:00:00.000Z", claimed_fingerprint: "aaaa-bbbb-cccc-dddd" }),
+      JSON.stringify({ version: 1, receipt_id: "gone-1", size: 42, arrived_at: "2026-08-11T00:00:00.000Z", claimed_fingerprint: "aaaa-bbbb-cccc-dddd" }),
     );
     const res = await dispatch(receiptsRequest(bearer()));
     const body = (await res.json()) as { receipts: ReceiptRow[] };
@@ -93,5 +93,22 @@ describe("GET /receipts", () => {
     expect(row?.has_ledger).toBe(true);
     expect(row?.has_blob).toBe(false);
     expect(row?.size).toBe(42);
+  });
+
+  it("downgrades a ledger row whose schema version does not match (drift detected, metadata withheld)", async () => {
+    // I7: a row written under a different ledger schema version must be a
+    // detectable, downgraded row - presence flag kept, metadata NOT surfaced -
+    // never a shape-guessed read of a stale/foreign schema.
+    await env.INTAKE_BLOBS.put(
+      "ledger:drifted-1",
+      JSON.stringify({ version: 999, receipt_id: "drifted-1", size: 7, arrived_at: "2026-08-11T00:00:00.000Z", claimed_fingerprint: "aaaa-bbbb-cccc-dddd" }),
+    );
+    const res = await dispatch(receiptsRequest(bearer()));
+    const body = (await res.json()) as { receipts: ReceiptRow[] };
+    const row = body.receipts.find((r) => r.receipt_id === "drifted-1");
+    expect(row?.has_ledger).toBe(true);
+    expect(row?.size).toBeUndefined();
+    expect(row?.arrived_at).toBeUndefined();
+    expect(row?.claimed_fingerprint).toBeUndefined();
   });
 });

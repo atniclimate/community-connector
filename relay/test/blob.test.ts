@@ -50,6 +50,37 @@ describe("GET /blob/:id", () => {
     expect(second.status).toBe(200);
     expect(await first.text()).toBe(await second.text());
   });
+
+  it("404-identity: auth-failure, authed-missing, and unauth-hit-on-existing are byte-identical (no oracle)", async () => {
+    // Seed a real, existing blob so an unauth/wrong-token request can probe a
+    // KNOWN-PRESENT id. If any of these five 404s differed in body, status, or
+    // headers, a future refactor would have reopened a body/timing existence
+    // oracle: the whole point of D6's 401-vs-404 rule is that a receipt id
+    // grants no lookup capability and auth failure reveals nothing.
+    const existingId = await submitAndGetId();
+
+    const responses = await Promise.all([
+      dispatch(blobRequest("does-not-exist", "GET")), // unauth, missing id
+      dispatch(blobRequest("does-not-exist", "GET", bearer("nope"))), // wrong token, missing id
+      dispatch(blobRequest("does-not-exist", "GET", bearer())), // authed, missing id
+      dispatch(blobRequest(existingId, "GET")), // unauth, EXISTING id
+      dispatch(blobRequest(existingId, "GET", bearer("nope"))), // wrong token, EXISTING id
+    ]);
+    const bodies = await Promise.all(responses.map((r) => r.text()));
+
+    for (const r of responses) {
+      expect(r.status).toBe(404);
+      // No CORS on the control plane, on any of these paths.
+      expect(r.headers.get("Access-Control-Allow-Origin")).toBeNull();
+    }
+    // Every body byte-equals the first - authed-missing == unauth-failure ==
+    // unauth-hit-on-existing - and is exactly the generic not_found envelope.
+    const first = bodies[0] as string;
+    for (const b of bodies) {
+      expect(b).toBe(first);
+    }
+    expect(JSON.parse(first)).toEqual({ error: "not_found" });
+  });
 });
 
 describe("DELETE /blob/:id", () => {

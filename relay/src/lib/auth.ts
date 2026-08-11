@@ -31,8 +31,16 @@ export async function isAuthorized(request: Request, env: Env): Promise<boolean>
 
   const presented = await sha256(token);
   const expected = fromHex(env.CREDENTIAL_HASH.trim());
-  if (expected === null) {
-    // Misconfigured/empty hash: a plain non-match, no distinct surface.
+  if (expected === null || expected.length !== presented.length) {
+    // The relay's OWN deploy config is broken: a non-hex, odd-length, or
+    // wrong-length CREDENTIAL_HASH can never match any presented token, so every
+    // control-plane request would 404 forever with zero operator signal. Numeric
+    // config errors and a MISSING secret fail loud; this must too (I3). Log the
+    // CLASS of failure only - NEVER the configured value. Still return false: the
+    // client surface is unchanged (a plain non-match), so the 404-identity and
+    // constant-time discipline hold - the branch depends only on deploy config,
+    // never on the token, so it leaks nothing about the token.
+    console.error("relay_credential_hash_invalid");
     return false;
   }
   return constantTimeEqual(presented, expected);

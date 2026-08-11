@@ -2,7 +2,7 @@ import type { Env } from "../env.js";
 import { readConfig, type RelayConfig } from "../lib/config.js";
 import { submitResponse } from "../lib/cors.js";
 import { toHex } from "../lib/hex.js";
-import { blobKey, ledgerKey } from "../lib/kv.js";
+import { blobKey, ledgerKey, LEDGER_SCHEMA_VERSION } from "../lib/kv.js";
 import { BLOB_PREFIX } from "../lib/kv.js";
 import { errorName } from "../lib/http.js";
 import { checkRateLimit } from "../lib/ratelimit.js";
@@ -11,13 +11,31 @@ import { checkRateLimit } from "../lib/ratelimit.js";
 const RETRY_AFTER_SECONDS = "60";
 
 /**
- * POST /submit (public, no auth): accept exactly one outer envelope as opaque
- * ciphertext (ADR-005 D1/D6). Ordered validation, cheapest checks first, fail
- * fast. EVERY response - success and every error - carries the /submit CORS
- * origin header via submitResponse (D5). The relay never decrypts, never
- * inspects the ciphertext, and stores the body byte-for-byte verbatim.
+ * POST /submit (public, no auth). Thin CORS-guaranteeing wrapper over the real
+ * handler: the D5 invariant is that EVERY /submit response carries the Pages
+ * CORS origin, and that must hold even when the handler THROWS (a KV fault, an
+ * unset ADMISSION_ALLOWLIST hitting `.split`, any unexpected error) - otherwise
+ * the browser form gets a CORS-less 500 it cannot read. Catch here and re-emit
+ * through submitResponse so the origin header is always present. Log the CLASS
+ * only (never a message/stack that could echo input); the body stays generic.
  */
 export async function handleSubmit(request: Request, env: Env): Promise<Response> {
+  try {
+    return await handleSubmitInner(request, env);
+  } catch (err) {
+    console.error("relay_submit_error", errorName(err));
+    return submitResponse(env, 500, { error: "internal_error" });
+  }
+}
+
+/**
+ * Accept exactly one outer envelope as opaque ciphertext (ADR-005 D1/D6).
+ * Ordered validation, cheapest checks first, fail fast. Every response - success
+ * and every error - carries the /submit CORS origin header via submitResponse
+ * (D5). The relay never decrypts, never inspects the ciphertext, and stores the
+ * body byte-for-byte verbatim (the raw request bytes, not a re-encoded string).
+ */
+async function handleSubmitInner(request: Request, env: Env): Promise<Response> {
   let config: RelayConfig;
   try {
     config = readConfig(env);
@@ -44,6 +62,9 @@ export async function handleSubmit(request: Request, env: Env): Promise<Response
 
   // 3. Read raw bytes and check the EXACT byte length (not a decoded string's
   //    .length, which counts UTF-16 units and under-counts multi-byte UTF-8).
+  //    The RAW bytes are what get stored (byte-for-byte verbatim); the UTF-8
+  //    decode below is a COPY used only for structural validation, so a body
+  //    that is valid JSON but not clean UTF-8 is still stored exactly as sent.
   const bytes = new Uint8Array(await request.arrayBuffer());
   if (bytes.byteLength > config.maxBlobSizeBytes) {
     return submitResponse(env, 413, { error: "payload_too_large" });
@@ -76,8 +97,9 @@ export async function handleSubmit(request: Request, env: Env): Promise<Response
     return submitResponse(env, 503, { error: "capacity_exceeded" }, { "Retry-After": RETRY_AFTER_SECONDS });
   }
 
-  // 11-14. Generate receipt id, then the two fixed-order KV writes.
-  return writeReceipt(env, config, rawBody, bytes.byteLength, fields.fingerprint);
+  // 11-14. Generate receipt id, then the two fixed-order KV writes. The stored
+  //    blob is the RAW bytes (not rawBody), preserving byte-for-byte fidelity.
+  return writeReceipt(env, config, bytes, fields.fingerprint);
 }
 
 interface EnvelopeFields {
@@ -126,7 +148,12 @@ function isAdmitted(fingerprint: string, env: Env): boolean {
  * known-stale, eventually consistent by design; no caching or "smarter"
  * approximation). At pilot scale (~300 max) a single .list() page covers the
  * count; a partial listing beyond a page would only UNDER-count, which cannot
- * falsely trip the cap.
+ * falsely trip the cap. This single-page read stays correct only while the
+ * configured cap is below KV's ~1000-key page ceiling (see wrangler.toml) - a
+ * cap at or above the ceiling could never trip because the count saturates at
+ * one page. The intentional single-list is NOT paginated (unlike the receipts
+ * listing): the D6 contract here is an approximate, eventually-consistent
+ * backstop, not an exact count.
  */
 async function isOverCap(env: Env, config: RelayConfig): Promise<boolean> {
   const listing = await env.INTAKE_BLOBS.list({ prefix: BLOB_PREFIX });
@@ -150,17 +177,18 @@ function randomReceiptId(): string {
 async function writeReceipt(
   env: Env,
   config: RelayConfig,
-  rawBody: string,
-  size: number,
+  body: Uint8Array,
   fingerprint: string,
 ): Promise<Response> {
   const receiptId = randomReceiptId();
 
   try {
-    // Store the ciphertext blob VERBATIM - the exact decoded string, no
-    // JSON.parse/JSON.stringify round trip (byte-for-byte fidelity; the Rust
-    // OuterEnvelope's flattened `extras` and key ordering must survive).
-    await env.INTAKE_BLOBS.put(blobKey(receiptId), rawBody, {
+    // Store the ciphertext blob VERBATIM - the exact RAW request bytes, no
+    // TextDecoder re-encode and no JSON.parse/JSON.stringify round trip
+    // (byte-for-byte fidelity; the Rust OuterEnvelope's flattened `extras` and
+    // key ordering must survive, and a body that is valid JSON but not clean
+    // UTF-8 is stored exactly as sent). GET /blob returns these bytes unchanged.
+    await env.INTAKE_BLOBS.put(blobKey(receiptId), body, {
       expirationTtl: config.blobTtlSeconds,
     });
   } catch (err) {
@@ -169,8 +197,9 @@ async function writeReceipt(
   }
 
   const ledger = {
+    version: LEDGER_SCHEMA_VERSION, // I7: schema-drift detection on read
     receipt_id: receiptId,
-    size,
+    size: body.byteLength,
     arrived_at: new Date().toISOString(),
     claimed_fingerprint: fingerprint, // content only, never ciphertext
   };

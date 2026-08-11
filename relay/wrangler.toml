@@ -42,7 +42,11 @@ LEDGER_TTL_SECONDS = "93600"         # illustrative: 26h
 MAX_BLOB_SIZE_BYTES = "8192"         # illustrative: 8 KiB
 # APPROXIMATE_BLOB_CAP: generous for pilot scale (~150 expected / 300 max, D6).
 # Eventually-consistent list-count, an approximate backstop, NOT a hard cap.
-APPROXIMATE_BLOB_CAP = "1000"        # illustrative
+# MUST stay below KV's ~1000-key single-page list ceiling: the cap check reads
+# one unpaginated .list() page, so a cap at/above 1000 could never trip (the
+# count saturates at one page). Keep it well under 1000 so a literal copy of
+# this illustrative value deploys safely.
+APPROXIMATE_BLOB_CAP = "500"         # illustrative (must be < ~1000 page ceiling)
 # RATE_LIMIT_PER_IP_PER_MINUTE: venue-scale NAT-safe (hundreds of phones behind
 # one venue IP, D6). Sized generously per-IP; the real abuse backstops are the
 # size cap, TTL, billing ceiling, and review gate.

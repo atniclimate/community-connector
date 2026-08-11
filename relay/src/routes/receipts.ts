@@ -1,6 +1,6 @@
 import type { Env } from "../env.js";
 import { isAuthorized } from "../lib/auth.js";
-import { BLOB_PREFIX, LEDGER_PREFIX, ledgerKey } from "../lib/kv.js";
+import { BLOB_PREFIX, LEDGER_PREFIX, LEDGER_SCHEMA_VERSION, ledgerKey } from "../lib/kv.js";
 import { jsonResponse, notFound } from "../lib/http.js";
 
 interface ReceiptFlags {
@@ -40,25 +40,43 @@ export async function handleReceipts(request: Request, env: Env): Promise<Respon
 
 /** Union the two prefixes into per-receipt presence flags. */
 async function collectPresence(env: Env): Promise<Map<string, ReceiptFlags>> {
-  const [blobList, ledgerList] = await Promise.all([
-    env.INTAKE_BLOBS.list({ prefix: BLOB_PREFIX }),
-    env.INTAKE_BLOBS.list({ prefix: LEDGER_PREFIX }),
-  ]);
-
   const flagsById = new Map<string, ReceiptFlags>();
-  for (const key of blobList.keys) {
-    const id = key.name.slice(BLOB_PREFIX.length);
+  await listAllKeys(env, BLOB_PREFIX, (id) => {
     const flags = flagsById.get(id) ?? { hasBlob: false, hasLedger: false };
     flags.hasBlob = true;
     flagsById.set(id, flags);
-  }
-  for (const key of ledgerList.keys) {
-    const id = key.name.slice(LEDGER_PREFIX.length);
+  });
+  await listAllKeys(env, LEDGER_PREFIX, (id) => {
     const flags = flagsById.get(id) ?? { hasBlob: false, hasLedger: false };
     flags.hasLedger = true;
     flagsById.set(id, flags);
-  }
+  });
   return flagsById;
+}
+
+/**
+ * Scan a full prefix, FOLLOWING the KV list cursor to completion so a listing
+ * beyond one page (KV caps a page at 1000 keys) is never SILENTLY truncated
+ * (I3). Pilot scale (~150 expected / 300 max, D6) fits in one page today, but a
+ * single unpaginated .list() would drop receipts past 1000 with no signal - the
+ * puller must see every receipt to reconcile orphans. The prefix-stripped id of
+ * each key is handed to `onId`. Mirrors the cursor loop in test/setup.ts.
+ */
+async function listAllKeys(
+  env: Env,
+  prefix: string,
+  onId: (id: string) => void,
+): Promise<void> {
+  let cursor: string | undefined;
+  do {
+    const listing = await env.INTAKE_BLOBS.list(
+      cursor === undefined ? { prefix } : { prefix, cursor },
+    );
+    for (const key of listing.keys) {
+      onId(key.name.slice(prefix.length));
+    }
+    cursor = listing.list_complete ? undefined : listing.cursor;
+  } while (cursor !== undefined);
 }
 
 /**
@@ -96,23 +114,39 @@ interface LedgerMeta {
 async function readLedger(env: Env, receiptId: string): Promise<LedgerMeta | null> {
   const raw = await env.INTAKE_BLOBS.get(ledgerKey(receiptId));
   if (raw === null) {
+    // The ledger key vanished between the prefix list and this get (TTL expiry
+    // or an explicit delete): a benign presence race, NOT corruption - no log.
     return null;
   }
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
   } catch {
+    // The relay's OWN persisted ledger row is unparseable - genuine corruption.
+    // Fail loud (I3): log the CLASS only, never the value/body, then keep the
+    // graceful row-downgrade (presence flags preserved, metadata omitted).
+    console.error("relay_ledger_unreadable");
     return null;
   }
   if (typeof parsed !== "object" || parsed === null) {
+    console.error("relay_ledger_unreadable");
     return null;
   }
   const obj = parsed as Record<string, unknown>;
+  if (obj["version"] !== LEDGER_SCHEMA_VERSION) {
+    // Schema drift (I7): the row was written under a different ledger schema
+    // version. A distinct, DETECTABLE condition - not shape-guessed. Log the
+    // class only, then downgrade the row.
+    console.error("relay_ledger_version_mismatch");
+    return null;
+  }
   if (
     typeof obj["size"] !== "number" ||
     typeof obj["arrived_at"] !== "string" ||
     typeof obj["claimed_fingerprint"] !== "string"
   ) {
+    // Right schema version but a malformed field set: corruption again (I3).
+    console.error("relay_ledger_unreadable");
     return null;
   }
   return {

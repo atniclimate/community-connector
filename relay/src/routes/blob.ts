@@ -15,12 +15,14 @@ export async function handleGetBlob(request: Request, env: Env, receiptId: strin
   if (!(await isAuthorized(request, env))) {
     return notFound();
   }
-  const value = await env.INTAKE_BLOBS.get(blobKey(receiptId));
+  // Read the RAW stored bytes (submit stores the verbatim request bytes as an
+  // ArrayBuffer). Returning bytes, not a re-decoded string, keeps the response
+  // body byte-for-byte identical to the originally-POSTed body even when it was
+  // valid JSON but not clean UTF-8. No CORS (control plane).
+  const value = await env.INTAKE_BLOBS.get(blobKey(receiptId), "arrayBuffer");
   if (value === null) {
     return notFound();
   }
-  // Exact stored string; new Response(string) re-encodes identity UTF-8, so the
-  // body equals the originally-POSTed bytes. No CORS (control plane).
   return new Response(value, {
     status: 200,
     headers: { "Content-Type": "application/json" },

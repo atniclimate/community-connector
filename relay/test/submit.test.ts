@@ -197,6 +197,29 @@ describe("POST /submit", () => {
     expect(res.status).toBe(409);
     expect(res.headers.get("Access-Control-Allow-Origin")).toBe(env.PAGES_ORIGIN);
   });
+
+  it("carries the CORS origin header even when /submit THROWS (unset ADMISSION_ALLOWLIST)", async () => {
+    // D5: EVERY /submit response must be readable by the browser form, including
+    // an unexpected throw. An unset ADMISSION_ALLOWLIST makes isAdmitted's
+    // `.split` throw; the wrapper must still return a CORS-bearing generic 500,
+    // never a CORS-less crash the form cannot read.
+    const broken = withEnv({ ADMISSION_ALLOWLIST: undefined });
+    const res = await dispatch(submitRequest(), broken);
+    expect(res.status).toBe(500);
+    expect(await res.json()).toEqual({ error: "internal_error" });
+    expect(res.headers.get("Access-Control-Allow-Origin")).toBe(env.PAGES_ORIGIN);
+  });
+
+  it("carries the CORS origin header when a KV fault throws inside /submit", async () => {
+    // A KV write fault on the rate-limit bucket throws from an unguarded spot;
+    // the wrapper must convert it to a CORS-bearing 500 (D5), not a bare crash.
+    const faulting = withEnv({
+      INTAKE_BLOBS: throwingKv(env.INTAKE_BLOBS, (k) => k.startsWith("ratelimit:")),
+    });
+    const res = await dispatch(submitRequest(), faulting);
+    expect(res.status).toBe(500);
+    expect(res.headers.get("Access-Control-Allow-Origin")).toBe(env.PAGES_ORIGIN);
+  });
 });
 
 describe("OPTIONS /submit (CORS preflight)", () => {
