@@ -150,18 +150,16 @@ human rulings D-072 landed the same arc (consent boilerplate authorized
 as draft; checkpoint = convention; ad hoc demos open pathways).
 
 **NOT done - ordered next actions:**
-1. STANDING DEBTS from the round (D-080; visible, unclaimed): browser
-   IndexedDB/FSA tests; the production interactive load path + the
-   mandatory synthetic decide -> apply -> reload rehearsal (amended
-   step 9, owed with the August pilot build BEFORE pilot use);
-   tripwire source/archive bypass hardening (optional); the
-   D-068/D-059.8 deploy gates.
-2. Remote intake relay implementation (ADR-005 D2/D6, mandate item 3) -
-   building is unlocked; DEPLOY stays barred by D-059.8.
-3. Snapshot data pipeline (D-048 / P2.3-P2.5) - targets the convention
-   build.
-4. Phase 4 slimmed (D-056.3): minimal P4.1 story authoring.
-5. P1.3 benchmark deferred to September; record in ADR-004.
+1. **STANDING DEBTS partially cleared (D-080).** Browser IndexedDB/FSA
+   tests LANDED (476116b, 2026-08-10): 12 new tests covering error
+   paths (read-back mismatch, fail-closed IO, unverifiable roots,
+   decisions enumeration failure), the full IDB lifecycle
+   (persist-success, restore-none/granted/denied/throws), and the
+   full-state round trip (grant -> stage -> scan -> approve/reject ->
+   verify). 121 app tests total. STILL OWED: the production interactive
+   load path (live-browser rehearsal of the full intake flow through the
+   real app, not just unit tests), tripwire source/archive bypass
+   hardening (optional), and the D-068/D-059.8 deploy gates.
 2. **Remote intake relay implementation (per ACCEPTED ADR-005).** Pages form,
    client-side sealed box, Workers+KV relay (receipt ledger, admission
    allowlist), pilot-PC puller (bundle+key pins, crash protocol). The

@@ -4,7 +4,23 @@
 > CLAUDE.md -> HANDOFF.md -> this file. Refresh the Brief at each session
 > end (CLAUDE.md session-end protocol).
 
-## The 60-second brief (refreshed 2026-07-25, end of the implementation-review session)
+## The 60-second brief (refreshed 2026-08-10)
+
+**D-080 standing debt 1 (browser IndexedDB/FSA tests) is CLEARED**
+(476116b): 12 new tests covering FSA error paths (read-back mismatch,
+fail-closed IO, unverifiable roots, decisions enumeration failure),
+the full IDB persist/restore lifecycle (five scenarios), and the
+full-state round trip (grant -> stage two submissions -> scan ->
+approve/reject -> verify). 121 app tests total, check-all 12/12 green.
+The remaining D-080 debts: the production interactive load path
+(live-browser rehearsal, owed before pilot use), tripwire hardening
+(optional), and the deploy gates (D-059.8, human-blocked). Next three
+actions: (1) the remote intake relay (build unlocked, deploy barred),
+(2) snapshot data pipeline (convention build), (3) minimal P4.1 story
+authoring. The human's queue is unchanged (D-023 consent review,
+committee checkpoint timing).
+
+## The previous brief (refreshed 2026-07-25, end of the implementation-review session)
 
 **The intake-pipeline implementation is ACCEPTED** (D-080): the
 mandatory adversarial round became FIVE rounds in one day (D-076..D-080;
