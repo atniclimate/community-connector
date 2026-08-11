@@ -17,6 +17,10 @@ pub enum IngestError {
     ChecksumMismatch { what: String },
     #[error("sidecar binding mismatch for record {record_id}")]
     BindingMismatch { record_id: String },
+    #[error("payload exceeds size cap: max {max} bytes, got {actual} bytes")]
+    OversizedPayload { max: usize, actual: usize },
+    #[error("consent not affirmed")]
+    ConsentNotAffirmed,
     #[error("serialization error: {0}")]
     Serialize(String),
 }

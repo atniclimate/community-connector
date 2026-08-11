@@ -1427,3 +1427,351 @@ fn stored_text_is_nfc_normalized_and_digest_shape_warns_only() {
         "non-hex digest shape is a warning: {findings:?}"
     );
 }
+
+// --- remote intake envelopes (ADR-005 D3; blueprint intake-relay section 2) ---
+
+fn outer_json() -> String {
+    r#"{
+        "intake_envelope_version": "0.1.0",
+        "recipient_key_fingerprint": "3f9a-1c02-7d44-9b10-e5f6-a1b2-c3d4-e5f6",
+        "ciphertext": "c2VhbGVkLWJveC1jaXBoZXJ0ZXh0"
+    }"#
+    .to_string()
+}
+
+fn inner_json() -> String {
+    r#"{
+        "submission_version": "0.1.0",
+        "submission_id": "11111111-2222-3333-4444-555555555555",
+        "form_version": "form-0.1.0",
+        "consent": {
+            "consent_text_digest": "abcdef",
+            "consent_affirmed": true,
+            "consent_affirmed_at": "2026-09-14T10:00:00Z"
+        },
+        "captured_at": "2026-09-14T09:59:00Z",
+        "kind": "person",
+        "fields": {
+            "display_name": "Synthetic Person",
+            "affiliation": ["River Alliance"]
+        }
+    }"#
+    .to_string()
+}
+
+fn remote_ctx() -> RemoteContext {
+    RemoteContext {
+        claimed_fingerprint: "3f9a-1c02".to_string(),
+        envelope_version: "0.1.0".to_string(),
+        key_used: "3f9a-1c02".to_string(),
+        receipt_id: "receipt-42".to_string(),
+        relay_received_at: Some(ts(100)),
+        pulled_at: ts(200),
+        ciphertext_hash: "ct-hash-abc".to_string(),
+    }
+}
+
+#[test]
+fn outer_envelope_parses_valid_json() {
+    let outer = OuterEnvelope::parse(outer_json().as_bytes(), DEFAULT_MAX_ENVELOPE_BYTES)
+        .expect("valid outer");
+    assert_eq!(outer.intake_envelope_version, semver::Version::new(0, 1, 0));
+    assert_eq!(
+        outer.recipient_key_fingerprint,
+        "3f9a-1c02-7d44-9b10-e5f6-a1b2-c3d4-e5f6"
+    );
+    assert_eq!(outer.ciphertext, "c2VhbGVkLWJveC1jaXBoZXJ0ZXh0");
+    assert!(outer.extras.is_empty(), "no unknown-minor fields present");
+}
+
+#[test]
+fn outer_envelope_unknown_minor_preserved_across_round_trip() {
+    let mut value: serde_json::Value = serde_json::from_str(&outer_json()).expect("json");
+    value["future_minor_field"] = json!({ "nested": "kept" });
+    let bytes = serde_json::to_vec(&value).expect("bytes");
+
+    let outer = OuterEnvelope::parse(&bytes, DEFAULT_MAX_ENVELOPE_BYTES).expect("parse");
+    assert_eq!(
+        outer.extras.get("future_minor_field"),
+        Some(&json!({ "nested": "kept" })),
+        "unknown minor field lands in extras"
+    );
+
+    // parse -> serialize -> parse must preserve extras verbatim.
+    let reserialized = serde_json::to_vec(&outer).expect("serialize");
+    let back = OuterEnvelope::parse(&reserialized, DEFAULT_MAX_ENVELOPE_BYTES).expect("reparse");
+    assert_eq!(back, outer, "round trip is identity");
+    assert_eq!(
+        back.extras.get("future_minor_field"),
+        Some(&json!({ "nested": "kept" }))
+    );
+}
+
+#[test]
+fn outer_envelope_unknown_major_rejected() {
+    let mut value: serde_json::Value = serde_json::from_str(&outer_json()).expect("json");
+    value["intake_envelope_version"] = json!("1.0.0");
+    let bytes = serde_json::to_vec(&value).expect("bytes");
+    assert!(
+        matches!(
+            OuterEnvelope::parse(&bytes, DEFAULT_MAX_ENVELOPE_BYTES),
+            Err(IngestError::UnknownMajorVersion { .. })
+        ),
+        "envelope major bump rejected loudly (I7)"
+    );
+    // The current major (0.x) still parses.
+    OuterEnvelope::parse(outer_json().as_bytes(), DEFAULT_MAX_ENVELOPE_BYTES).expect("0.x parses");
+}
+
+#[test]
+fn outer_envelope_oversized_rejected_before_parsing() {
+    let bytes = outer_json();
+    let cap = bytes.len() - 1;
+    match OuterEnvelope::parse(bytes.as_bytes(), cap) {
+        Err(IngestError::OversizedPayload { max, actual }) => {
+            assert_eq!(max, cap);
+            assert_eq!(actual, bytes.len());
+        }
+        other => panic!("expected OversizedPayload, got {other:?}"),
+    }
+
+    // The size gate runs BEFORE the parser (D6): oversized GARBAGE that would
+    // otherwise fail JSON parsing must surface as OversizedPayload, not a
+    // Serialize error.
+    let garbage = vec![b'{'; 100];
+    assert!(
+        matches!(
+            OuterEnvelope::parse(&garbage, 10),
+            Err(IngestError::OversizedPayload { .. })
+        ),
+        "size gate precedes the parser"
+    );
+}
+
+#[test]
+fn inner_payload_parses_valid_json() {
+    let inner = InnerPayload::parse(inner_json().as_bytes()).expect("valid inner");
+    assert_eq!(inner.submission_version, semver::Version::new(0, 1, 0));
+    assert_eq!(inner.submission_id, "11111111-2222-3333-4444-555555555555");
+    assert_eq!(inner.form_version, "form-0.1.0");
+    assert!(inner.consent.consent_affirmed);
+    assert_eq!(inner.consent.consent_text_digest, "abcdef");
+    assert_eq!(inner.consent.consent_affirmed_at, "2026-09-14T10:00:00Z");
+    assert_eq!(inner.captured_at, "2026-09-14T09:59:00Z");
+    assert_eq!(inner.kind.as_deref(), Some("person"));
+    assert_eq!(
+        inner.fields.get("display_name"),
+        Some(&json!("Synthetic Person"))
+    );
+    assert!(inner.extras.is_empty());
+}
+
+#[test]
+fn inner_payload_consent_not_affirmed_is_loud() {
+    let mut value: serde_json::Value = serde_json::from_str(&inner_json()).expect("json");
+    value["consent"]["consent_affirmed"] = json!(false);
+    let bytes = serde_json::to_vec(&value).expect("bytes");
+    assert_eq!(
+        InnerPayload::parse(&bytes),
+        Err(IngestError::ConsentNotAffirmed),
+        "unaffirmed consent must be rejected loudly, never staged (D-030)"
+    );
+}
+
+#[test]
+fn inner_payload_unknown_minor_preserved() {
+    let mut value: serde_json::Value = serde_json::from_str(&inner_json()).expect("json");
+    value["future_field"] = json!("kept");
+    let bytes = serde_json::to_vec(&value).expect("bytes");
+    let inner = InnerPayload::parse(&bytes).expect("parse");
+    assert_eq!(inner.extras.get("future_field"), Some(&json!("kept")));
+    let reserialized = serde_json::to_value(&inner).expect("value");
+    assert_eq!(
+        reserialized["future_field"],
+        json!("kept"),
+        "unknown minor survives re-serialization"
+    );
+}
+
+#[test]
+fn inner_payload_kind_absent_is_none_and_omitted() {
+    let mut value: serde_json::Value = serde_json::from_str(&inner_json()).expect("json");
+    value.as_object_mut().expect("obj").remove("kind");
+    let bytes = serde_json::to_vec(&value).expect("bytes");
+    let inner = InnerPayload::parse(&bytes).expect("parse");
+    assert!(inner.kind.is_none(), "absent kind deserializes to None");
+    assert!(
+        !inner.extras.contains_key("kind"),
+        "kind is a known field, never captured by the flattened extras"
+    );
+    let reserialized = serde_json::to_value(&inner).expect("value");
+    assert!(
+        reserialized.get("kind").is_none(),
+        "None kind is omitted, not emitted as null"
+    );
+}
+
+#[test]
+fn envelope_version_strings_enforce_major_discipline() {
+    // "0.1.0" parses (current major is 0).
+    let ok = InnerPayload::parse(inner_json().as_bytes()).expect("0.x parses");
+    assert_eq!(ok.submission_version.major, 0);
+
+    // "1.0.0" rejects (unknown major).
+    let mut bumped: serde_json::Value = serde_json::from_str(&inner_json()).expect("json");
+    bumped["submission_version"] = json!("1.0.0");
+    let bytes = serde_json::to_vec(&bumped).expect("bytes");
+    assert!(matches!(
+        InnerPayload::parse(&bytes),
+        Err(IngestError::UnknownMajorVersion { .. })
+    ));
+
+    // A higher MINOR (0.9.0) is tolerated (ignore-and-preserve).
+    let mut minor: serde_json::Value = serde_json::from_str(&inner_json()).expect("json");
+    minor["submission_version"] = json!("0.9.0");
+    let bytes = serde_json::to_vec(&minor).expect("bytes");
+    InnerPayload::parse(&bytes).expect("higher minor tolerated");
+}
+
+#[test]
+fn stage_remote_record_builds_verified_remote_queue_record() {
+    let inner = InnerPayload::parse(inner_json().as_bytes()).expect("inner");
+    let record = stage_remote_record(&inner, remote_ctx(), "rec-remote".to_string(), ts(200))
+        .expect("staged");
+
+    // The record verifies: version major, torn-write checksum, and payload
+    // hash are all populated and self-consistent.
+    record.verify().expect("verifies");
+    assert!(!record.payload_hash.is_empty(), "payload hash populated");
+    assert!(
+        !record.record_checksum.is_empty(),
+        "record checksum populated"
+    );
+    assert_eq!(record.record_id, "rec-remote");
+    assert_eq!(record.staged_at, ts(200));
+
+    // The source is Remote with every ctx field propagated - none of it comes
+    // from the untrusted inner payload.
+    let SubmissionSource::Remote {
+        claimed_fingerprint,
+        envelope_version,
+        key_used,
+        receipt_id,
+        relay_received_at,
+        pulled_at,
+        ciphertext_hash,
+    } = &record.source
+    else {
+        panic!("expected Remote source, got {:?}", record.source);
+    };
+    assert_eq!(claimed_fingerprint, "3f9a-1c02");
+    assert_eq!(envelope_version, "0.1.0");
+    assert_eq!(key_used, "3f9a-1c02");
+    assert_eq!(receipt_id, "receipt-42");
+    assert_eq!(*relay_received_at, Some(ts(100)));
+    assert_eq!(*pulled_at, ts(200));
+    assert_eq!(ciphertext_hash, "ct-hash-abc");
+
+    // The payload is the inner payload verbatim: dedup, kind resolution, and
+    // planning read exactly what the submitter sent.
+    assert_eq!(
+        record.payload["submission_id"],
+        json!("11111111-2222-3333-4444-555555555555")
+    );
+    assert_eq!(record.payload["kind"], json!("person"));
+    assert_eq!(record.payload["consent"]["consent_affirmed"], json!(true));
+    assert_eq!(
+        record.payload["fields"]["display_name"],
+        json!("Synthetic Person")
+    );
+
+    // The transport dedup key is extractable from the staged record.
+    let key = DedupKey::from_record(&record);
+    assert_eq!(key.receipt_id.as_deref(), Some("receipt-42"));
+    assert_eq!(key.ciphertext_hash.as_deref(), Some("ct-hash-abc"));
+    assert_eq!(key.submission_id, "11111111-2222-3333-4444-555555555555");
+}
+
+#[test]
+fn stage_remote_record_preserves_unknown_minor_in_payload() {
+    let mut value: serde_json::Value = serde_json::from_str(&inner_json()).expect("json");
+    value["future_field"] = json!("kept");
+    let bytes = serde_json::to_vec(&value).expect("bytes");
+    let inner = InnerPayload::parse(&bytes).expect("inner");
+    let record =
+        stage_remote_record(&inner, remote_ctx(), "rec-x".to_string(), ts(5)).expect("staged");
+    assert_eq!(
+        record.payload["future_field"],
+        json!("kept"),
+        "unknown-minor extras survive into the staged payload"
+    );
+}
+
+#[test]
+fn stage_remote_record_rejects_unaffirmed_consent_defense_in_depth() {
+    // A hand-crafted InnerPayload that never went through parse still cannot
+    // stage with consent unaffirmed: staging is the gate to the queue (D-030).
+    let inner = InnerPayload {
+        submission_version: semver::Version::new(0, 1, 0),
+        submission_id: "sub-x".to_string(),
+        form_version: "form-0.1.0".to_string(),
+        consent: ConsentBlock {
+            consent_text_digest: "d".to_string(),
+            consent_affirmed: false,
+            consent_affirmed_at: "2026-09-14T00:00:00Z".to_string(),
+        },
+        captured_at: "2026-09-14T00:00:00Z".to_string(),
+        kind: None,
+        fields: std::collections::BTreeMap::new(),
+        extras: std::collections::BTreeMap::new(),
+    };
+    assert_eq!(
+        stage_remote_record(&inner, remote_ctx(), "rec-x".to_string(), ts(1)),
+        Err(IngestError::ConsentNotAffirmed)
+    );
+}
+
+#[test]
+fn envelope_golden_vectors_pin_the_format() {
+    // Outer: exact struct from pinned JSON. Any parse or field-mapping drift
+    // fails HERE, not in a live relay pull.
+    let outer =
+        OuterEnvelope::parse(outer_json().as_bytes(), DEFAULT_MAX_ENVELOPE_BYTES).expect("outer");
+    let expected_outer = OuterEnvelope {
+        intake_envelope_version: semver::Version::new(0, 1, 0),
+        recipient_key_fingerprint: "3f9a-1c02-7d44-9b10-e5f6-a1b2-c3d4-e5f6".to_string(),
+        ciphertext: "c2VhbGVkLWJveC1jaXBoZXJ0ZXh0".to_string(),
+        extras: std::collections::BTreeMap::new(),
+    };
+    assert_eq!(outer, expected_outer);
+
+    // Inner: exact struct.
+    let inner = InnerPayload::parse(inner_json().as_bytes()).expect("inner");
+    let mut fields = std::collections::BTreeMap::new();
+    fields.insert("display_name".to_string(), json!("Synthetic Person"));
+    fields.insert("affiliation".to_string(), json!(["River Alliance"]));
+    let expected_inner = InnerPayload {
+        submission_version: semver::Version::new(0, 1, 0),
+        submission_id: "11111111-2222-3333-4444-555555555555".to_string(),
+        form_version: "form-0.1.0".to_string(),
+        consent: ConsentBlock {
+            consent_text_digest: "abcdef".to_string(),
+            consent_affirmed: true,
+            consent_affirmed_at: "2026-09-14T10:00:00Z".to_string(),
+        },
+        captured_at: "2026-09-14T09:59:00Z".to_string(),
+        kind: Some("person".to_string()),
+        fields,
+        extras: std::collections::BTreeMap::new(),
+    };
+    assert_eq!(inner, expected_inner);
+
+    // The staged payload's canonical digest is pinned: any serializer or field
+    // drift in the inner-payload -> payload conversion fails HERE.
+    let record = stage_remote_record(&inner, remote_ctx(), "golden-remote".to_string(), ts(7))
+        .expect("staged");
+    assert_eq!(
+        record.payload_hash, "1e07dc4ca697cf86d54d8eb90098f8df1f9b721e1acaf5a08ce5fc1262335983",
+        "inner payload canonical digest domain"
+    );
+}
