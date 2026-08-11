@@ -1200,6 +1200,72 @@ fn optional_typed_fields_survive_approval_not_silently_dropped() {
 }
 
 #[test]
+fn remote_iso_string_timestamps_validate_and_reach_intake_provenance() {
+    // D-088 regression: the remote form (form/src/envelope.ts) emits
+    // consent_affirmed_at / captured_at as ISO-8601 STRINGS, while the in-app
+    // form emits epoch-ms numbers. Before the durable owner reconciled the two,
+    // validate_submission rejected every remote submission ("not an integer")
+    // and, even past that, the IntakeProvenance block stored a zeroed instant
+    // (as_i64().unwrap_or(0)). Blueprint step 9 caught this end to end; this pins
+    // it at the unit level so the two conventions never silently drift apart.
+    let mut iso_payload = payload();
+    iso_payload["consent"]["consent_affirmed_at"] = json!("2000-01-01T00:00:00.000Z");
+    iso_payload["captured_at"] = json!("2000-01-01T00:00:00.500Z");
+
+    let record = QueueRecord::new(
+        "rec-iso".to_string(),
+        ts(30),
+        SubmissionSource::Remote {
+            claimed_fingerprint: "fp-iso".to_string(),
+            envelope_version: "0.1.0".to_string(),
+            key_used: "fp-iso".to_string(),
+            receipt_id: "receipt-iso".to_string(),
+            relay_received_at: None,
+            pulled_at: ts(30),
+            ciphertext_hash: "ct-iso".to_string(),
+        },
+        iso_payload,
+    )
+    .expect("record");
+    let template = plan_template();
+
+    // The ISO-string timestamps validate (the reconciliation, not a rejection),
+    // and captured_at no longer spuriously warns.
+    let findings = validate_submission(&record.payload, &template);
+    assert!(
+        findings.errors.is_empty(),
+        "remote ISO-string timestamps must validate: {findings:?}"
+    );
+    assert!(
+        !findings.warnings.iter().any(|w| w.contains("captured_at")),
+        "captured_at ISO string must not warn: {findings:?}"
+    );
+
+    // And the affirmation instant survives into the IntakeProvenance as real
+    // epoch-ms (2000-01-01T00:00:00Z = 946_684_800_000), never a zeroed default.
+    let plan = plan_approval(
+        &record,
+        &template,
+        &plan_context(),
+        &mut deterministic_ids(),
+    )
+    .expect("plan");
+    assert!(plan.validation.errors.is_empty(), "{:?}", plan.validation);
+    let cn_store::OpKind::EntityCreate { entity } = &plan.ops[0].kind else {
+        panic!("expected EntityCreate");
+    };
+    let intake = entity
+        .provenance
+        .intake()
+        .expect("intake provenance present on the created entity");
+    assert_eq!(
+        intake.consent_affirmed_at,
+        Timestamp(946_684_800_000),
+        "remote ISO consent_affirmed_at coerced to epoch-ms, not zeroed"
+    );
+}
+
+#[test]
 fn validate_submission_enforces_template_value_contract() {
     let template = plan_template();
 

@@ -27,7 +27,7 @@ pub use membership::Membership;
 pub use provenance::*;
 pub use story::{Story, StoryStep};
 pub use tier::SensitivityTier;
-pub use time::Timestamp;
+pub use time::{Timestamp, parse_iso8601_utc_to_unix_ms};
 pub use trust::{TrustGrant, TrustScope};
 
 /// Current persisted model schema version. 0.1.1 added the optional

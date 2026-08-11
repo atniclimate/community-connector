@@ -2137,3 +2137,63 @@ over one directory whose contents are, by construction, copies of the already-
 exempt live handoff. `pii-scan -SelfTest` still passes (rules trip, the
 exemption negative holds). D-075's tripwire intent is unchanged for every
 non-handoff file.
+
+## D-088 (2026-08-11) - Durable owner reconciles the two intake timestamp conventions (relay step 9)
+
+Trigger: blueprint step 9's form-to-graph e2e (`scripts/e2e-remote-intake.ps1`,
+built by the post-true-up 2026-08-11 session and left uncommitted; picked up and
+run this session) drove a SYNTHETIC remote submission all the way through and
+FAILED at the final `cn intake apply` with a preflight `validation_failed`:
+"consent_affirmed_at missing or not an integer". A real defect in the shipped
+remote pipeline (steps 1-8), caught exactly where step 9 is meant to catch it -
+`form/src/envelope.ts` had explicitly deferred "full cross-language interop
+verification" to this step.
+
+Causal chain: the two intake paths emit the same consent/capture timestamps in
+DIFFERENT JSON types. The in-app form (`app/src/ui/forms/model.ts`) emits epoch-ms
+NUMBERS; the remote form (`form/src/envelope.ts`) emits ISO-8601 STRINGS because
+the Rust `InnerPayload` fields are typed `String` (a number is a hard deserialize
+failure at the puller). The puller stages the decrypted inner payload VERBATIM
+(`stage_remote_record` = `serde_json::to_value(inner)`), so a remote record's
+`consent_affirmed_at` is a JSON string. But the durable owner's `approval.rs`
+required an integer in TWO places: `validate_submission` (`Value::as_i64` -> hard
+error) and the `IntakeProvenance` builder (`as_i64().unwrap_or(0)`). Net: no
+remote submission could ever be approved, and even past validation the consent-
+affirmation instant that ADR-005 requires to survive the purge sweep would
+silently store as `Timestamp(0)`. Each half had tests (in-app integer fixtures;
+remote ISO envelope-PARSE tests) but the two were never integration-tested
+through apply until now.
+
+Options: (a) normalize ISO -> epoch-ms at staging (`stage_remote_record`), one
+canonical stored shape; (b) teach the durable owner to accept BOTH conventions;
+(c) change the remote wire format to emit integers.
+
+Choice: (b). (c) is a non-starter - `InnerPayload`'s `String` type makes a numeric
+wire value a hard deserialize failure, and the ISO wire form is the deliberate
+D-083 design. (a) is worse than it looks: the puller computes the in-loop semantic
+dedup `payload_hash` over the ISO inner payload (`canonical_digest(&inner)`) while
+`QueueRecord::new` computes `record.payload_hash` over the STORED payload - normalize
+the stored payload and those two digests diverge, so a repeat of the same submission
+is misclassified as a SEMANTIC CONFLICT instead of a replay. (a) also mutates the
+stored client assertion. (b) is localized to `approval.rs` - the single place the
+two client conventions must reconcile into modeled values - touches no checksum,
+hash, or dedup path, and keeps the staged record a faithful copy of what the client
+asserted. Implementation: a `timestamp_epoch_ms` helper accepting `as_i64()` OR a
+parseable ISO string, used at all three sites; the hand-rolled ISO parser was
+lifted from the CLI's `pull.rs` into `cn-model` (`parse_iso8601_utc_to_unix_ms`,
+shared by the puller AND the durable owner) rather than duplicated. Regression:
+a cn-ingest unit test stages a remote-shaped ISO record and asserts it validates
+and lands a real (non-zero) epoch in `IntakeProvenance`; the opt-in e2e now passes
+seal -> POST -> pull(real HTTP) -> approve -> apply -> export end to end.
+
+Strongest surviving objection: the durable store now holds two representations for
+one semantic field (integer for in-app, ISO string for remote), a latent smell - a
+future consumer that reads a raw payload timestamp with a bare `as_i64` gets `None`
+on remote records and could silently mishandle it. Accepted: the durable owner is
+the sole authority that turns raw payloads into modeled values, and it now coerces
+both; the coercion is documented on `timestamp_epoch_ms` as the required reader for
+any new raw-payload timestamp. A uniform-wire cleanup (normalize at both form
+boundaries so the stored payload is single-typed) is deferred, not foreclosed.
+Note: this fix reconciles the timestamp TYPE only; the app-side facilitator review
+view rendering a remote record's timestamps is display-only, outside the e2e assert
+path, and is flagged for the step 9-11 adversarial round.

@@ -14,7 +14,7 @@ use unicode_normalization::UnicodeNormalization;
 use cn_model::{
     ActorRef, AttributeInstance, AttributeValue, Entity, EntityId, GeoValue, GroupId,
     INTAKE_BLOCK_VERSION, IntakeProvenance, IsoDate, KindId, LinkValue, MediaRefId, Origin,
-    PersonId, ProvenanceEnvelope, SensitivityTier, Timestamp,
+    PersonId, ProvenanceEnvelope, SensitivityTier, Timestamp, parse_iso8601_utc_to_unix_ms,
 };
 use cn_schema::{AttrDef, AttrType, GroupTemplate, ValidationReport, validate_entity};
 use cn_store::{Hlc, OpKind, Operation, SortKey};
@@ -108,6 +108,20 @@ fn check_text(findings: &mut SubmissionFindings, what: &str, text: &str) {
     }
 }
 
+/// Reads a payload timestamp field as epoch-ms, accepting EITHER convention the
+/// two intake paths emit (D-088): an epoch-ms INTEGER (the in-app form,
+/// `app/src/ui/forms/model.ts`) or an ISO-8601 UTC STRING (the remote form,
+/// `form/src/envelope.ts`, whose Rust `InnerPayload` timestamp fields are typed
+/// `String`). The durable owner is the single point that reconciles the two so a
+/// remote submission validates and its consent/capture instants land in the
+/// `IntakeProvenance` block as real epoch-ms rather than a zeroed default.
+/// Returns `None` when the value is neither - a malformed timestamp still fails.
+fn timestamp_epoch_ms(value: &Value) -> Option<i64> {
+    value
+        .as_i64()
+        .or_else(|| value.as_str().and_then(parse_iso8601_utc_to_unix_ms))
+}
+
 /// Validates the RAW submission payload against the submission schema
 /// (allowlist, versions, consent, caps, control characters). Pure; the
 /// caller decides what staging state the findings produce. An approve of
@@ -195,19 +209,24 @@ pub fn validate_submission(payload: &Value, template: &GroupTemplate) -> Submiss
             }
             if consent
                 .get("consent_affirmed_at")
-                .and_then(Value::as_i64)
+                .and_then(timestamp_epoch_ms)
                 .is_none()
             {
-                findings
-                    .errors
-                    .push("consent_affirmed_at missing or not an integer".to_string());
+                findings.errors.push(
+                    "consent_affirmed_at missing or not an epoch-ms integer / ISO-8601 UTC string"
+                        .to_string(),
+                );
             }
         }
     }
-    if object.get("captured_at").and_then(Value::as_i64).is_none() {
-        findings
-            .warnings
-            .push("captured_at missing or not an integer".to_string());
+    if object
+        .get("captured_at")
+        .and_then(timestamp_epoch_ms)
+        .is_none()
+    {
+        findings.warnings.push(
+            "captured_at missing or not an epoch-ms integer / ISO-8601 UTC string".to_string(),
+        );
     }
 
     // Field allowlist against the template (payload kind rule, D-070.5).
@@ -522,7 +541,7 @@ pub fn plan_approval(
         consent_affirmed_at: Timestamp(
             consent
                 .and_then(|c| c.get("consent_affirmed_at"))
-                .and_then(Value::as_i64)
+                .and_then(timestamp_epoch_ms)
                 .unwrap_or(0),
         ),
         payload_digest: record.payload_hash.clone(),
