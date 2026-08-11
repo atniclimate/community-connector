@@ -1,0 +1,59 @@
+# Cloudflare Worker config for the Community Navigator intake relay
+# (ADR-005 D6; docs/blueprints/intake-relay.md section 5).
+#
+# THIS FILE IS NOT A DEPLOY ARTIFACT. Every concrete value below is an
+# ILLUSTRATIVE PLACEHOLDER, not a decision. Real values are deploy-runbook
+# configuration set at deploy time inside ADR-005 D6's fixed bounds
+# (blueprint 5.3: "concrete values are deploy-runbook configuration... values
+# are set at deploy"). The deploy bar (D-059.8) is unmet; nothing here is
+# published. account_id and the KV namespace ids are deliberate REPLACE_WITH_*
+# placeholders - there is no real Cloudflare account behind this yet.
+
+name = "community-navigator-intake-relay"
+main = "src/index.ts"
+compatibility_date = "2026-08-11"
+
+# No nodejs_compat: hashing (SHA-256) and randomness use the Web Crypto API,
+# not any Node built-in. Do not add compatibility_flags unless a genuine need
+# arises, and comment why if you do.
+
+account_id = "REPLACE_WITH_ACCOUNT_ID"
+
+# One KV namespace, two key prefixes: blob:<receipt_id> (ciphertext) and
+# ledger:<receipt_id> (non-content metadata). KV's per-key expirationTtl gives
+# each prefix its own independent TTL without needing separate namespaces.
+[[kv_namespaces]]
+binding = "INTAKE_BLOBS"
+id = "REPLACE_WITH_KV_NAMESPACE_ID"
+preview_id = "REPLACE_WITH_KV_PREVIEW_NAMESPACE_ID"
+
+[vars]
+# All values below are ILLUSTRATIVE ONLY (deploy-runbook territory, D6).
+# BLOB_TTL_SECONDS: >= 2x max pull interval, <= pilot-window length.
+BLOB_TTL_SECONDS = "86400"           # illustrative: 24h
+# LEDGER_TTL_SECONDS: blob TTL + KV consistency margin + >= one max pull
+# interval (the D6 guaranteed observation window). Illustrative: 86400 + 3600
+# margin + 3600 pull interval.
+LEDGER_TTL_SECONDS = "93600"         # illustrative: 26h
+# MAX_BLOB_SIZE_BYTES: single-digit KB per D6. Matches the Rust side's
+# already-committed DEFAULT_MAX_ENVELOPE_BYTES (8 * 1024) so both sides of the
+# module fence start from the same sane default (each still enforces its own
+# copy independently).
+MAX_BLOB_SIZE_BYTES = "8192"         # illustrative: 8 KiB
+# APPROXIMATE_BLOB_CAP: generous for pilot scale (~150 expected / 300 max, D6).
+# Eventually-consistent list-count, an approximate backstop, NOT a hard cap.
+APPROXIMATE_BLOB_CAP = "1000"        # illustrative
+# RATE_LIMIT_PER_IP_PER_MINUTE: venue-scale NAT-safe (hundreds of phones behind
+# one venue IP, D6). Sized generously per-IP; the real abuse backstops are the
+# size cap, TTL, billing ceiling, and review gate.
+RATE_LIMIT_PER_IP_PER_MINUTE = "600" # illustrative
+# PAGES_ORIGIN: the exact Pages origin for CORS on POST /submit (never "*").
+PAGES_ORIGIN = "https://REPLACE_WITH_PAGES_ORIGIN.example"
+
+# Secrets are NEVER in this file. Set at real deploy time via `wrangler secret
+# put` (outside this step's scope):
+#   CREDENTIAL_HASH    - SHA-256 hex of the control-plane bearer token
+#   ADMISSION_ALLOWLIST - comma-separated admitted key fingerprints
+# For local dev/test, supply them via .dev.vars (gitignored; see
+# .dev.vars.example) or, for the Vitest suite, via miniflare bindings in
+# vitest.config.ts.

@@ -1,0 +1,24 @@
+{
+  "compilerOptions": {
+    // Workers runtime target, not DOM: the relay runs on the Cloudflare
+    // Workers isolate. Strictness posture mirrors app/tsconfig.json
+    // (strict + noUncheckedIndexedAccess + noImplicitOverride +
+    // exactOptionalPropertyTypes + verbatimModuleSyntax); the differences from
+    // the app are runtime-driven (no DOM lib; Workers ambient + test types).
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022"],
+    "types": ["@cloudflare/workers-types", "@cloudflare/vitest-pool-workers/types"],
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "exactOptionalPropertyTypes": true,
+    "verbatimModuleSyntax": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "isolatedModules": true,
+    "forceConsistentCasingInFileNames": true
+  },
+  "include": ["src", "test", "vitest.config.ts"]
+}

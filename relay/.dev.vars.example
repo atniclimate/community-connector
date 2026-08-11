@@ -1,0 +1,13 @@
+# Example local secrets for `wrangler dev`. Copy to `.dev.vars` (gitignored)
+# and fill in local-only test values. NEVER put real deployment secrets here,
+# and never commit `.dev.vars`.
+#
+# CREDENTIAL_HASH is the SHA-256 hex of the control-plane bearer token. The
+# value below is the hash of the local token literal "cn-relay-local-dev" and
+# is for LOCAL DEV ONLY.
+CREDENTIAL_HASH = "REPLACE_WITH_SHA256_HEX_OF_YOUR_LOCAL_BEARER_TOKEN"
+
+# ADMISSION_ALLOWLIST is a comma-separated list of admitted key fingerprints
+# (the D3/D6 rotation cutoff is an edit to this list). Trimmed per entry,
+# exact-string matched.
+ADMISSION_ALLOWLIST = "3f9a-1c02-7b41-e6d5"

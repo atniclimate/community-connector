@@ -1,0 +1,13 @@
+# Relay-local ignore (kept inside relay/ so parallel sessions never contend on
+# the repo-root .gitignore). Node + Wrangler build/runtime state and local
+# secrets only; source, config, and tests are tracked.
+node_modules/
+.wrangler/
+dist/
+
+# Local secret values for `wrangler dev` / local runs. NEVER commit real
+# credential hashes or admission allowlists. The committed template is
+# .dev.vars.example.
+.dev.vars
+.dev.vars.*
+!.dev.vars.example

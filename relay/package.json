@@ -1,0 +1,20 @@
+{
+  "name": "community-navigator-intake-relay",
+  "private": true,
+  "type": "module",
+  "version": "0.1.0",
+  "description": "Zero-trust ciphertext relay for Community Navigator remote intake (ADR-005 D6). Stores sealed envelopes it cannot read; authenticated fetch/delete control plane.",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "build-check": "wrangler deploy --dry-run --outdir=.wrangler/dry-run"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "^0.21.0",
+    "@cloudflare/workers-types": "^5.20260811.1",
+    "typescript": "^6.0.3",
+    "vitest": "4.1.10",
+    "wrangler": "^4.120.1"
+  }
+}

@@ -1917,3 +1917,57 @@ cross-language interop is blueprint step 9's e2e job by design. For Call 2, a
 single-file artifact is marginally simpler to reason about as "one pinned blob,"
 but the manifest already pins the whole multi-file set with equal strength, so
 nothing is lost.
+
+## D-084 (2026-08-11) - Relay Worker test toolchain: cloudflareTest plugin + manual KV wipe (Phase C step 5)
+
+Trigger: blueprint 5.4 and the step-5 prompt specified the Workers Vitest
+integration as "Vitest + miniflare" and named `defineWorkersConfig` from
+`@cloudflare/vitest-pool-workers/config` plus an `isolatedStorage` pool option.
+The current package that actually installs - `@cloudflare/vitest-pool-workers`
+0.21.0, the vitest-4 line whose peer requirement (`vitest ^4.1.0`) matches the
+app's already-pinned `vitest 4.1.10` - removed BOTH: there is no `/config`
+subpath export, no `defineWorkersConfig`, and `isolatedStorage` is no longer a
+config key. The step-5 prompt explicitly directed resolving concrete tool calls
+against "what's actually current and actually installs," not training-data
+memory, so this is a resolve-it decision, not a blocker.
+
+Options: (a) pin an OLDER pool version (the 0.8.x era) that still exposes
+`defineWorkersConfig` + `isolatedStorage`, matching the prompt's literal API
+names; (b) adopt the current v4 API - the `cloudflareTest()` Vite plugin fed to
+`defineConfig` from `vitest/config` - and replace `isolatedStorage` with an
+explicit per-test KV wipe.
+
+Choice: (b). Pinning an old pool would drag vitest back to the v3 line,
+conflicting with the app's pinned `vitest 4.1.10` (the workspace standard) and
+with the current pool's own peer range; matching the live workspace toolchain
+outranks matching now-stale API spellings in the brief. The `cloudflareTest()`
+plugin takes EXACTLY the object that used to live at `poolOptions.workers`, so
+the config's substance is unchanged: `wrangler: { configPath }` loads `[vars]`
+and the KV binding from wrangler.toml, `miniflare.bindings` supplies the two
+secrets (`CREDENTIAL_HASH`, `ADMISSION_ALLOWLIST`) with local-only test values,
+and one KV namespace backs both prefixes. The dropped `isolatedStorage` is
+replaced by a `beforeEach` in `test/setup.ts` that lists and deletes every KV
+key (all prefixes) for a deterministic clean slate. Tests use the documented
+unit-test dispatch (`import worker from "../src/index"`; call
+`worker.fetch(request, env, ctx)` with `env` from `cloudflare:test`), which also
+lets the write-order and forced-failure tests wrap `env.INTAKE_BLOBS` in a Proxy
+to observe/inject KV behavior.
+
+Adopted AS SPECIFIED (pre-reasoned in the step-5 brief, no separate
+deliberation, recorded here only for traceability): the `GET /receipts`
+union-of-both-prefixes response shape (the single listing route that surfaces
+both the pulled/expired and the orphan-blob crash cases, D6); one KV namespace
+with `blob:`/`ledger:` prefixes; the KV-backed fixed-window per-IP rate limiter;
+and DELETE idempotency tracking the blob's prior existence (200 deleted-now vs
+204 already-gone).
+
+Strongest surviving objection: the manual `beforeEach` wipe is harness
+scaffolding the removed `isolatedStorage` did natively, so a future pool upgrade
+that restores or renames the option would leave dead cleanup code; and a wipe
+that itself failed mid-loop could leave residue masking a real bug. Accepted:
+the wipe is a few order-independent lines (it deletes all keys unconditionally),
+and its correctness is transitively proven - the isolation-sensitive tests
+(empty-listing, approximate-cap, per-IP rate limit) would fail loudly if state
+leaked between cases. The pinned versions (wrangler ^4.120.1, pool ^0.21.0,
+`@cloudflare/workers-types` ^5.x, typescript ^6.0.3) live in relay/package.json
+and enter DEPENDENCIES.md at the step-11 docs true-up, not incrementally here.
