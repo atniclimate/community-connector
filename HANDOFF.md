@@ -9,8 +9,8 @@
 > fix). Every path below was verified on disk at the 2026-08-11 step-9 true-up.
 > **The repo is PUBLIC** - origin is
 > `https://github.com/atniclimate/community-connector`. The local `main` is
-> **~21 commits ahead of origin and UNPUSHED** (all relay-implementation work,
-> steps 1-9 + the fix-now bucket + the D-088 fix + true-ups; run
+> **~24 commits ahead of origin and UNPUSHED** (all relay-implementation work,
+> steps 1-11 + the fix-now bucket + the D-088 fix + doc true-ups; run
 > `git rev-list --count origin/main..main` for the exact count); pushing is
 > authorized and safe but has not been run this arc. The pre-commit PII scan and
 > I1 are the publication boundary.
@@ -183,9 +183,10 @@ as draft; checkpoint = convention; ad hoc demos open pathways).
    PROGRESS (2026-08-11, all unpushed on main, ~21 commits ahead of
    origin incl. true-ups; live per-step ledger = memory
    relay-orchestration-state):
-   **Phases A+B+C+D COMPLETE (steps 1-8 landed, reviewed, confirmed);
-   Phase E step 9 (form-to-graph e2e) DONE and PASSING - see the
-   step-9 block below. Steps 10-11 remain.**
+   **ALL 11 STEPS LANDED. Phases A+B+C+D (steps 1-8) + Phase E
+   steps 9-11 all DONE - see the step-9 and steps-10-11 blocks below.
+   Only the MANDATORY adversarial round on the 1-11 diff remains
+   before acceptance.**
    Phases A+B+C (steps 1-6):
    - Step 1 sealed-box crypto binding (14b9778, D-081)
    - Step 2 keygen ceremony CLI (4a0b8db)
@@ -243,10 +244,22 @@ as draft; checkpoint = convention; ad hoc demos open pathways).
    adversarial backlog): the app-side facilitator review view renders a remote
    record's timestamps display-only and was NOT exercised by the e2e - check it
    handles ISO strings.
-   NEXT: **step 10 (deploy runbook draft `docs/runbooks/intake-relay-deploy.md`)**
-   then **step 11 (docs true-up: MANIFEST/DEPENDENCIES for new crates/dirs)**,
-   both sequential and NOT gated on deploy, then the MANDATORY adversarial round
-   on the whole steps 1-11 diff (backlog above), judgment, acceptance.
+   **Steps 10-11 DONE (2026-08-11, commits cc5cc2c + 7709ec7 + f6e9b1c).** Step 10:
+   deploy runbook DRAFT `docs/runbooks/intake-relay-deploy.md` (NOT to execute until
+   the D-059.8 deploy bar clears; verified accurate vs relay/src/env.ts + ADR-005
+   D6). Step 11: MANIFEST.md + DEPENDENCIES.md trued up for the whole relay surface
+   (DEPENDENCIES correctly keeps registry packages out of its path-reference scope,
+   points to blueprint section 9; self-containment verdict unchanged + re-verified).
+   Follow-up f6e9b1c aligned NOTICE-third-party license status to D-054. Both steps
+   produced by community-connector subagents, conductor-verified on disk + committed.
+   Two pre-deploy gaps surfaced by step 10 (into the human queue): no GitHub Pages
+   workflow exists yet; form/vite.config.ts sets no Vite `base` (a Pages project-
+   subpath would 404 assets - fix BEFORE the pinned build).
+   NEXT: **all 11 steps have landed -> the MANDATORY adversarial round on the whole
+   steps 1-11 diff is the sole remaining gate before acceptance** (backlog above +
+   the two step-10 pre-deploy gaps + the D-088 app-review-view residual). Then
+   judgment + acceptance. The DEPLOY bar (D-059.8) stays separate and unmet
+   (keygen ceremony + D-023 still owed).
 3. **Snapshot data pipeline (D-048 / P2.3-P2.5)** - targets the convention build.
 4. **Phase 4 slimmed (D-056.3):** minimal P4.1 story authoring.
 5. **P1.3 benchmark** deferred to September; record in ADR-004.
