@@ -182,6 +182,14 @@ fn read_one_record(queue: &Path) -> serde_json::Value {
     serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap()
 }
 
+fn record_count(queue: &Path) -> usize {
+    std::fs::read_dir(queue)
+        .unwrap()
+        .filter_map(|entry| entry.ok())
+        .filter(|entry| entry.path().to_string_lossy().ends_with(".record.json"))
+        .count()
+}
+
 /// An injectable relay: serves `/receipts` from `order` (id, arrived_at,
 /// has_ledger; has_blob computed live from the blob store), `/blob/:id` from the
 /// store, and records deletes.
@@ -635,5 +643,115 @@ fn envelope_cap_is_configurable() {
     assert_eq!(
         raised_run.report["main_loop"]["staged"], 1,
         "raising the cap stages the larger submission"
+    );
+}
+
+// 13. Transport conflict: same receipt id, different ciphertext -> stage BOTH,
+// retain the blob, loud, failure exit (ADR-005 D4).
+#[test]
+fn transport_conflict_stages_both_and_retains_blob() {
+    let s = setup(&[DIGEST]);
+    let inner = make_inner("sub-tc", DIGEST);
+    // A prior record for the SAME receipt id but a DIFFERENT ciphertext hash.
+    prestage(
+        &s.queue,
+        &inner,
+        "rcpt-tc",
+        "a-different-ciphertext-hash",
+        &s.fp,
+    );
+    let outer = seal_outer(&s.kp.public, &s.fp, &inner);
+    let mock = MockRelay::new().with_receipt("rcpt-tc", None, Some(outer));
+
+    let summary =
+        execute_pull(&s.config, &s.kp, &s.queue, &mock, degraded_fetch(), NOW_MS).expect("pull");
+    assert_eq!(summary.report["main_loop"]["transport_conflicts"], 1);
+    assert_eq!(
+        summary.report["main_loop"]["staged"], 1,
+        "the new copy is staged alongside the existing"
+    );
+    assert!(
+        mock.deletes.borrow().is_empty(),
+        "a transport conflict retains the relay blob as evidence"
+    );
+    assert!(summary.failure);
+    assert_eq!(record_count(&s.queue), 2, "both copies on disk");
+}
+
+// 14. Semantic conflict: same submission id, different bytes -> stage BOTH,
+// retain the blob, loud, failure exit (ADR-005 D4).
+#[test]
+fn semantic_conflict_stages_both_and_retains_blob() {
+    let s = setup(&[DIGEST]);
+    let existing = make_inner("sub-sc", DIGEST);
+    // A prior record for a DIFFERENT receipt but the SAME submission id.
+    prestage(
+        &s.queue,
+        &existing,
+        "rcpt-old-sc",
+        "an-old-ciphertext-hash",
+        &s.fp,
+    );
+    // The new envelope shares the submission id but has different bytes.
+    let mut fresh = make_inner("sub-sc", DIGEST);
+    fresh.fields.insert(
+        "changed".to_string(),
+        serde_json::Value::String("v2".to_string()),
+    );
+    let outer = seal_outer(&s.kp.public, &s.fp, &fresh);
+    let mock = MockRelay::new().with_receipt("rcpt-new-sc", None, Some(outer));
+
+    let summary =
+        execute_pull(&s.config, &s.kp, &s.queue, &mock, degraded_fetch(), NOW_MS).expect("pull");
+    assert_eq!(summary.report["main_loop"]["semantic_conflicts"], 1);
+    assert_eq!(summary.report["main_loop"]["staged"], 1);
+    assert!(
+        mock.deletes.borrow().is_empty(),
+        "a semantic conflict retains the relay blob as evidence"
+    );
+    assert!(summary.failure);
+    assert_eq!(record_count(&s.queue), 2);
+}
+
+// 15. Reconciliation Expired arm: a blob-absent receipt past TTL + margin.
+#[test]
+fn reconciliation_classifies_expired() {
+    let s = setup(&[DIGEST]);
+    let mut cfg = s.config.clone();
+    cfg.blob_ttl_seconds = 2; // ttl + margin = 302s; a 2020 arrival is far past it
+    let mock = MockRelay::new().with_receipt("rcpt-exp", Some("2020-01-01T00:00:00.000Z"), None);
+
+    let summary =
+        execute_pull(&cfg, &s.kp, &s.queue, &mock, degraded_fetch(), NOW_MS).expect("pull");
+    assert_eq!(summary.report["reconciliation"]["total_receipts"], 1);
+    assert_eq!(summary.report["reconciliation"]["expired"], 1);
+    assert_eq!(summary.report["reconciliation"]["integrity_alert"], 0);
+}
+
+// 16. Reconciliation Unpulled arm + half-TTL warning + oldest-age tracking.
+#[test]
+fn reconciliation_classifies_unpulled_with_half_ttl_warning() {
+    let s = setup(&[DIGEST]);
+    let mut cfg = s.config.clone();
+    cfg.blob_ttl_seconds = 2; // half_ttl = 1s
+    let inner = make_inner("sub-unp", DIGEST);
+    // Addressed to another key: retained (never staged), blob still present.
+    let outer = seal_outer(
+        &s.kp.public,
+        "0000-0000-0000-0000-0000-0000-0000-0000",
+        &inner,
+    );
+    let mock =
+        MockRelay::new().with_receipt("rcpt-unp", Some("2020-01-01T00:00:00.000Z"), Some(outer));
+
+    let summary =
+        execute_pull(&cfg, &s.kp, &s.queue, &mock, degraded_fetch(), NOW_MS).expect("pull");
+    assert_eq!(summary.report["reconciliation"]["unpulled"], 1);
+    assert_eq!(summary.report["reconciliation"]["half_ttl_warning"], true);
+    assert!(
+        summary.report["reconciliation"]["oldest_unpulled_age_secs"]
+            .as_i64()
+            .unwrap()
+            > 1
     );
 }
