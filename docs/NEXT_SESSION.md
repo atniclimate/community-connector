@@ -6,6 +6,23 @@
 
 ## The 60-second brief (refreshed 2026-08-11)
 
+**Remote intake relay: phases A-C COMPLETE (steps 1-6), phase D
+DISPATCHED (steps 7+8).** All six landed steps are reviewed and
+confirmed by independent Sonnet 5 subagents reading committed code and
+re-running tests. Nine adversarial items accumulated for the mandatory
+round after all 11 steps land. Steps 7+8 (the puller CLI `cn intake
+pull` + D8 bundle verification) are combined into one dispatch running
+in an Opus 4.8 session - this is the biggest step: ureq HTTP client in
+CLI crate only (D1 fence), full fetch/decrypt/validate/stage/delete
+loop, receipt-ledger reconciliation, and the D8 manifest-based deployed-
+form verification. After 7+8 land: steps 9-11 are sequential (form-to-
+graph e2e test, deploy runbook draft, docs true-up), then the mandatory
+adversarial round on the full diff. The repo is 10 commits ahead of
+origin (unpushed). The human's queue is unchanged (D-023, committee
+checkpoint). The deploy bar (D-059.8) is unmet.
+
+## The previous brief (refreshed 2026-08-11, pre-step-5+6)
+
 **The remote intake relay director blueprint is WRITTEN**
 (docs/blueprints/intake-relay.md): 11 steps in 5 phases covering the
 full ADR-005 remote path - sealed-box Rust crypto binding with
@@ -113,10 +130,9 @@ ADR-005 adversarial round, then the P3.5/P3.6 intake pipeline.
    pass on docs/design/intake-consent-text-draft-2026-07-24.md (checklist
    inside, ~20 minutes, record as a DECISIONS entry), and (b) any news on
    committee timing for the bundled checkpoint + consent-text presentation.
-3. If autonomous: run the ADR-005 adversarial round first (adversary wrapper,
-   healthy 2026-07-24), judge and amend, then start the P3.5/P3.6 intake
-   pipeline (director blueprint first - permission-adjacent at the approval
-   boundary).
+3. If autonomous: check HANDOFF.md for relay step status. If steps 7+8 have
+   landed, review completion report, then draft step 9 prompt (form-to-graph
+   e2e test). If steps 7+8 haven't landed, wait for completion report.
 4. Re-arm the 8:00 AM safety cron if the usage-failover directive stands.
 
 ## Remaining open questions (defaults keep autonomous work unblocked)

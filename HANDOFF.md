@@ -172,16 +172,32 @@ as draft; checkpoint = convention; ad hoc demos open pathways).
    Permission-adjacent: gets a MANDATORY adversarial round. The DEPLOY
    bar (D-059.8) still requires: intake pipeline working + keygen
    ceremony executed + D-023 sign-off on form text.
-   PROGRESS (2026-08-11, all unpushed on main; live per-step ledger =
-   memory relay-orchestration-state): Phases A+B COMPLETE - step 1
-   sealed-box crypto binding (14b9778, D-081), step 2 keygen ceremony CLI
-   (4a0b8db), step 3 envelope formats (69fc557), step 4 puller core logic
-   - transport dedup key + D6 receipt classifier + consent-digest check
-   (2df3fdd, D-082); check-all 12/12 green at each. NEXT: step 5
-   (Cloudflare Worker relay under relay/) + step 6 (Pages form under
-   form/) - independent pair; then steps 7+8 (`cn intake pull` CLI + D8
-   bundle verification), then 9-11 (e2e test, deploy runbook, docs
-   true-up). The MANDATORY adversarial round stays HELD until all 11 land.
+   PROGRESS (2026-08-11, all unpushed on main, 10 commits ahead of
+   origin; live per-step ledger = memory relay-orchestration-state):
+   Phases A+B+C COMPLETE (steps 1-6 all landed, reviewed, confirmed):
+   - Step 1 sealed-box crypto binding (14b9778, D-081)
+   - Step 2 keygen ceremony CLI (4a0b8db)
+   - Step 3 envelope formats (69fc557)
+   - Step 4 puller core logic (2df3fdd, D-082)
+   - Step 5 Worker relay in relay/ (3975a77, D-084): 26 files, 43 tests
+   - Step 6 Pages form in form/ (d0f6c6a, D-083): template-driven,
+     libsodium sealed-box, D8 manifest pipeline, 42 tests
+   Check-all green at each; Sonnet 5 subagent reviews CONFIRMED every
+   claim in every step's completion report. Nine adversarial items
+   accumulated (2 step 2: passphrase zeroization gap + silent cleanup;
+   1 step 4: missing test combo; 5 step 5: silent CREDENTIAL_HASH
+   misconfiguration, silent ledger parse failure, receipts pagination,
+   CF-Connecting-IP trust boundary, 404-identity regression test gap;
+   1 step 6: GitHub-vs-Cloudflare Pages naming slip in commit/comments).
+   DISPATCHED: steps 7+8 combined (puller CLI `cn intake pull` + D8
+   bundle verification module) - running in Opus 4.8; prompt at conductor
+   scratchpad prompt-step7-8-puller-cli-bundle.md. These are Phase D and
+   the biggest step: HTTP client (ureq) in CLI crate only (D1 fence),
+   config parsing, precondition checks, main loop (receipts -> fetch ->
+   decrypt -> validate -> stage -> delete), reconciliation via
+   classify_receipt, I12 run report. After 7+8 land: steps 9-11 are
+   sequential (e2e test, deploy runbook, docs true-up). The MANDATORY
+   adversarial round stays HELD until all 11 land.
 3. **Snapshot data pipeline (D-048 / P2.3-P2.5)** - targets the convention build.
 4. **Phase 4 slimmed (D-056.3):** minimal P4.1 story authoring.
 5. **P1.3 benchmark** deferred to September; record in ADR-004.
