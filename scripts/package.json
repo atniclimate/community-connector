@@ -1,0 +1,13 @@
+{
+  "name": "cn-scripts",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Developer scripts for community-connector. NOT part of check-all and NOT a runtime dependency of the app or form; run manually. Currently: cross-implementation crypto test-vector generation for the relay sealed-box binding (docs/blueprints/intake-relay.md section 1).",
+  "type": "commonjs",
+  "scripts": {
+    "generate:crypto-vectors": "node generate-crypto-vectors.js"
+  },
+  "dependencies": {
+    "libsodium-wrappers": "0.7.15"
+  }
+}

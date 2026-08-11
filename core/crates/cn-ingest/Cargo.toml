@@ -16,6 +16,22 @@ sha2 = "0.10"
 thiserror = "2"
 unicode-normalization = "0.1"
 uuid = { version = "1", features = ["v7", "serde", "js"] }
+# Relay sealed-box binding (docs/blueprints/intake-relay.md section 1;
+# ADR-005 D3). crypto_box's `seal` feature is libsodium `crypto_box_seal`
+# (X25519 + XSalsa20-Poly1305), pure Rust, no C build dependency; interop with
+# libsodium.js is proven by fixtures/crypto/sealed-box-vectors.json. See D-081.
+crypto_box = { version = "0.9", features = ["seal"] }
+crypto_secretbox = "0.1"      # XSalsa20-Poly1305 secretbox for the key file
+blake2 = "0.10"               # BLAKE2b-256 key fingerprint
+argon2 = "0.5"                # Argon2id passphrase KDF for the secret key file
+zeroize = { version = "1", features = ["derive"] }
+base64 = "0.22"               # key-file salt/nonce/ciphertext encoding
+
+# crypto_box/crypto_secretbox pull getrandom 0.2 for OsRng. cn-ingest compiles
+# into the wasm bundle (cn-wasm -> cn-api -> cn-ingest), so the wasm target
+# needs getrandom's js backend or the build fails to compile.
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+getrandom = { version = "0.2", features = ["js"] }
 
 [dev-dependencies]
 uuid = { version = "1", features = ["v7"] }

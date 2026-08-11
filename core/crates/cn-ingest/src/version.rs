@@ -23,6 +23,14 @@ pub enum IngestError {
     ConsentNotAffirmed,
     #[error("serialization error: {0}")]
     Serialize(String),
+    /// Content-free crypto failure (blueprint intake-relay section 1): a failed
+    /// sealed-box open or passphrase decrypt leaks nothing about WHY it failed.
+    #[error("crypto operation failed")]
+    Crypto,
+    /// Structural key-file envelope error - loud and descriptive (I3); these
+    /// are format/parse faults, not the crypto oracle above.
+    #[error("key file error: {detail}")]
+    KeyFile { detail: String },
 }
 
 /// SHA-256 (lowercase hex) over a value's canonical bytes: the value is

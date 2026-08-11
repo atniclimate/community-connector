@@ -8,6 +8,7 @@
 //! network code may ever enter this crate (ADR-005 D1 module fence).
 
 pub mod approval;
+pub mod crypto;
 pub mod decision;
 pub mod dedup;
 pub mod envelope;
@@ -17,6 +18,7 @@ pub mod recovery;
 mod version;
 
 pub use approval::*;
+pub use crypto::*;
 pub use decision::*;
 pub use dedup::*;
 pub use envelope::*;

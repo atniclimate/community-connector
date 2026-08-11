@@ -1778,3 +1778,56 @@ source/archive content bypasses under the defense-in-depth disclaimer;
 (4) the D-068/D-059.8 deploy gates (exhaustive fault injection,
 quiescent provenance deployment, provider-bound runbook evidence, human
 ceremony rehearsal) - the deploy bar remains unmet and unclaimed.
+
+## D-081 (2026-08-11) - Relay sealed-box binding: RustCrypto `crypto_box` (Phase A step 1)
+
+Trigger: relay blueprint (docs/blueprints/intake-relay.md) section 1 requires a
+Rust sealed-box implementation that opens what libsodium.js `crypto_box_seal`
+produces in the browser (ADR-005 D3). The blueprint fixed the selection
+CRITERIA, not the winner, and left the choice to the cross-implementation test
+vectors: (1) sealed-box interop with libsodium.js proven by test vectors;
+(2) pure Rust (no C build dependency); (3) maintained/audited/widely used;
+(4) minimal API surface.
+
+Options: (a) RustCrypto `crypto_box` with its `seal` feature; (b) `dryoc`
+(pure-Rust libsodium port); (c) `libsodium-sys` (C bindings). (c) fails
+criterion (2) outright (adds a C toolchain dependency to the workspace and to
+the pilot PC's trusted computing base, the exact surface the sealed-envelope
+design minimizes) and was rejected. Between (a) and (b): docs research
+confirmed `crypto_box`'s `seal` feature IS libsodium's sealed box - the feature
+pulls in `blake2` precisely for the `blake2b(ephemeral_pk || recipient_pk)`
+nonce derivation `crypto_box_seal` uses. With interop achievable either way,
+`crypto_box` wins the remaining criteria: RustCrypto is more widely used and
+audited than dryoc's single-maintainer port (3), and `crypto_box` is the more
+minimal surface - keygen, seal, unseal, nothing else (4) - versus dryoc's full
+libsodium port.
+
+Choice: `crypto_box` 0.9 (`seal` feature). Companions: `blake2` (BLAKE2b-256
+fingerprint), `zeroize` (SecretKey hygiene), `argon2` (Argon2id passphrase KDF
+for the secret-key file), `crypto_secretbox` (XSalsa20-Poly1305 secretbox for
+that file - the ceremony's specified cipher; Rust-only, no interop needed since
+the browser never reads secret-key files), and `base64` (key-file
+salt/nonce/ciphertext encoding; the base64 dep was deliberately deferred from
+the step-3 envelope work to this binding). The crypto module lives in
+cn-ingest (pure crypto + byte-level envelope (de)serialization; no file or
+network I/O - ADR-005 D1 module fence). Interop is not asserted by faith: the
+committed fixture fixtures/crypto/sealed-box-vectors.json is produced by
+libsodium.js (scripts/generate-crypto-vectors.js, a manual dev tool, NOT in
+check-all) and tests/crypto_vectors.rs (which IS in check-all) proves every
+libsodium-sealed box opens in Rust and the fingerprints match.
+
+Implementation note: `crypto_box`/`crypto_secretbox` pull getrandom 0.2 for
+OsRng. cn-ingest compiles into the wasm bundle (cn-wasm -> cn-api -> cn-ingest),
+so the Cargo.toml gates `getrandom = { features = ["js"] }` to
+`cfg(target_arch = "wasm32")` - without it the wasm build fails to compile
+(the RNG code is present even though the wasm facade never calls it).
+
+Strongest surviving objection: pinning `crypto_box` 0.9 pins the RustCrypto
+0.5-era `aead`/`rand_core` 0.6 stack, which now trails the workspace's
+rand_core 0.9 / getrandom 0.3-0.4 lines, so the tree carries multiple
+getrandom/rand_core majors. This is cosmetic (cargo coexists semver-major
+versions; the wasm js feature is gated correctly) and reversible: the binding
+is a thin module behind our own PublicKey/SecretKey/Keypair types, so a future
+swap to a rand_core-0.9 `crypto_box` (or dryoc) touches one file and re-runs the
+same vectors. The interop guarantee - the thing that is expensive to get wrong -
+is the property the fixture locks down regardless of which crate provides it.
