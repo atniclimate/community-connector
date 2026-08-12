@@ -12,3 +12,9 @@ history is also in git.
   gate-grill session, superseded by that session's rewrite: all six queued human
   gates answered (D-050..D-055), the intake relay workstream added, and the
   publish preconditions (license, pre-publish sweep, stability) recorded.
+- `2026-08-11-relay-7-8-dispatched.md` - morning-of-2026-08-11 snapshot with relay
+  steps 7-8 landed and step 9 dispatch-ready, superseded by the same day's
+  end-of-day true-up after steps 9-11 + the adversarial round landed.
+- `2026-08-11-relay-complete.md` - end-of-2026-08-11 snapshot: the remote-intake
+  relay (steps 1-11) COMPLETE and ACCEPTED (D-089, adversarial round), all fixes
+  landed. The live root `HANDOFF.md` continues from here.
