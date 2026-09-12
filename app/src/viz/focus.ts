@@ -102,20 +102,70 @@ export function applyFocusToNodeLayer(
   const kinds = new Map((projection.entities ?? []).map((entity) => [entity.id, entity.kind ?? ""]));
   for (const record of layer.records) {
     for (const [instanceId, entityId] of record.entityIds.entries()) {
-      const role = focusRole(entityId, focus);
-      COLOR.set(nodeFocusHex(kinds.get(entityId) ?? "", role, theme));
-      record.mesh.setColorAt(instanceId, COLOR);
-      record.mesh.getMatrixAt(instanceId, MATRIX);
-      MATRIX.decompose(DUMMY.position, DUMMY.quaternion, DUMMY.scale);
-      const baseScale = degreeToScale(degrees.get(entityId) ?? RENDER_TOKENS.node.minDegree);
-      DUMMY.scale.setScalar(Math.max(RENDER_TOKENS.node.minRadius, baseScale * nodeFocusScaleFactor(role)));
-      DUMMY.updateMatrix();
-      record.mesh.setMatrixAt(instanceId, DUMMY.matrix);
+      writeInstanceAppearance(record.mesh, instanceId, {
+        kind: kinds.get(entityId) ?? "",
+        degree: degrees.get(entityId) ?? RENDER_TOKENS.node.minDegree,
+        role: focusRole(entityId, focus),
+        hovered: false,
+        theme,
+      });
     }
-    record.mesh.instanceMatrix.needsUpdate = true;
-    if (record.mesh.instanceColor !== null) {
-      record.mesh.instanceColor.needsUpdate = true;
-    }
+    markInstancesDirty(record.mesh);
+  }
+}
+
+/**
+ * Hover emphasis for one node on top of its focus role: the theme hover color
+ * and a small absolute scale bump. `hovered: false` restores the role look.
+ * Instant in every motion mode, so reduced motion needs no variant (I9).
+ */
+export function writeNodeHover(
+  layer: NodeLayer,
+  entityId: string,
+  appearance: { readonly kind: string; readonly degree: number; readonly focus: FocusSet | null; readonly theme: Theme | null },
+  hovered: boolean,
+): void {
+  const target = layer.entityToMesh.get(entityId);
+  if (target === undefined) {
+    return;
+  }
+  writeInstanceAppearance(target.mesh, target.instanceId, {
+    kind: appearance.kind,
+    degree: appearance.degree,
+    role: focusRole(entityId, appearance.focus),
+    hovered,
+    theme: appearance.theme,
+  });
+  markInstancesDirty(target.mesh);
+}
+
+function writeInstanceAppearance(
+  mesh: NodeLayer["records"][number]["mesh"],
+  instanceId: number,
+  appearance: {
+    readonly kind: string;
+    readonly degree: number;
+    readonly role: NodeFocusRole;
+    readonly hovered: boolean;
+    readonly theme: Theme | null;
+  },
+): void {
+  const colorRole = appearance.hovered ? "focused" : appearance.role;
+  COLOR.set(nodeFocusHex(appearance.kind, colorRole, appearance.theme));
+  mesh.setColorAt(instanceId, COLOR);
+  mesh.getMatrixAt(instanceId, MATRIX);
+  MATRIX.decompose(DUMMY.position, DUMMY.quaternion, DUMMY.scale);
+  const hoverFactor = appearance.hovered ? RENDER_TOKENS.node.hoverScale : UNIT;
+  const scale = degreeToScale(appearance.degree) * nodeFocusScaleFactor(appearance.role) * hoverFactor;
+  DUMMY.scale.setScalar(Math.max(RENDER_TOKENS.node.minRadius, scale));
+  DUMMY.updateMatrix();
+  mesh.setMatrixAt(instanceId, DUMMY.matrix);
+}
+
+function markInstancesDirty(mesh: NodeLayer["records"][number]["mesh"]): void {
+  mesh.instanceMatrix.needsUpdate = true;
+  if (mesh.instanceColor !== null) {
+    mesh.instanceColor.needsUpdate = true;
   }
 }
 

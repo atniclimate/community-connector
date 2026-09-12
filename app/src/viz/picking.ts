@@ -49,6 +49,7 @@ export class PickingController {
   private readonly raycast: RaycastFn;
   private pending: PointerEvent | null = null;
   private frame = NO_INSTANCE;
+  private hoveredEntityId: string | null = null;
 
   public constructor(
     private readonly element: HTMLElement,
@@ -90,14 +91,24 @@ export class PickingController {
       this.frame = NO_INSTANCE;
       const pending = this.pending;
       this.pending = null;
-      dispatchHoveredEntity(this.store, pending === null ? null : this.pickNow(pending));
+      this.applyHover(pending === null ? null : this.pickNow(pending));
     });
   };
 
   private readonly onPointerLeave = (): void => {
     this.pending = null;
-    dispatchHoveredEntity(this.store, null);
+    this.applyHover(null);
   };
+
+  /** Dispatches only on change: re-hovering the same node is free. */
+  private applyHover(entityId: string | null): void {
+    if (entityId === this.hoveredEntityId) {
+      return;
+    }
+    this.hoveredEntityId = entityId;
+    this.element.style.cursor = entityId === null ? "" : "pointer";
+    dispatchHoveredEntity(this.store, entityId);
+  }
 
   private readonly onClick = (event: MouseEvent): void => {
     const entityId = this.pickNow(event);

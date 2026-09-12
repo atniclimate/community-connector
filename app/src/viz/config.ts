@@ -19,6 +19,7 @@ export const RENDER_TOKENS = {
     referenceDegree: 12,
     emissiveShare: 0.45,
     selectedScale: 1.2,
+    hoverScale: 1.15,
     dimmedScale: 0.75,
     geometryDetail: 1,
   },

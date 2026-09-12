@@ -39,6 +39,32 @@
         min-width: 0;
         min-height: 320px;
         clip-path: inset(0);
+        position: relative;
+      }
+      .cn-viz-tooltip {
+        position: absolute;
+        top: 0;
+        left: 0;
+        z-index: 5;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        max-width: 280px;
+        padding: 6px 10px;
+        border-radius: 8px;
+        pointer-events: none;
+        color: #eef2f8;
+        background: rgb(8 11 17 / 0.88);
+        border: 1px solid rgb(255 255 255 / 0.12);
+        font-size: 13px;
+        line-height: 1.35;
+      }
+      .cn-viz-tooltip[hidden] {
+        display: none;
+      }
+      .cn-viz-tooltip span {
+        font-size: 12px;
+        opacity: 0.72;
       }
       .cn-search-region,
       .cn-detail-region {

@@ -13,6 +13,7 @@ import {
   focusRole,
   nodeFocusHex,
   nodeFocusScaleFactor,
+  writeNodeHover,
 } from "./focus";
 import { buildHaloLayer, setHaloFocusDim } from "./halos";
 import { computeLayout } from "./layout";
@@ -169,6 +170,37 @@ describe("focus node application", () => {
     applyFocusToNodeLayer(layer, data, theme(), degrees, null);
     expect(instanceScale(focused.mesh, focused.instanceId)).toBeCloseTo(focusedBase);
     expectColorClose(instanceColor(focused.mesh, focused.instanceId), "#ff0000");
+    layer.dispose();
+  });
+
+  it("layers hover on the focus role and restores it without compounding", () => {
+    const data = projection();
+    const layer = nodeLayer(data, theme());
+    const degrees = degreesForProjection(data);
+    const focus = computeFocusSet(data, entityA);
+    applyFocusToNodeLayer(layer, data, theme(), degrees, focus);
+    const target = layer.entityToMesh.get(entityC);
+    if (target === undefined) {
+      throw new Error("missing hover test instance");
+    }
+    const appearance = { kind: "person", degree: degrees.get(entityC) ?? 0, focus, theme: theme() };
+    const unrelatedScale = Math.max(
+      RENDER_TOKENS.node.minRadius,
+      degreeToScale(appearance.degree) * RENDER_TOKENS.node.dimmedScale,
+    );
+    const hoveredScale = Math.max(
+      RENDER_TOKENS.node.minRadius,
+      degreeToScale(appearance.degree) * RENDER_TOKENS.node.dimmedScale * RENDER_TOKENS.node.hoverScale,
+    );
+
+    writeNodeHover(layer, entityC, appearance, true);
+    writeNodeHover(layer, entityC, appearance, true);
+    expect(instanceScale(target.mesh, target.instanceId)).toBeCloseTo(hoveredScale);
+    expectColorClose(instanceColor(target.mesh, target.instanceId), shiftLightness("#ff0000", 0.08));
+
+    writeNodeHover(layer, entityC, appearance, false);
+    expect(instanceScale(target.mesh, target.instanceId)).toBeCloseTo(unrelatedScale);
+    expectColorClose(instanceColor(target.mesh, target.instanceId), scaleChroma("#ff0000", 0.35));
     layer.dispose();
   });
 });
