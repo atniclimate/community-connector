@@ -81,6 +81,8 @@ export type ViewMode = "overview" | "focus" | "story" | "present";
 export type QualityTierName = "A" | "B" | "C" | "D";
 export type ShapeName = "sphere" | "cube" | "octahedron" | "tetrahedron" | "torus" | "cone";
 
+export type PresentMeasure = "betweenness_top_n" | "single_tie";
+
 export type PresentBeat = {
   readonly id: string;
   readonly label: string;
@@ -88,7 +90,7 @@ export type PresentBeat = {
   readonly filter?: {
     readonly kinds?: readonly string[];
   };
-  readonly measure?: string;
+  readonly measure?: PresentMeasure;
   readonly topN?: number;
 };
 

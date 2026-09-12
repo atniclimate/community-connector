@@ -102,6 +102,14 @@ export class WasmClient {
     return this.request({ kind: "queryNeighborhood", groupId, viewer, request });
   }
 
+  public graphMeasures(
+    groupId: string,
+    viewer: ViewerContextDto,
+    request: JsonObject,
+  ): Promise<JsonObject> {
+    return this.request({ kind: "graphMeasures", groupId, viewer, request });
+  }
+
   public viewerRoles(groupId: string, viewer: ViewerContextDto): Promise<JsonObject> {
     return this.request({ kind: "viewerRoles", groupId, viewer });
   }

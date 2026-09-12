@@ -151,7 +151,7 @@ store.dispatch({ kind: "reducedMotionChanged", reducedMotion: reducedMotionMedia
 const unmounts = [
   store.subscribe(render),
   mountSearch(searchElement, { store, client }),
-  mountViz(vizElement, store),
+  mountViz(vizElement, store, client),
   mountLegend(vizElement, store),
   mountDetailPanel(detailElement, { store, client }),
   mountFlatProjection(flatElement, { store }),

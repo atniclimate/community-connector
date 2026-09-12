@@ -1,6 +1,7 @@
 import { WebGLRenderer } from "three";
 import type { AppState, PresentBeat, ProjectionDto, ViewMode } from "../state/state";
 import type { Store } from "../state/store";
+import type { WasmClient } from "../wasm/client";
 import { RENDER_TOKENS } from "./config";
 import { buildEdgeLayer, setEdgeFocusBlend, writeFocusTargetColors, type EdgeLayer } from "./edges";
 import { buildHaloLayer, setHaloFocusDim, type HaloLayer } from "./halos";
@@ -12,6 +13,7 @@ import { projectedEntities } from "./projection";
 import { createVizScene, type SceneSetup } from "./scene";
 import { createCameraRig, zoomToFit, type CameraRig } from "./camera";
 import { applyFocusToNodeLayer, computeFocusSet, FocusBlend } from "./focus";
+import { measureHighlights, presenterBeatText } from "./presenter";
 import { QualityManager, type QualityProfile } from "./quality";
 
 export type MountedViz = () => void;
@@ -42,21 +44,29 @@ type RenderState = {
   themeKey: string;
   viewMode: ViewMode;
   presentBeatIndex: number | null;
+  presentMeasureKey: string | null;
+  highlightedIds: ReadonlySet<string>;
+  measureExplanations: readonly string[];
+  live: HTMLDivElement;
+  beatLabel: HTMLDivElement;
   dirty: boolean;
   frame: number | null;
   lastTime: number | null;
 };
 
-export function mountViz(container: HTMLElement, store: Store): MountedViz {
+export function mountViz(container: HTMLElement, store: Store, client: WasmClient): MountedViz {
   container.replaceChildren();
   const canvas = document.createElement("canvas");
   const live = document.createElement("div");
+  const beatLabel = document.createElement("div");
   live.setAttribute("aria-live", "polite");
   live.className = "cn-viz-live";
+  beatLabel.className = "cn-present-beat";
+  beatLabel.hidden = true;
   canvas.setAttribute("role", "img");
   canvas.setAttribute("aria-label", CANVAS_LABEL_EMPTY);
   canvas.setAttribute("tabindex", "0");
-  container.append(canvas, live);
+  container.append(canvas, live, beatLabel);
   const renderer = new WebGLRenderer({ canvas, antialias: true });
   const sceneSetup = createVizScene(store.getState().theme.resolved);
   let markViewDirty = (): void => {
@@ -84,6 +94,11 @@ export function mountViz(container: HTMLElement, store: Store): MountedViz {
     themeKey: "",
     viewMode: "overview",
     presentBeatIndex: null,
+    presentMeasureKey: null,
+    highlightedIds: new Set<string>(),
+    measureExplanations: [],
+    live,
+    beatLabel,
     dirty: true,
     frame: null,
     lastTime: null,
@@ -93,12 +108,12 @@ export function mountViz(container: HTMLElement, store: Store): MountedViz {
     schedule(renderState, store);
   };
   renderState.picking = new PickingController(canvas, cameraRig.camera, () => renderState.nodes, store);
-  const unsubscribe = store.subscribe(() => handleState(renderState, container, store));
+  const unsubscribe = store.subscribe(() => handleState(renderState, container, store, client));
   const onVisibility = (): void => schedule(renderState, store);
   const onKeydown = (event: KeyboardEvent): void => handlePresenterKeydown(event, renderState, store);
   document.addEventListener("visibilitychange", onVisibility);
   window.addEventListener("keydown", onKeydown);
-  handleState(renderState, container, store);
+  handleState(renderState, container, store, client);
   return () => {
     unsubscribe();
     document.removeEventListener("visibilitychange", onVisibility);
@@ -108,14 +123,19 @@ export function mountViz(container: HTMLElement, store: Store): MountedViz {
   };
 }
 
-function handleState(renderState: RenderState, container: HTMLElement, store: Store): void {
+function handleState(
+  renderState: RenderState,
+  container: HTMLElement,
+  store: Store,
+  client: WasmClient,
+): void {
   const state = store.getState();
   resize(renderState, container);
   const rebuilt = rebuildIfNeeded(renderState, state, () => {
     renderState.dirty = true;
     schedule(renderState, store);
   });
-  syncMotion(renderState, state, rebuilt);
+  syncMotion(renderState, state, rebuilt, store, client);
   updateAria(renderState, state);
   renderState.dirty = true;
   schedule(renderState, store);
@@ -176,7 +196,13 @@ function rebuildIfNeeded(renderState: RenderState, state: AppState, onNeedsRende
  * machine (view.mode / view.focusedEntityId); this only projects it onto the
  * already-built render layers, and re-projects after any layer rebuild.
  */
-function syncMotion(renderState: RenderState, state: AppState, rebuilt: boolean): void {
+function syncMotion(
+  renderState: RenderState,
+  state: AppState,
+  rebuilt: boolean,
+  store: Store,
+  client: WasmClient,
+): void {
   const reduced = state.ui.reducedMotion;
   const present = state.view.mode === "present";
   renderState.cameraRig.setReducedMotion(reduced);
@@ -185,7 +211,10 @@ function syncMotion(renderState: RenderState, state: AppState, rebuilt: boolean)
     present ? RENDER_TOKENS.drift.presentAutoRotateSpeed : RENDER_TOKENS.drift.autoRotateSpeed,
   );
   renderState.sceneSetup.setPresentMode(present);
-  const focusedId = state.view.mode === "focus" ? state.view.focusedEntityId : null;
+  const beat = present ? state.presentation.beats[state.presentation.beatIndex] : undefined;
+  syncPresenterMeasure(renderState, state, beat, store, client);
+  updatePresenterLabel(renderState, present, beat);
+  const focusedId = state.view.mode === "focus" || present ? state.view.focusedEntityId : null;
   const focusChanged = focusedId !== renderState.focusedEntityId;
   const presentBeatIndex = present ? state.presentation.beatIndex : null;
   const presentBeatChanged = presentBeatIndex !== renderState.presentBeatIndex;
@@ -198,22 +227,114 @@ function syncMotion(renderState: RenderState, state: AppState, rebuilt: boolean)
   if (projection === null || renderState.nodes === null || renderState.edges === null || renderState.degrees === null) {
     return;
   }
-  const focus = computeFocusSet(projection, focusedId);
-  applyFocusToNodeLayer(renderState.nodes, projection, state.theme.resolved, renderState.degrees, focus);
-  writeFocusTargetColors(renderState.edges, state.theme.resolved, focus?.adjacentEdgeIds ?? null);
-  renderState.focusBlend.setTarget(focus === null ? BLEND_OFF : BLEND_ON);
-  if (focusChanged && focus !== null) {
-    const position = renderState.layout?.positions.get(focus.focusedId);
+  const focus = applyFocusRendering(renderState, state, focusedId);
+  if (focusChanged && focusedId !== null) {
+    const position = renderState.layout?.positions.get(focusedId);
     if (position !== undefined) {
       renderState.cameraRig.flyTo(position.clone(), reduced);
     }
   } else if (present && (presentBeatChanged || rebuilt) && renderState.layout !== null) {
-    const beat = state.presentation.beats[state.presentation.beatIndex];
     zoomToFit(renderState.cameraRig, positionsForBeat(projection, renderState.layout, beat), {
       paddingWorldUnits: RENDER_TOKENS.camera.fitAllPaddingWorldUnits,
       reducedMotion: reduced,
     });
   }
+}
+
+function applyFocusRendering(
+  renderState: RenderState,
+  state: AppState,
+  focusedId: string | null,
+): ReturnType<typeof computeFocusSet> {
+  const projection = state.data.projection;
+  if (projection === null || renderState.nodes === null || renderState.edges === null || renderState.degrees === null) {
+    return null;
+  }
+  const focus = computeFocusSet(projection, focusedId, renderState.highlightedIds);
+  applyFocusToNodeLayer(renderState.nodes, projection, state.theme.resolved, renderState.degrees, focus);
+  writeFocusTargetColors(renderState.edges, state.theme.resolved, focus?.adjacentEdgeIds ?? null);
+  renderState.focusBlend.setTarget(focus === null ? BLEND_OFF : BLEND_ON);
+  return focus;
+}
+
+function activeMeasureKey(state: AppState, beat: PresentBeat | undefined): string | null {
+  if (state.view.mode !== "present" || state.session.groupId === null || beat?.measure === undefined) {
+    return null;
+  }
+  return [
+    state.session.sessionId,
+    state.session.revision,
+    state.presentation.beatIndex,
+    beat.id,
+    beat.measure,
+    beat.topN ?? "",
+  ].join(":");
+}
+
+function syncPresenterMeasure(
+  renderState: RenderState,
+  state: AppState,
+  beat: PresentBeat | undefined,
+  store: Store,
+  client: WasmClient,
+): void {
+  const key = activeMeasureKey(state, beat);
+  if (key === renderState.presentMeasureKey) {
+    return;
+  }
+  renderState.presentMeasureKey = key;
+  renderState.highlightedIds = new Set<string>();
+  renderState.measureExplanations = [];
+  if (key !== null && beat?.measure !== undefined && state.session.groupId !== null) {
+    void loadPresenterMeasure(renderState, store, client, state, beat, key);
+  }
+}
+
+async function loadPresenterMeasure(
+  renderState: RenderState,
+  store: Store,
+  client: WasmClient,
+  requestState: AppState,
+  beat: PresentBeat,
+  key: string,
+): Promise<void> {
+  const groupId = requestState.session.groupId;
+  if (groupId === null) {
+    return;
+  }
+  try {
+    const response = await client.graphMeasures(groupId, requestState.session.viewer, {
+      membership_kind: "member_of",
+      jaccard_pairs: [],
+    });
+    const current = store.getState();
+    if (renderState.presentMeasureKey !== key || activeMeasureKey(current, beat) !== key) {
+      return;
+    }
+    const highlights = measureHighlights(response, beat);
+    renderState.highlightedIds = highlights.ids;
+    renderState.measureExplanations = highlights.explanations;
+    updatePresenterLabel(renderState, true, beat);
+    applyFocusRendering(renderState, current, current.view.focusedEntityId);
+    renderState.dirty = true;
+    schedule(renderState, store);
+  } catch (error) {
+    const current = store.getState();
+    if (renderState.presentMeasureKey === key && activeMeasureKey(current, beat) === key) {
+      store.dispatch({ kind: "errorSurfaced", error: client.toErrorEnvelope(error) });
+    }
+  }
+}
+
+function updatePresenterLabel(
+  renderState: RenderState,
+  present: boolean,
+  beat: PresentBeat | undefined,
+): void {
+  const text = present ? presenterBeatText(beat, renderState.measureExplanations) : "";
+  renderState.beatLabel.hidden = !present || text === "";
+  renderState.beatLabel.textContent = text;
+  renderState.live.textContent = text;
 }
 
 function positionsForBeat(

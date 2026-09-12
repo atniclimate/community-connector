@@ -100,6 +100,21 @@ describe("focus set", () => {
     expect(computeFocusSet(projection(), entityA)?.neighborIds.has(entityC)).toBe(false);
   });
 
+  it("merges presenter highlights into neighbors without requiring a focused entity", () => {
+    const highlighted = new Set([entityC]);
+    const focus = computeFocusSet(projection(), null, highlighted);
+
+    expect(focus?.focusedId).toBeNull();
+    expect([...focus?.neighborIds ?? []]).toEqual([entityC]);
+    expect(focus?.adjacentEdgeIds.size).toBe(0);
+    expect(focusRole(entityC, focus)).toBe("neighbor");
+    expect(focusRole(entityA, focus)).toBe("unrelated");
+    expect(computeFocusSet(projection(), null, new Set())).toBeNull();
+
+    const combined = computeFocusSet(projection(), entityA, highlighted);
+    expect([...combined?.neighborIds ?? []].sort()).toEqual([entityB, entityC]);
+  });
+
   it("assigns roles and role appearance from theme tokens with derive-matched fallbacks", () => {
     const focus = computeFocusSet(projection(), entityA);
 

@@ -12,7 +12,7 @@ import { kindColor, projectedEdges } from "./projection";
 // machine (view.mode / view.focusedEntityId).
 
 export type FocusSet = {
-  readonly focusedId: string;
+  readonly focusedId: string | null;
   readonly neighborIds: ReadonlySet<string>;
   readonly adjacentEdgeIds: ReadonlySet<string>;
 };
@@ -31,20 +31,26 @@ const COLOR = new Color();
 const HOVER_LIGHTNESS_DELTA = 0.08;
 const DIM_CHROMA_SCALE = 0.35;
 
-export function computeFocusSet(projection: ProjectionDto, focusedId: string | null): FocusSet | null {
-  if (focusedId === null) {
+export function computeFocusSet(
+  projection: ProjectionDto,
+  focusedId: string | null,
+  highlightedIds: ReadonlySet<string> = new Set<string>(),
+): FocusSet | null {
+  if (focusedId === null && highlightedIds.size === ZERO) {
     return null;
   }
-  const neighborIds = new Set<string>();
+  const neighborIds = new Set(highlightedIds);
   const adjacentEdgeIds = new Set<string>();
-  for (const edge of projectedEdges(projection)) {
-    if (edge.from !== focusedId && edge.to !== focusedId) {
-      continue;
-    }
-    adjacentEdgeIds.add(edge.id);
-    const other: string = edge.from === focusedId ? edge.to : edge.from;
-    if (other !== focusedId) {
-      neighborIds.add(other);
+  if (focusedId !== null) {
+    for (const edge of projectedEdges(projection)) {
+      if (edge.from !== focusedId && edge.to !== focusedId) {
+        continue;
+      }
+      adjacentEdgeIds.add(edge.id);
+      const other: string = edge.from === focusedId ? edge.to : edge.from;
+      if (other !== focusedId) {
+        neighborIds.add(other);
+      }
     }
   }
   return { focusedId, neighborIds, adjacentEdgeIds };

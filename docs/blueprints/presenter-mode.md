@@ -104,46 +104,46 @@ duplicate the story machinery - extend the same effect, one more `case`.
 
 ## UNIT 2 - highlight beats (second commit, gated)
 
-**Precondition, checked before starting:** `core/crates/cn-api` must expose
-a measures JSON call (git log on `core/crates/cn-api` and
-`core/crates/cn-graph` for R4a's commit). At blueprint-writing time
-(2026-09-12) neither has landed since the original scaffold
-(`3dfe8a8`/`2af163c`) - R4a is still `planned` in `SESSION_ROSTER.yaml`.
-**Do not start UNIT 2 until that changes.** If R4a has not landed by Sunday
-2026-09-14 16:00, skip UNIT 2 and record it in `HANDOFF.md`'s next actions
-instead of blocking on it.
+**Precondition met 2026-09-12 14:32:** R4a landed (`18d4a09` and four
+commits before it) - `cn-api::graph_measures(group_id, viewer_ctx_json,
+request_json)` returns `{ degree, betweenness, eccentricity,
+shared_committee_jaccard }`, keyed by entity id, each carrying its own
+`explanation` string (`core/crates/cn-api/src/dto.rs`). `cn-wasm` exports
+it, mirroring `query_neighborhood`. Correction to the original assumption
+below: `viz/focus.ts` has no separate "analysis" tier yet -
+`computeFocusSet`/`focusRole` only know `focused | neighbor | unrelated |
+base` for ONE `focusedId`. Extend additively, no new tier:
 
-- Extend `PresentBeat` with the already-reserved `measure`/`topN` fields
-  (UNIT 1 added them to the type; UNIT 2 is the first thing that reads
-  them).
-- On entering a beat that names a `measure`, call R4a's new `cn-api` JSON
-  endpoint (same client pattern as the existing `query_paths`/
-  `query_neighborhood`/`search` calls in `app/src/wasm/client.ts`) to
-  resolve the target entity ids (betweenness top-N, `single_tie`, or a
-  committee's `member_of` set).
-- Feed the resolved ids into `viz/focus.ts`'s existing `analysis` priority
-  tier (already implemented per the design brief's ladder - transition >
-  analysis > story path > selection > user filter > view-mode ghost >
-  base) as one `uFocusBlend` target-state update, same mechanism the
-  existing selection/story states already use. Do not add a second blend
-  path.
-- The detail panel renders each measure's plain-language explanation
-  string (R4a's `cn-api` response carries it per the discovery memo's
-  Track B table, e.g. "sits on 40% of shortest paths between others") next
-  to the beat label. No new panel; extend whatever component already
-  renders `EntityDetailDto`/beat label.
-- Reduced motion: the highlight blend reuses `motion.focus`'s existing RM
-  variant (150ms opacity-only, no stagger) - no new RM branch.
+- `app/src/wasm/client.ts`: add `graphMeasures(groupId, viewer, request):
+  Promise<JsonObject>` (mirrors `queryNeighborhood`). `app/src/wasm/
+  protocol.ts`: add the `graphMeasures` request/response variant.
+  `app/src/wasm/worker.ts`: add the dispatch case calling
+  `wasmCore.graph_measures(group_id, viewer_ctx_json, request_json)`.
+- `PresentBeat.measure` accepts `"betweenness_top_n" | "single_tie"` (the
+  two Track-C-shortlisted measures; committee-member highlighting is
+  already covered by UNIT 1's `filter.kinds`, it is not a measure call).
+  `topN` applies only to `betweenness_top_n`.
+- `viz/focus.ts`: widen `FocusSet.focusedId` to `string | null`; add an
+  optional `highlightedIds: ReadonlySet<string>` (default empty) param to
+  `computeFocusSet`, merged into the returned `neighborIds` so
+  `focusRole` renders highlighted entities as today's "neighbor" role -
+  no new role, no new shader path. Non-null when EITHER `focusedId` is
+  set OR `highlightedIds` is non-empty. Existing 2-arg calls keep
+  compiling.
+- `viz/index.ts` beat-entry branch: for a beat with `measure`, call
+  `client.graphMeasures`, pick the id set (top `topN` by
+  `betweenness.value` desc, or every `degree.single_tie === true`), pass
+  it as the new argument alongside `focusedEntityId` (null for these
+  beats). Beats without `measure` are unaffected.
+- Beat label surfaces the matched entities' `explanation` strings from
+  the same response; extend UNIT 1's beat label, no new panel.
+- Reduced motion: unchanged - `FocusBlend` already snaps under RM.
 
 ## Verification (both units)
 
 `npm run typecheck && npm run build && npm run test` from `app/`, then
 `pwsh scripts/check-all.ps1`. Grep the diff for any state mutation outside
-`app/src/state` (I4) and any new dependency in `app/package.json` - both
-must be clean before commit. Manual check in the dev app: enter present
-mode on the `atni-convention` fixture, step through three beats with
-Space/Left/Right, confirm Escape exits, confirm chrome hidden and labels
-enlarged. Screenshots to
-`docs/design/screenshots/present-2026-09-13-*.png`. Visual acceptance is
-the human's per `SESSION_ROSTER.yaml`'s S-R4b gate - this session does not
-claim it.
+`app/src/state` (I4). Manual dev-app check: enter present mode on `atni-convention`,
+step through beats, confirm Escape exits and chrome hides. Screenshots to
+`docs/design/screenshots/`. Visual acceptance is the human's per
+`SESSION_ROSTER.yaml`'s S-R4b gate - this session does not claim it.

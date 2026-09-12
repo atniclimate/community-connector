@@ -68,4 +68,24 @@ describe("WasmClient protocol routing", () => {
 
     await expect(pending).rejects.toEqual(error);
   });
+
+  it("routes graph measure requests through the worker protocol", async () => {
+    const transport = new MockTransport();
+    const client = new WasmClient(transport);
+    const pending = client.graphMeasures("group-alpha", { kind: "anonymous" }, {
+      membership_kind: "member_of",
+      jaccard_pairs: [],
+    });
+
+    expect(transport.sent[0]).toEqual({
+      correlationId: 1,
+      kind: "graphMeasures",
+      groupId: "group-alpha",
+      viewer: { kind: "anonymous" },
+      request: { membership_kind: "member_of", jaccard_pairs: [] },
+    });
+    transport.reply({ correlationId: 1, ok: { degree: {}, betweenness: {} } });
+
+    await expect(pending).resolves.toEqual({ degree: {}, betweenness: {} });
+  });
 });
