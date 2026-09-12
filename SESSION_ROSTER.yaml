@@ -449,9 +449,37 @@ sessions:
       scripts/check-all.ps1's PII scan passes on the two new files"
     stop_when: "scripts/reveal.ps1 and CONTROLS.md both exist, the script opens the
       browser, and this entry is marked done"
-    status: planned
-    outcome: "superseded by human ruling 2026-09-12; P5.9 (convention rehearsal
-      checklist) remains human-only and is not this task - see PLAN_1.0.md P5.9"
+    status: done
+    outcome: "2026-09-12: Correction to this entry's own prior outcome text (committed
+      398eeb8): that text read 'superseded by human ruling 2026-09-12', with no
+      corresponding DECISIONS.md entry and no HANDOFF.md mention of any such ruling -
+      it was stale/erroneous, most likely the same concurrent-session-clobbering
+      pattern already documented in this file's own S-R4a outcome (multiple sessions
+      writing this file in one shared working tree). P5.9 (PLAN_1.0.md:883, human-only
+      convention rehearsal) is confirmed a distinct, unrelated task; that part of the
+      note was accurate but did not actually explain a 'superseded' verdict on S-R7
+      itself. Flagged to the human this session before proceeding; ruled to proceed.
+      scripts/reveal.ps1 and CONTROLS.md landed as specified. Checked app/src/main.ts
+      first, per this entry's own instruction to use the real query parameters: it
+      reads NO URL query parameters at all (no `mode`, no `group`) - DEMO_GROUP_ID is
+      hardcoded to the research-network fixture, and presenter mode is entered only via
+      the in-app Present button. Per the brief's own fallback instruction, the launcher
+      therefore opens the plain app URL with no query string, and says so in the
+      script's own header comment and in CONTROLS.md - no app code touched. reveal.ps1
+      rebuilds core/crates/cn-wasm/pkg via wasm-pack if missing, starts the app (dev by
+      default, `-Built` for a build + vite preview), resolves npx via
+      Get-Command (a bare 'npx' FilePath fails under Start-Process on Windows -
+      '%1 is not a valid Win32 application' - confirmed by hitting it live this
+      session), polls the port with a TcpClient loop, then opens the default browser
+      and prints the URL plus 'Escape exits presenter mode'. Verified live: ran
+      `pwsh scripts/reveal.ps1 -Port 5198`, printed `http://localhost:5198/`, dev
+      server confirmed answering before exit; process cleaned up after. CONTROLS.md
+      (52 lines) holds the presenter-mode key table from
+      docs/blueprints/presenter-mode.md, the app/public/beats.atni.json edit shape,
+      and the 4-step live-entry loop from docs/runbooks/live-entry.md. Gate:
+      `pwsh scripts/check-all.ps1` 12/12 PASS (rust-fmt/clippy/test, wasm-build,
+      app-typecheck/build/test/templates/smoke/snapshot, pii-scan, pii-selftest);
+      pii-scan reports clean on 357 files including both new files."
 
   - id: S-R1
     task_ids: [R1]
