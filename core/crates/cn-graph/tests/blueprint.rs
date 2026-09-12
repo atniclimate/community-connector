@@ -330,6 +330,24 @@ fn search_matches_projected_attribute_values_with_stable_ordering() {
 }
 
 #[test]
+fn degree_measures_flag_single_tie_and_explain() {
+    let p = projection(
+        vec![entity(1, "person"), entity(2, "person"), entity(3, "person")],
+        vec![
+            edge(1, 1, 2, "connected_to", false, None),
+            edge(2, 1, 3, "connected_to", false, None),
+        ],
+    );
+    let idx = GraphIndex::build(&p);
+    let measures = degree_measures(&idx);
+    assert_eq!(measures[&entity_id(1)].degree, 2);
+    assert!(!measures[&entity_id(1)].single_tie);
+    assert_eq!(measures[&entity_id(2)].degree, 1);
+    assert!(measures[&entity_id(2)].single_tie);
+    assert!(measures[&entity_id(2)].explanation.contains('1'));
+}
+
+#[test]
 fn search_snippet_truncates_on_char_boundary() {
     let mut entity = entity(1, "person");
     let long = format!("{}harbor", "a".repeat(100));

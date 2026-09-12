@@ -162,6 +162,40 @@ pub fn degrees(idx: &GraphIndex) -> BTreeMap<EntityId, usize> {
     degrees
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct DegreeMeasure {
+    pub entity: EntityId,
+    pub degree: usize,
+    pub single_tie: bool,
+    pub explanation: String,
+}
+
+/// Degree plus the single-tie flag (degree == 1), each with an explanation.
+pub fn degree_measures(idx: &GraphIndex) -> BTreeMap<EntityId, DegreeMeasure> {
+    degrees(idx)
+        .into_iter()
+        .map(|(entity, degree)| {
+            let single_tie = degree == 1;
+            let explanation = if degree == 0 {
+                "has no connections".to_string()
+            } else if single_tie {
+                "connected to 1 other person".to_string()
+            } else {
+                format!("connected to {degree} others")
+            };
+            (
+                entity,
+                DegreeMeasure {
+                    entity,
+                    degree,
+                    single_tie,
+                    explanation,
+                },
+            )
+        })
+        .collect()
+}
+
 pub fn search(p: &Projection, q: &SearchQuery) -> Vec<SearchHit> {
     let needle = q.text.trim().to_lowercase();
     if needle.is_empty() || q.limit == 0 {

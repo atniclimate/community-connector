@@ -255,7 +255,7 @@ mod tests {
         let kp = generate_keypair();
         let (base32, check) = encode_print_backup(&kp.secret);
         // A hand transcription might lower-case and add readability spaces.
-        let messy = format!("{}  {}", &base32[..26].to_lowercase(), &base32[26..]);
+        let messy = format!("{}  {}", base32[..26].to_lowercase(), &base32[26..]);
         let recovered = decode_print_backup(&messy, &format!("  {check}  ")).expect("decode");
         assert_eq!(recovered.expose_bytes(), kp.secret.expose_bytes());
     }
