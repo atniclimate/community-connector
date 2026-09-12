@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use cn_graph::PathConstraints;
+use cn_graph::{self, PathConstraints};
 use cn_model::{AttrId, AttributeValue, Circle, EntityId, KindId, SensitivityTier};
 use cn_perm::{DetailProvenance, Projection};
 use cn_store::{StoreReport, SubmitOutcome};
@@ -59,6 +59,35 @@ pub(crate) struct NeighborhoodRequest {
     pub(crate) hops: usize,
     #[serde(default)]
     pub(crate) constraints: PathConstraints,
+}
+
+/// One committee-overlap comparison requested by the caller (the graph side
+/// is otherwise computed for every entity, never scoped by the caller - the
+/// no-leak property, ADR-003 D1).
+#[derive(Debug, Deserialize)]
+pub(crate) struct JaccardPairRequest {
+    pub(crate) a: EntityId,
+    pub(crate) b: EntityId,
+}
+
+/// Request for the S-R4a event measures call: degree/betweenness/
+/// eccentricity are computed for the whole viewer projection; Jaccard is
+/// computed only for the requested pairs.
+#[derive(Debug, Deserialize)]
+pub(crate) struct GraphMeasuresRequest {
+    pub(crate) membership_kind: KindId,
+    #[serde(default)]
+    pub(crate) jaccard_pairs: Vec<JaccardPairRequest>,
+}
+
+/// Response for `graph_measures` (discovery-2026-09-12.md Track B): all five
+/// measures, each carrying its own plain-language explanation string.
+#[derive(Debug, Serialize)]
+pub(crate) struct GraphMeasures {
+    pub(crate) degree: BTreeMap<EntityId, cn_graph::DegreeMeasure>,
+    pub(crate) betweenness: BTreeMap<EntityId, cn_graph::BetweennessMeasure>,
+    pub(crate) eccentricity: BTreeMap<EntityId, cn_graph::EccentricityMeasure>,
+    pub(crate) shared_committee_jaccard: Vec<cn_graph::JaccardMeasure>,
 }
 
 #[derive(Debug, Default, Deserialize)]

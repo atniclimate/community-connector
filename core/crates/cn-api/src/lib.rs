@@ -18,8 +18,8 @@ use cn_perm::{ProjectedEntity, Projection, ViewerContext};
 use cn_store::{Operation, StoreReport};
 use dto::{
     CoreInfo, DecisionRequest, DetailValue, EntityDetail, ExportOptions, ExportSnapshot,
-    IntakeDedup, IntakeValidation, LoadReport, NearDupRequest, NeighborhoodRequest, PathRequest,
-    StagedPair, SubmitReport,
+    GraphMeasures, GraphMeasuresRequest, IntakeDedup, IntakeValidation, LoadReport, NearDupRequest,
+    NeighborhoodRequest, PathRequest, StagedPair, SubmitReport,
 };
 use error::{ApiError, ErrorCode};
 use export::export_projection;
@@ -121,6 +121,18 @@ impl Api {
         request_json: &str,
     ) -> String {
         respond(|| self.query_neighborhood_impl(group_id, viewer_ctx_json, request_json))
+    }
+
+    /// Computes degree/single-tie/betweenness/eccentricity for every entity
+    /// plus shared-committee Jaccard for the requested pairs, all over the
+    /// viewer projection (ADR-003 D1; discovery-2026-09-12.md Track B).
+    pub fn graph_measures(
+        &mut self,
+        group_id: &str,
+        viewer_ctx_json: &str,
+        request_json: &str,
+    ) -> String {
+        respond(|| self.graph_measures_impl(group_id, viewer_ctx_json, request_json))
     }
 
     /// Searches projected attribute values only (ADR-003 A-B4).
@@ -445,6 +457,37 @@ impl Api {
         let (_projection, index) = self.index_for_request(group_id, viewer_ctx_json)?;
         cn_graph::neighborhood(&index, request.center, request.hops, &request.constraints)
             .map_err(graph_error)
+    }
+
+    fn graph_measures_impl(
+        &mut self,
+        group_id: &str,
+        viewer_ctx_json: &str,
+        request_json: &str,
+    ) -> Result<GraphMeasures, ApiError> {
+        let request: GraphMeasuresRequest = parse_json(request_json)?;
+        let (_projection, index) = self.index_for_request(group_id, viewer_ctx_json)?;
+        let degree = cn_graph::degree_measures(&index);
+        let betweenness = cn_graph::betweenness(&index);
+        let eccentricity = cn_graph::eccentricity(&index);
+        let mut shared_committee_jaccard = Vec::with_capacity(request.jaccard_pairs.len());
+        for pair in &request.jaccard_pairs {
+            shared_committee_jaccard.push(
+                cn_graph::shared_committee_jaccard(
+                    &index,
+                    pair.a,
+                    pair.b,
+                    &request.membership_kind,
+                )
+                .map_err(graph_error)?,
+            );
+        }
+        Ok(GraphMeasures {
+            degree,
+            betweenness,
+            eccentricity,
+            shared_committee_jaccard,
+        })
     }
 
     fn search_impl(
