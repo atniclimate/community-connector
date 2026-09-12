@@ -19,7 +19,7 @@ import type { ProjectionDto } from "../state/state";
 import type { Theme } from "../theme/tokens";
 import { motionSettings } from "./camera";
 import { RENDER_TOKENS } from "./config";
-import { buildEdgeBuffers, expectedEdgeVertexCount, weightToAlpha } from "./edges";
+import { buildEdgeBuffers, buildEdgeLayer, expectedEdgeVertexCount, weightToAlpha } from "./edges";
 import { buildHaloLayer } from "./halos";
 import {
   labelCandidates,
@@ -168,6 +168,43 @@ describe("edges", () => {
     expect(buffers.colors[3] ?? Number.NaN).toBeCloseTo(weightToAlpha(5));
     expect(weightToAlpha(-99)).toBe(0.08);
     expect(weightToAlpha(99)).toBe(0.6);
+  });
+});
+
+describe("render pipeline agreement", () => {
+  it("puts nodes, edges, and halos through the same fog and output chunks", () => {
+    const data = projection();
+    const layout = computeLayout(data.entities ?? []);
+    const nodes = buildNodeLayer({ projection: data, layout, kindMeta: kindMeta(), theme: theme(), degrees: degreesForProjection(data) });
+    const edges = buildEdgeLayer(data, layout, theme());
+    const halos = buildHaloLayer({
+      projection: data,
+      layout,
+      kindMeta: kindMeta(),
+      theme: theme(),
+      tier: "A",
+      cameraPosition: new Vector3(0, 0, 0),
+      viewMode: "overview",
+    });
+    const materials = [
+      nodes.records[0]?.mesh.material,
+      edges.object.material,
+      (halos.group.children[0] as InstancedMesh | undefined)?.material,
+    ];
+    for (const material of materials) {
+      if (!(material instanceof ShaderMaterial)) {
+        throw new Error("expected a shader material");
+      }
+      expect(material.fog).toBe(true);
+      expect(material.uniforms.fogDensity).toBeDefined();
+      expect(material.vertexShader).toContain("#include <fog_vertex>");
+      for (const chunk of ["tonemapping_fragment", "colorspace_fragment", "fog_fragment"]) {
+        expect(material.fragmentShader).toContain(`#include <${chunk}>`);
+      }
+    }
+    nodes.dispose();
+    edges.dispose();
+    halos.dispose();
   });
 });
 

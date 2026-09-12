@@ -6,6 +6,8 @@ import {
   InstancedMesh,
   Object3D,
   ShaderMaterial,
+  UniformsLib,
+  UniformsUtils,
   Vector3,
 } from "three";
 import type { KindMeta, ProjectionDto, ShapeName, ViewMode } from "../state/state";
@@ -38,20 +40,30 @@ function haloMaterial(color: Color, restingAlpha: number): ShaderMaterial {
     side: BackSide,
     transparent: true,
     depthWrite: false,
-    uniforms: {
-      uColor: { value: color },
-      uAlpha: { value: restingAlpha },
-      uFalloffC: { value: RENDER_TOKENS.halo.falloffC },
-      uFalloffP: { value: RENDER_TOKENS.halo.falloffP },
-    },
+    fog: true,
+    uniforms: UniformsUtils.merge([
+      UniformsLib.fog,
+      {
+        uColor: { value: color },
+        uAlpha: { value: restingAlpha },
+        uFalloffC: { value: RENDER_TOKENS.halo.falloffC },
+        uFalloffP: { value: RENDER_TOKENS.halo.falloffP },
+      },
+    ]),
     vertexShader: `
+      #include <common>
+      #include <fog_pars_vertex>
       varying vec3 vNormal;
       void main() {
         vNormal = normalize(normalMatrix * normal);
-        gl_Position = projectionMatrix * modelViewMatrix * instanceMatrix * vec4(position, 1.0);
+        vec4 mvPosition = modelViewMatrix * instanceMatrix * vec4(position, 1.0);
+        gl_Position = projectionMatrix * mvPosition;
+        #include <fog_vertex>
       }
     `,
     fragmentShader: `
+      #include <common>
+      #include <fog_pars_fragment>
       varying vec3 vNormal;
       uniform vec3 uColor;
       uniform float uAlpha;
@@ -60,6 +72,9 @@ function haloMaterial(color: Color, restingAlpha: number): ShaderMaterial {
       void main() {
         float fresnel = pow(uFalloffC + abs(dot(vNormal, vec3(0.0, 0.0, 1.0))), uFalloffP);
         gl_FragColor = vec4(uColor, clamp(uAlpha * fresnel, 0.0, 1.0));
+        #include <tonemapping_fragment>
+        #include <colorspace_fragment>
+        #include <fog_fragment>
       }
     `,
   });

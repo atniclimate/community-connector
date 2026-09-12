@@ -4,6 +4,8 @@ import {
   Color,
   LineSegments,
   ShaderMaterial,
+  UniformsLib,
+  UniformsUtils,
   Vector3,
 } from "three";
 import type { ProjectionDto } from "../state/state";
@@ -43,21 +45,34 @@ function edgeMaterial(): ShaderMaterial {
   return new ShaderMaterial({
     transparent: true,
     depthWrite: false,
-    uniforms: { uFocusBlend: { value: BASE_BLEND } },
+    fog: true,
+    uniforms: UniformsUtils.merge([
+      UniformsLib.fog,
+      { uFocusBlend: { value: BASE_BLEND } },
+    ]),
     vertexShader: `
+      #include <common>
+      #include <fog_pars_vertex>
       attribute vec4 color;
       attribute vec4 targetColor;
       varying vec4 vColor;
       uniform float uFocusBlend;
       void main() {
         vColor = mix(color, targetColor, uFocusBlend);
-        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+        gl_Position = projectionMatrix * mvPosition;
+        #include <fog_vertex>
       }
     `,
     fragmentShader: `
+      #include <common>
+      #include <fog_pars_fragment>
       varying vec4 vColor;
       void main() {
         gl_FragColor = vColor;
+        #include <tonemapping_fragment>
+        #include <colorspace_fragment>
+        #include <fog_fragment>
       }
     `,
   });
