@@ -254,6 +254,97 @@ fn committees_of(
         .collect()
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct BetweennessMeasure {
+    pub entity: EntityId,
+    pub value: f64,
+    pub explanation: String,
+}
+
+/// Exact Brandes' betweenness centrality over unweighted shortest paths,
+/// traversing every adjacency entry regardless of edge direction (I2: the
+/// index already carries only the permission-filtered projection's edges).
+/// Normalized by (n-1)(n-2); zero for n <= 2.
+pub fn betweenness(idx: &GraphIndex) -> BTreeMap<EntityId, BetweennessMeasure> {
+    let nodes: Vec<EntityId> = idx.entities.iter().copied().collect();
+    let n = nodes.len();
+    let mut centrality: BTreeMap<EntityId, f64> = nodes.iter().map(|&v| (v, 0.0)).collect();
+
+    for &s in &nodes {
+        let mut stack = Vec::new();
+        let mut predecessors: BTreeMap<EntityId, Vec<EntityId>> =
+            nodes.iter().map(|&v| (v, Vec::new())).collect();
+        let mut sigma: BTreeMap<EntityId, f64> = nodes.iter().map(|&v| (v, 0.0)).collect();
+        let mut dist: BTreeMap<EntityId, i64> = nodes.iter().map(|&v| (v, -1)).collect();
+        sigma.insert(s, 1.0);
+        dist.insert(s, 0);
+        let mut queue = VecDeque::from([s]);
+        while let Some(v) = queue.pop_front() {
+            stack.push(v);
+            let dv = dist[&v];
+            let sv = sigma[&v];
+            for adj in all_neighbors(idx, v) {
+                let w = adj.to;
+                if dist[&w] < 0 {
+                    dist.insert(w, dv + 1);
+                    queue.push_back(w);
+                }
+                if dist[&w] == dv + 1 {
+                    *sigma.get_mut(&w).expect("known node") += sv;
+                    predecessors.get_mut(&w).expect("known node").push(v);
+                }
+            }
+        }
+        let mut delta: BTreeMap<EntityId, f64> = nodes.iter().map(|&v| (v, 0.0)).collect();
+        while let Some(w) = stack.pop() {
+            let sigma_w = sigma[&w];
+            let delta_w = delta[&w];
+            for &v in &predecessors[&w] {
+                let contribution = (sigma[&v] / sigma_w) * (1.0 + delta_w);
+                *delta.get_mut(&v).expect("known node") += contribution;
+            }
+            if w != s {
+                *centrality.get_mut(&w).expect("known node") += delta_w;
+            }
+        }
+    }
+
+    let normalization = if n > 2 {
+        ((n - 1) * (n - 2)) as f64
+    } else {
+        0.0
+    };
+    nodes
+        .into_iter()
+        .map(|entity| {
+            let raw = centrality[&entity];
+            let value = if normalization > 0.0 {
+                raw / normalization
+            } else {
+                0.0
+            };
+            let explanation = format!(
+                "sits on {:.1}% of shortest paths between other people",
+                value * 100.0
+            );
+            (
+                entity,
+                BetweennessMeasure {
+                    entity,
+                    value,
+                    explanation,
+                },
+            )
+        })
+        .collect()
+}
+
+/// All adjacency entries for a node, ignoring `forward`/direction - used by
+/// measures defined as undirected (betweenness, eccentricity).
+fn all_neighbors(idx: &GraphIndex, node: EntityId) -> impl Iterator<Item = &Adjacency> {
+    idx.adjacency.get(&node).into_iter().flatten()
+}
+
 pub fn search(p: &Projection, q: &SearchQuery) -> Vec<SearchHit> {
     let needle = q.text.trim().to_lowercase();
     if needle.is_empty() || q.limit == 0 {

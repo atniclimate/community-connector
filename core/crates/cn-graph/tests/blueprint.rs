@@ -391,6 +391,45 @@ fn shared_committee_jaccard_counts_overlap_and_rejects_missing() {
 }
 
 #[test]
+fn betweenness_ranks_the_planted_bridge_above_every_non_bridge_node() {
+    // Two triangles joined only through entity 4 (the bridge).
+    let p = projection(
+        vec![
+            entity(1, "person"),
+            entity(2, "person"),
+            entity(3, "person"),
+            entity(4, "person"),
+            entity(5, "person"),
+            entity(6, "person"),
+            entity(7, "person"),
+        ],
+        vec![
+            edge(1, 1, 2, "connected_to", false, None),
+            edge(2, 2, 3, "connected_to", false, None),
+            edge(3, 3, 1, "connected_to", false, None),
+            edge(4, 3, 4, "connected_to", false, None),
+            edge(5, 4, 5, "connected_to", false, None),
+            edge(6, 5, 6, "connected_to", false, None),
+            edge(7, 6, 7, "connected_to", false, None),
+            edge(8, 7, 5, "connected_to", false, None),
+        ],
+    );
+    let idx = GraphIndex::build(&p);
+    let scores = betweenness(&idx);
+    let bridge = scores[&entity_id(4)].value;
+    for (entity, measure) in &scores {
+        if *entity != entity_id(4) {
+            assert!(
+                measure.value < bridge,
+                "{entity:?} scored {} >= bridge's {bridge}",
+                measure.value
+            );
+        }
+    }
+    assert!(scores[&entity_id(4)].explanation.contains('%'));
+}
+
+#[test]
 fn search_snippet_truncates_on_char_boundary() {
     let mut entity = entity(1, "person");
     let long = format!("{}harbor", "a".repeat(100));
