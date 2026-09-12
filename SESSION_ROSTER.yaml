@@ -288,8 +288,47 @@ sessions:
     stop_when: "cn-api exposes the new measures as one JSON call, cargo test is green, and
       the claim-verifier subagent has independently reproduced at least one measure's
       value on the R2 fixture"
-    status: planned
-    outcome: null
+    status: done
+    outcome: "2026-09-12: all five measures landed in cn-graph/src/query.rs -
+      degree_measures (exists, now wrapped with single_tie + explanation),
+      shared_committee_jaccard (Jaccard over member_of adjacency), betweenness (exact
+      Brandes', undirected traversal, normalized by (n-1)(n-2)), eccentricity (BFS per
+      node, component field from a union-by-min-EntityId pass so disconnected nodes
+      report their own component instead of being folded together) - each returning a
+      value plus a plain-language explanation string. cn-api gained one new call,
+      graph_measures (dto.rs: GraphMeasuresRequest/JaccardPairRequest/GraphMeasures;
+      lib.rs: graph_measures/graph_measures_impl, wired through the existing
+      index_for_request the same way query_paths/query_neighborhood are), covered by a
+      new integration test (tests/graph_measures.rs) that loads the REAL ATNI
+      convention fixture (fixtures/templates + fixtures/groups, not an inline
+      projection) through load_group_begin/load_ops_chunk/load_group_commit. cn-wasm
+      gained a matching export-only binding. cn-graph's own unit tests (blueprint.rs)
+      use small purpose-built synthetic projections instead of the ATNI fixture for the
+      four new measures, because the assertions need precisely engineered shapes (a
+      planted bridge node for betweenness, a disconnected pair for eccentricity's
+      component field) that the pseudo-randomly generated ATNI fixture does not
+      guarantee; the ATNI-fixture coverage lives at the cn-api integration level
+      instead. Commits: 7be2b5b (S-R0 clippy fix, landed first because check-all was
+      blocking on it once this session touched real Rust code - the session's own
+      scope fence does not cover core/cli, but leaving it unfixed would have blocked
+      every commit below), 18b521e (rustfmt catch-up), 877925c, 5ebbf69, 170b0ec,
+      9ece89a, 18d4a09. Gates: cargo test --workspace green (every crate, 0 failed) and
+      pwsh scripts/check-all.ps1 12/12 (better than this session's starting 11/12,
+      since the S-R0 clippy fix landed). One claim-verifier subagent (claude-sonnet-5,
+      medium) independently rewrote Brandes' from the raw edge list (not from
+      query.rs) for the planted-bridge fixture's three named nodes and confirmed:
+      bridge node 4 normalizes to 0.3, exceeding both bridge-adjacent nodes 3/5 (0.267)
+      and outer-triangle nodes 1/2/6/7 (0.0) - CONFIRMED, no discrepancy. Residual
+      note: this session's git commits interleaved with a concurrent S-R4b session
+      also committing to main in the SAME working tree (not a separate worktree) -
+      two commits (18b521e's predecessor and 18d4a09) ended up combined with
+      unrelated staged content from that session (S-R4b's own SESSION_ROSTER.yaml
+      outcome text, and once its app/ working-tree files) because `git add <path> &&
+      git commit` commits whatever else is already staged in a shared index; content
+      in both cases was correct and no work was lost, but the commit boundaries are
+      not as clean as intended - worth a HANDOFF.md note that concurrent sessions
+      sharing one checkout should each stage AND commit in one uninterrupted breath,
+      or use separate worktrees."
 
   - id: S-R4b
     task_ids: [R4]
