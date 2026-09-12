@@ -278,9 +278,9 @@ function updateRig(
     rigState.msSinceInteraction,
     rigState.reducedMotion,
   );
-  const needsLoop = controls.autoRotate || controls.enableDamping;
-  if (needsLoop) {
-    controls.update();
-  }
-  return needsLoop;
+  // OrbitControls.update reports whether the camera moved, so settled damping
+  // stops the loop. Waiting out the idle delay keeps it alive until drift starts.
+  const moved = controls.update(deltaSeconds);
+  const awaitingDrift = rigState.driftEnabled && !rigState.interacting && !rigState.reducedMotion;
+  return moved || controls.autoRotate || awaitingDrift;
 }

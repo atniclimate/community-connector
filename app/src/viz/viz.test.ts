@@ -36,7 +36,7 @@ import {
   entityIdFromIntersection,
   type PickDispatch,
 } from "./picking";
-import { profileForTier, QualityManager } from "./quality";
+import { effectivePixelRatio, profileForTier, QualityManager } from "./quality";
 import { createVizScene } from "./scene";
 
 const entityA = "entity-a";
@@ -307,6 +307,15 @@ describe("quality", () => {
       manager.sample(1);
     }
     expect(manager.profile).toEqual(profileForTier("B"));
+  });
+});
+
+describe("pixel ratio", () => {
+  it("treats the tier DPR as a cap, never an upscale", () => {
+    expect(effectivePixelRatio(1, 1.5)).toBe(1);
+    expect(effectivePixelRatio(2, 1.5)).toBe(1.5);
+    expect(effectivePixelRatio(1.25, 1.25)).toBe(1.25);
+    expect(effectivePixelRatio(0, 1.5)).toBe(1);
   });
 });
 

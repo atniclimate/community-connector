@@ -29,6 +29,11 @@ export function profileForTier(tier: QualityTier): QualityProfile {
   }
 }
 
+/** The tier DPR is a ceiling; a 1x display never renders above its native density. */
+export function effectivePixelRatio(devicePixelRatio: number, tierCap: number): number {
+  return Math.min(devicePixelRatio > 0 ? devicePixelRatio : 1, tierCap);
+}
+
 export class QualityManager {
   private tierIndex = ORDER.indexOf("B");
   private emaMs: number = RENDER_TOKENS.quality.upgradeMs;

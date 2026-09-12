@@ -1,4 +1,4 @@
-import { WebGLRenderer } from "three";
+import { NeutralToneMapping, SRGBColorSpace, Vector2, WebGLRenderer } from "three";
 import type { AppState, PresentBeat, ProjectionDto, ViewMode } from "../state/state";
 import type { Store } from "../state/store";
 import type { WasmClient } from "../wasm/client";
@@ -14,7 +14,7 @@ import { createVizScene, type SceneSetup } from "./scene";
 import { createCameraRig, zoomToFit, type CameraRig } from "./camera";
 import { applyFocusToNodeLayer, computeFocusSet, FocusBlend } from "./focus";
 import { measureHighlights, presenterBeatText } from "./presenter";
-import { QualityManager, type QualityProfile } from "./quality";
+import { effectivePixelRatio, QualityManager, type QualityProfile } from "./quality";
 
 export type MountedViz = () => void;
 
@@ -24,6 +24,7 @@ const UNIT = 1;
 const MIN_HEIGHT = 320;
 const BLEND_OFF = 0;
 const BLEND_ON = 1;
+const LOGICAL_SIZE = new Vector2();
 
 type RenderState = {
   sceneSetup: SceneSetup;
@@ -68,6 +69,8 @@ export function mountViz(container: HTMLElement, store: Store, client: WasmClien
   canvas.setAttribute("tabindex", "0");
   container.append(canvas, live, beatLabel);
   const renderer = new WebGLRenderer({ canvas, antialias: true });
+  renderer.outputColorSpace = SRGBColorSpace;
+  renderer.toneMapping = NeutralToneMapping;
   const sceneSetup = createVizScene(store.getState().theme.resolved);
   let markViewDirty = (): void => {
     // Replaced below once renderState exists; camera changes before then are
@@ -109,12 +112,23 @@ export function mountViz(container: HTMLElement, store: Store, client: WasmClien
   };
   renderState.picking = new PickingController(canvas, cameraRig.camera, () => renderState.nodes, store);
   const unsubscribe = store.subscribe(() => handleState(renderState, container, store, client));
-  const onVisibility = (): void => schedule(renderState, store);
+  const onVisibility = (): void => {
+    // A hidden interval must not reach the frame clock or the quality EMA.
+    renderState.lastTime = null;
+    schedule(renderState, store);
+  };
   const onKeydown = (event: KeyboardEvent): void => handlePresenterKeydown(event, renderState, store);
+  const resizeObserver = new ResizeObserver(() => {
+    resize(renderState, container);
+    renderState.dirty = true;
+    schedule(renderState, store);
+  });
+  resizeObserver.observe(container);
   document.addEventListener("visibilitychange", onVisibility);
   window.addEventListener("keydown", onKeydown);
   handleState(renderState, container, store, client);
   return () => {
+    resizeObserver.disconnect();
     unsubscribe();
     document.removeEventListener("visibilitychange", onVisibility);
     window.removeEventListener("keydown", onKeydown);
@@ -407,14 +421,18 @@ function updateAria(renderState: RenderState, state: AppState): void {
 function resize(renderState: RenderState, container: HTMLElement): void {
   const width = Math.max(UNIT, container.clientWidth);
   const height = Math.max(MIN_HEIGHT, container.clientHeight);
-  const canvas = renderState.renderer.domElement;
-  if (canvas.width === width && canvas.height === height) {
+  const renderer = renderState.renderer;
+  const pixelRatio = effectivePixelRatio(window.devicePixelRatio, renderState.profile.dpr);
+  if (renderer.getPixelRatio() !== pixelRatio) {
+    renderer.setPixelRatio(pixelRatio);
+  }
+  renderer.getSize(LOGICAL_SIZE);
+  if (LOGICAL_SIZE.x === width && LOGICAL_SIZE.y === height) {
     return;
   }
   renderState.cameraRig.camera.aspect = width / height;
   renderState.cameraRig.camera.updateProjectionMatrix();
-  renderState.renderer.setSize(width, height, false);
-  renderState.renderer.setPixelRatio(renderState.profile.dpr);
+  renderer.setSize(width, height, false);
 }
 
 function schedule(renderState: RenderState, store: Store): void {
@@ -430,13 +448,15 @@ function frame(renderState: RenderState, store: Store, time: number): void {
   const deltaSeconds = renderState.lastTime === null ? ZERO : (time - renderState.lastTime) / RENDER_TOKENS.time.secondsToMs;
   renderState.lastTime = time;
   const deltaMs = deltaSeconds * RENDER_TOKENS.time.secondsToMs;
-  const previousTier = renderState.profile.tier;
-  renderState.profile = renderState.quality.sample(deltaMs);
-  if (renderState.profile.tier !== previousTier) {
-    renderState.projectionRevision = null;
-    store.dispatch({ kind: "qualityTierChanged", tier: renderState.profile.tier });
+  if (deltaMs > ZERO) {
+    const previousTier = renderState.profile.tier;
+    renderState.profile = renderState.quality.sample(deltaMs);
+    if (renderState.profile.tier !== previousTier) {
+      renderState.projectionRevision = null;
+      // The store subscriber re-runs resize(), which applies the new DPR cap.
+      store.dispatch({ kind: "qualityTierChanged", tier: renderState.profile.tier });
+    }
   }
-  renderState.renderer.setPixelRatio(renderState.profile.dpr);
   const animated = renderState.cameraRig.update(deltaSeconds);
   const labelsChanged = renderState.labels?.update(renderState.cameraRig.camera, deltaMs) ?? false;
   const blendChanged = renderState.focusBlend.update(deltaMs, state.ui.reducedMotion);
@@ -453,6 +473,11 @@ function frame(renderState: RenderState, store: Store, time: number): void {
   }
   if ((animated || blendChanged) && !state.ui.reducedMotion) {
     schedule(renderState, store);
+  }
+  if (renderState.frame === null) {
+    // Loop is idle; the next wake-up starts a fresh clock instead of reporting
+    // the whole idle gap as one slow frame.
+    renderState.lastTime = null;
   }
 }
 
