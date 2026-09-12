@@ -20,7 +20,7 @@ import type { Theme } from "../theme/tokens";
 import { motionSettings } from "./camera";
 import { RENDER_TOKENS } from "./config";
 import { buildEdgeBuffers, buildEdgeLayer, expectedEdgeVertexCount, weightToAlpha } from "./edges";
-import { buildHaloLayer } from "./halos";
+import { buildHaloLayer, selectHaloCandidates } from "./halos";
 import {
   labelCandidates,
   selectVisibleLabels,
@@ -208,7 +208,8 @@ describe("render pipeline agreement", () => {
     const materials = [
       nodes.records[0]?.mesh.material,
       edges.object.material,
-      (halos.group.children[0] as InstancedMesh | undefined)?.material,
+      (halos.field.children[0] as InstancedMesh | undefined)?.material,
+      halos.selected.material,
     ];
     for (const material of materials) {
       if (!(material instanceof ShaderMaterial)) {
@@ -240,11 +241,11 @@ describe("halos", () => {
       cameraPosition: new Vector3(0, 0, RENDER_TOKENS.camera.initialZ),
       viewMode: "overview",
     });
-    const haloCount = layer.group.children.reduce(
+    const haloCount = layer.field.children.reduce(
       (sum, child) => sum + (child instanceof InstancedMesh ? child.count : 0),
       0,
     );
-    const firstMesh = layer.group.children[0];
+    const firstMesh = layer.field.children[0];
     if (!(firstMesh instanceof InstancedMesh)) {
       throw new Error("missing halo mesh");
     }
@@ -255,6 +256,39 @@ describe("halos", () => {
 
     expect(haloCount).toBe(data.entities?.length);
     expect(decomposed.scale.x).toBeGreaterThan(degreeToScale(1));
+    layer.dispose();
+  });
+
+  it("applies the tier distance before the cap, and follows the camera on refresh", () => {
+    const near = new Vector3(0, 0, 0);
+    const far = new Vector3(0, 0, RENDER_TOKENS.halo.tierBDistance + 100);
+    const picked = selectHaloCandidates([far, near], new Vector3(0, 0, 0), "B");
+
+    expect(picked.map((candidate) => candidate.entryIndex)).toEqual([1]);
+    expect(selectHaloCandidates([near], near, "C")).toEqual([]);
+
+    const data = projection();
+    const layout = computeLayout(data.entities ?? []);
+    const layer = buildHaloLayer({
+      projection: data,
+      layout,
+      kindMeta: kindMeta(),
+      theme: theme(),
+      tier: "B",
+      cameraPosition: new Vector3(0, 0, 100_000),
+      viewMode: "overview",
+    });
+    const visible = (): number => layer.field.children.reduce(
+      (sum, child) => sum + (child.visible && child instanceof InstancedMesh ? child.count : 0),
+      0,
+    );
+    expect(visible()).toBe(0);
+    layer.refresh(new Vector3(0, 0, 0));
+    expect(visible()).toBe(data.entities?.length);
+    layer.setSelected(entityA);
+    expect(layer.selected.visible).toBe(true);
+    layer.setSelected(null);
+    expect(layer.selected.visible).toBe(false);
     layer.dispose();
   });
 });

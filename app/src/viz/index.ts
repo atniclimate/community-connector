@@ -267,6 +267,7 @@ function applyFocusRendering(
   const focus = computeFocusSet(projection, focusedId, renderState.highlightedIds);
   applyFocusToNodeLayer(renderState.nodes, projection, state.theme.resolved, renderState.degrees, focus);
   writeFocusTargetColors(renderState.edges, state.theme.resolved, focus?.adjacentEdgeIds ?? null);
+  renderState.halos?.setSelected(focusedId);
   renderState.focusBlend.setTarget(focus === null ? BLEND_OFF : BLEND_ON);
   return focus;
 }
@@ -459,6 +460,13 @@ function frame(renderState: RenderState, store: Store, time: number): void {
   }
   const animated = renderState.cameraRig.update(deltaSeconds);
   const labelsChanged = renderState.labels?.update(renderState.cameraRig.camera, deltaMs) ?? false;
+  const halos = renderState.halos;
+  const cameraPosition = renderState.cameraRig.camera.position;
+  const halosMoved = halos !== null
+    && halos.lastRefreshPosition.distanceTo(cameraPosition) > RENDER_TOKENS.halo.refreshDistance;
+  if (halosMoved) {
+    halos.refresh(cameraPosition);
+  }
   const blendChanged = renderState.focusBlend.update(deltaMs, state.ui.reducedMotion);
   if (renderState.edges !== null) {
     setEdgeFocusBlend(renderState.edges, renderState.focusBlend.value);
@@ -466,7 +474,7 @@ function frame(renderState: RenderState, store: Store, time: number): void {
   if (renderState.halos !== null) {
     setHaloFocusDim(renderState.halos, renderState.focusBlend.value);
   }
-  renderState.dirty = renderState.dirty || labelsChanged || blendChanged;
+  renderState.dirty = renderState.dirty || labelsChanged || blendChanged || halosMoved;
   if (renderState.dirty || animated) {
     renderState.renderer.render(renderState.sceneSetup.scene, renderState.cameraRig.camera);
     renderState.dirty = false;

@@ -1,6 +1,7 @@
 import {
   BackSide,
   Color,
+  DynamicDrawUsage,
   Group,
   IcosahedronGeometry,
   InstancedMesh,
@@ -19,23 +20,39 @@ import { degreeToScale } from "./nodes";
 import type { QualityTier } from "./quality";
 
 export type HaloLayer = {
+  /** Scene root: the resting field plus the selected shell. */
   readonly group: Group;
+  /** Per-kind resting halos; draw counts follow the camera. */
+  readonly field: Group;
+  readonly selected: InstancedMesh;
   readonly restingAlpha: number;
+  /** Re-picks the nearest visible resting halos for a camera position. */
+  readonly refresh: (cameraPosition: Vector3) => void;
+  readonly lastRefreshPosition: Vector3;
+  /** Shows the selected shell around `entityId` (null hides it). */
+  readonly setSelected: (entityId: string | null) => void;
   readonly dispose: () => void;
 };
 
-const UNIT = 1;
-const BASE_VISIBLE_DISTANCE = Number.POSITIVE_INFINITY;
-const ZERO_VISIBLE = 0;
-const TORUS_HALO_RADIUS_FACTOR = 1.35;
-const DUMMY = new Object3D();
+type HaloEntry = {
+  readonly entityId: string;
+  readonly kind: string;
+  readonly position: Vector3;
+  readonly scale: number;
+};
 
-type HaloCandidate = {
-  readonly entityIndex: number;
+export type HaloCandidate = {
+  readonly entryIndex: number;
   readonly distance: number;
 };
 
-function haloMaterial(color: Color, restingAlpha: number): ShaderMaterial {
+const UNIT = 1;
+const ZERO_VISIBLE = 0;
+const SINGLE_INSTANCE = 1;
+const TORUS_HALO_RADIUS_FACTOR = 1.35;
+const DUMMY = new Object3D();
+
+function haloMaterial(color: Color, alpha: number, rim = false): ShaderMaterial {
   return new ShaderMaterial({
     side: BackSide,
     transparent: true,
@@ -45,9 +62,10 @@ function haloMaterial(color: Color, restingAlpha: number): ShaderMaterial {
       UniformsLib.fog,
       {
         uColor: { value: color },
-        uAlpha: { value: restingAlpha },
+        uAlpha: { value: alpha },
         uFalloffC: { value: RENDER_TOKENS.halo.falloffC },
         uFalloffP: { value: RENDER_TOKENS.halo.falloffP },
+        uRim: { value: rim ? UNIT : ZERO_VISIBLE },
       },
     ]),
     vertexShader: `
@@ -69,9 +87,15 @@ function haloMaterial(color: Color, restingAlpha: number): ShaderMaterial {
       uniform float uAlpha;
       uniform float uFalloffC;
       uniform float uFalloffP;
+      uniform float uRim;
       void main() {
-        float fresnel = pow(uFalloffC + abs(dot(vNormal, vec3(0.0, 0.0, 1.0))), uFalloffP);
-        gl_FragColor = vec4(uColor, clamp(uAlpha * fresnel, 0.0, 1.0));
+        float facing = abs(dot(vNormal, vec3(0.0, 0.0, 1.0)));
+        // Resting glow is brightest behind the node; the selected shell is an
+        // outline ring, brightest at its silhouette.
+        float glow = pow(uFalloffC + facing, uFalloffP);
+        float ring = pow(1.0 - facing, ${RENDER_TOKENS.halo.selectedRimPower.toFixed(1)});
+        float falloff = mix(glow, ring, uRim);
+        gl_FragColor = vec4(uColor, clamp(uAlpha * falloff, 0.0, 1.0));
         #include <tonemapping_fragment>
         #include <colorspace_fragment>
         #include <fog_fragment>
@@ -99,20 +123,29 @@ function shellScale(shape: ShapeName, nodeScale: number): number {
   return nodeScale * RENDER_TOKENS.halo.scale * shapeFactor;
 }
 
-function haloCandidates(args: Parameters<typeof buildHaloLayer>[0]): readonly HaloCandidate[] {
-  const maxDistance = tierDistance(args.tier);
-  const maxVisible = visibleLimit(args.tier);
-  const entities = args.projection.entities ?? [];
-  const candidates = entities.flatMap((entity, entityIndex) => {
-    const position = args.layout.positions.get(entity.id);
-    if (position === undefined) {
-      return [];
-    }
-    return [{ entityIndex, distance: position.distanceTo(args.cameraPosition) }];
-  }).sort((left, right) => left.distance - right.distance);
-  return candidates
-    .filter((candidate, index) => candidate.distance <= maxDistance || index < maxVisible)
+/** Distance eligibility first, then the tier cap (ADR-004: halos degrade first). */
+export function selectHaloCandidates(
+  positions: readonly Vector3[],
+  cameraPosition: Vector3,
+  tier: QualityTier,
+): readonly HaloCandidate[] {
+  const maxVisible = visibleLimit(tier);
+  if (maxVisible === ZERO_VISIBLE) {
+    return [];
+  }
+  const maxDistance = tierDistance(tier);
+  return positions
+    .map((position, entryIndex) => ({ entryIndex, distance: position.distanceTo(cameraPosition) }))
+    .filter((candidate) => candidate.distance <= maxDistance)
+    .sort((left, right) => left.distance - right.distance)
     .slice(ZERO_VISIBLE, maxVisible);
+}
+
+function writeShell(mesh: InstancedMesh, instanceId: number, entry: HaloEntry, scaleFactor = UNIT): void {
+  DUMMY.position.copy(entry.position);
+  DUMMY.scale.setScalar(entry.scale * scaleFactor);
+  DUMMY.updateMatrix();
+  mesh.setMatrixAt(instanceId, DUMMY.matrix);
 }
 
 export function buildHaloLayer(args: {
@@ -125,28 +158,96 @@ export function buildHaloLayer(args: {
   readonly viewMode: ViewMode;
 }): HaloLayer {
   const group = new Group();
+  const field = new Group();
   const restingAlpha = args.viewMode === "present"
     ? RENDER_TOKENS.halo.restingAlphaPresent
     : RENDER_TOKENS.halo.restingAlpha;
   const geometry = new IcosahedronGeometry(UNIT, RENDER_TOKENS.node.geometryDetail);
-  const byKind = new Map<string, number[]>();
   const entities = args.projection.entities ?? [];
-  for (const candidate of haloCandidates(args)) {
-    const entity = entities[candidate.entityIndex];
-    if (entity !== undefined) {
-      byKind.set(entity.kind ?? "", [...(byKind.get(entity.kind ?? "") ?? []), candidate.entityIndex]);
+  const degrees = degreeByEntityId(entities, projectedEdges(args.projection));
+  const entries: HaloEntry[] = [];
+  const kindCounts = new Map<string, number>();
+  for (const entity of entities) {
+    const position = args.layout.positions.get(entity.id);
+    if (position === undefined) {
+      continue;
     }
+    const kind = entity.kind ?? "";
+    const shape = args.kindMeta[kind]?.shape ?? "sphere";
+    const nodeScale = degreeToScale(degrees.get(entity.id) ?? RENDER_TOKENS.node.minDegree);
+    entries.push({ entityId: entity.id, kind, position, scale: shellScale(shape, nodeScale) });
+    kindCounts.set(kind, (kindCounts.get(kind) ?? ZERO_VISIBLE) + UNIT);
   }
-  for (const [kind, indexes] of byKind.entries()) {
-    addKindHalos(group, geometry, args, kind, indexes);
+  const kindMeshes = new Map<string, InstancedMesh>();
+  for (const [kind, count] of kindCounts.entries()) {
+    const mesh = new InstancedMesh(geometry, haloMaterial(new Color(kindColor(kind, args.theme)), restingAlpha), count);
+    mesh.instanceMatrix.setUsage(DynamicDrawUsage);
+    // Instances are reassigned on refresh; lazily cached bounds would go stale.
+    mesh.frustumCulled = false;
+    kindMeshes.set(kind, mesh);
+    field.add(mesh);
   }
+  // One instance only, so a smoother silhouette costs a few hundred triangles.
+  const selectedGeometry = new IcosahedronGeometry(UNIT, RENDER_TOKENS.halo.selectedGeometryDetail);
+  const selected = new InstancedMesh(
+    selectedGeometry,
+    haloMaterial(new Color(), RENDER_TOKENS.halo.selectedAlpha, true),
+    SINGLE_INSTANCE,
+  );
+  selected.visible = false;
+  selected.frustumCulled = false;
+  group.add(field, selected);
+  const lastRefreshPosition = args.cameraPosition.clone();
+  const entryById = new Map(entries.map((entry) => [entry.entityId, entry]));
+  const positions = entries.map((entry) => entry.position);
+
+  const refresh = (cameraPosition: Vector3): void => {
+    lastRefreshPosition.copy(cameraPosition);
+    const used = new Map<string, number>();
+    for (const candidate of selectHaloCandidates(positions, cameraPosition, args.tier)) {
+      const entry = entries[candidate.entryIndex];
+      const mesh = entry === undefined ? undefined : kindMeshes.get(entry.kind);
+      if (entry === undefined || mesh === undefined) {
+        continue;
+      }
+      const instanceId = used.get(entry.kind) ?? ZERO_VISIBLE;
+      writeShell(mesh, instanceId, entry);
+      used.set(entry.kind, instanceId + UNIT);
+    }
+    for (const [kind, mesh] of kindMeshes.entries()) {
+      mesh.count = used.get(kind) ?? ZERO_VISIBLE;
+      mesh.visible = mesh.count > ZERO_VISIBLE;
+      mesh.instanceMatrix.needsUpdate = true;
+    }
+  };
+  refresh(args.cameraPosition);
+
   return {
     group,
+    field,
+    selected,
     restingAlpha,
+    refresh,
+    lastRefreshPosition,
+    setSelected: (entityId) => {
+      const entry = entityId === null ? undefined : entryById.get(entityId);
+      if (entry === undefined) {
+        selected.visible = false;
+        return;
+      }
+      // Clears the enlarged focused node, including cone/cube corners.
+      writeShell(selected, ZERO_VISIBLE, entry, RENDER_TOKENS.halo.selectedShellFactor);
+      selected.instanceMatrix.needsUpdate = true;
+      const color = (selected.material as ShaderMaterial).uniforms.uColor?.value;
+      if (color instanceof Color) {
+        color.set(kindColor(entry.kind, args.theme));
+      }
+      selected.visible = true;
+    },
     dispose: () => {
       geometry.dispose();
-      for (const child of group.children) {
-        const mesh = child as InstancedMesh;
+      selectedGeometry.dispose();
+      for (const mesh of [...kindMeshes.values(), selected]) {
         (mesh.material as ShaderMaterial).dispose();
       }
     },
@@ -154,56 +255,24 @@ export function buildHaloLayer(args: {
 }
 
 /**
- * Dims the halo field as the focus blend rises (P1.2). Halos are instanced per
- * kind with a shared material, so the dim is uniform across the field; the
- * focused node's emphasis comes from its scale, color, and label instead.
+ * Dims the resting halo field as the focus blend rises (P1.2) and fades the
+ * selected shell in on the same blend, so node, edge, and halo emphasis share
+ * one timeline. Under reduced motion the blend snaps, so both snap.
  */
 export function setHaloFocusDim(layer: HaloLayer, blend: number): void {
   const resting = layer.restingAlpha;
   const dimmed = resting * RENDER_TOKENS.focus.haloDimFactor;
   const alpha = resting + (dimmed - resting) * blend;
-  for (const child of layer.group.children) {
-    const material = (child as InstancedMesh).material as ShaderMaterial;
-    const uniform = material.uniforms.uAlpha;
-    if (uniform === undefined) {
-      throw new Error("Halo material is missing the uAlpha uniform");
-    }
-    uniform.value = alpha;
+  for (const child of layer.field.children) {
+    setAlpha(child as InstancedMesh, alpha);
   }
+  setAlpha(layer.selected, RENDER_TOKENS.halo.selectedAlpha * blend);
 }
 
-function addKindHalos(
-  group: Group,
-  geometry: IcosahedronGeometry,
-  args: Parameters<typeof buildHaloLayer>[0],
-  kind: string,
-  indexes: readonly number[],
-): void {
-  const mesh = new InstancedMesh(
-    geometry,
-    haloMaterial(new Color(kindColor(kind, args.theme)), args.viewMode === "present"
-      ? RENDER_TOKENS.halo.restingAlphaPresent
-      : RENDER_TOKENS.halo.restingAlpha),
-    indexes.length,
-  );
-  const entities = args.projection.entities ?? [];
-  const shape = args.kindMeta[kind]?.shape ?? "sphere";
-  const degrees = degreeByEntityId(entities, projectedEdges(args.projection));
-  for (const [instanceId, entityIndex] of indexes.entries()) {
-    const entity = entities[entityIndex];
-    if (entity === undefined) {
-      continue;
-    }
-    const position = args.layout.positions.get(entity.id);
-    if (position === undefined) {
-      continue;
-    }
-    DUMMY.position.copy(position);
-    DUMMY.scale.setScalar(shellScale(shape, degreeToScale(degrees.get(entity.id) ?? RENDER_TOKENS.node.minDegree)));
-    DUMMY.updateMatrix();
-    mesh.setMatrixAt(instanceId, DUMMY.matrix);
+function setAlpha(mesh: InstancedMesh, alpha: number): void {
+  const uniform = (mesh.material as ShaderMaterial).uniforms.uAlpha;
+  if (uniform === undefined) {
+    throw new Error("Halo material is missing the uAlpha uniform");
   }
-  mesh.instanceMatrix.needsUpdate = true;
-  mesh.matrixWorldNeedsUpdate = true;
-  group.add(mesh);
+  uniform.value = alpha;
 }

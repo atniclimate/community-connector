@@ -245,7 +245,7 @@ describe("focus halo dim", () => {
       viewMode: "overview",
     });
     const alphas = (): readonly number[] =>
-      layer.group.children.map((child) => {
+      layer.field.children.map((child) => {
         const material = (child as InstancedMesh).material as ShaderMaterial;
         return material.uniforms.uAlpha?.value as number;
       });
@@ -254,6 +254,9 @@ describe("focus halo dim", () => {
     expect(alphas().every((alpha) => Math.abs(alpha - RENDER_TOKENS.halo.restingAlpha * RENDER_TOKENS.focus.haloDimFactor) < 1e-9)).toBe(true);
     setHaloFocusDim(layer, 0);
     expect(alphas().every((alpha) => alpha === RENDER_TOKENS.halo.restingAlpha)).toBe(true);
+    expect((layer.selected.material as ShaderMaterial).uniforms.uAlpha?.value).toBe(0);
+    setHaloFocusDim(layer, 1);
+    expect((layer.selected.material as ShaderMaterial).uniforms.uAlpha?.value).toBe(RENDER_TOKENS.halo.selectedAlpha);
     layer.dispose();
   });
 });
