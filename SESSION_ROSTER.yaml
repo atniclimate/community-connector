@@ -310,32 +310,38 @@ sessions:
 
   - id: S-R7
     task_ids: [R7]
-    title: "Convention rehearsal checklist (human-only artifact)"
+    title: "Reveal launcher: scripts/reveal.ps1 + CONTROLS.md"
     tier: T1
     model: claude-sonnet-5
     effort: medium
     mode: direct
     run_as: main
-    role: "checklist author: produce docs/runbooks/convention-rehearsal-checklist.md - a
-      dated, human-executable checklist for the full facilitator arc (ingest, reveal,
-      route, story, re-ingest) on synthetic fixtures; this session writes the checklist,
-      it does NOT run the rehearsal (that is the human's act, P5.9's own acceptance)"
+    depends_on: [S-R2, S-R4b]
+    role: "launcher author: produce scripts/reveal.ps1 (rebuilds the wasm pkg if missing,
+      runs the app dev server or a -Built preview, waits for the port, opens the default
+      browser at the app URL with the real presenter-mode query parameters per
+      app/src/main.ts once S-R4b lands them; prints the URL and 'Escape exits presenter
+      mode') and CONTROLS.md at the repo root (under 60 lines: the presenter-mode keys
+      from docs/blueprints/presenter-mode.md, how to edit app/public/beats.atni.json, and
+      the four-line live-entry loop from docs/runbooks/live-entry.md) - both of those docs
+      and the query-param contract are written by S-R2/S-R4b, not this session; this
+      session does not touch app code"
     skills: []
     mcp: []
     subagents: []
     standing_rulings_no_fix: [D-032, D-037, D-051, D-056.4, ADR-004]
     reads:
-      - { path: "PLAN_1.0.md", lines: "883-889", est_tokens: 200, why: "P5.9's exact acceptance sentence this checklist must satisfy" }
-      - { path: "docs/runbooks/e2e-remote-intake.md", lines: "1-40", est_tokens: 600, why: "the existing manual-runbook style/structure to match (headings only needed, per scout-intake section 5)" }
-      - { path: "docs/design/DESIGN_BRIEF.md", lines: "1-20", est_tokens: 300, why: "any presenter-mode/projector items from R4b that the rehearsal checklist should verify live (e.g. the 1080p projector rehearsal named at discovery-2026-09-12.md Track C row 'Projector legibility')" }
+      - { path: "app/src/main.ts", lines: "1-40", est_tokens: 600, why: "the real presenter-mode query parameters S-R4b lands, so the launcher URL matches app code exactly instead of guessing" }
+      - { path: "docs/blueprints/presenter-mode.md", lines: "1-60", est_tokens: 800, why: "the presenter-mode key bindings this session copies into CONTROLS.md - written by S-R2/S-R4b" }
+      - { path: "docs/runbooks/live-entry.md", lines: "1-40", est_tokens: 500, why: "the four-line live-entry loop (open the real folder, approve in the wizard, cn intake apply, reload) this session copies into CONTROLS.md" }
     budget_tokens: 15000
-    gate: "the checklist file exists at docs/runbooks/convention-rehearsal-checklist.md,
-      is dated, and covers ingest/reveal/route/story/re-ingest end to end; no code gate
-      applies (P5.9/AGENTS.md name this human-only - a machine cannot close it)"
-    stop_when: "the checklist is written and committed; this session does not attempt the
-      rehearsal itself"
+    gate: "the script runs once end to end (prints a URL that answers) and pwsh
+      scripts/check-all.ps1's PII scan passes on the two new files"
+    stop_when: "scripts/reveal.ps1 and CONTROLS.md both exist, the script opens the
+      browser, and this entry is marked done"
     status: planned
-    outcome: null
+    outcome: "superseded by human ruling 2026-09-12; P5.9 (convention rehearsal
+      checklist) remains human-only and is not this task - see PLAN_1.0.md P5.9"
 
   - id: S-R1
     task_ids: [R1]
