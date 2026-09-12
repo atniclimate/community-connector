@@ -1,208 +1,121 @@
-# NEXT_SESSION.md - Resume Brief and Remaining Questions
+# NEXT_SESSION.md - Launch cards (refreshed 2026-09-12, pickup + discovery close)
 
-> For the next session with the human present. A resuming director: read
-> CLAUDE.md -> HANDOFF.md -> this file. Refresh the Brief at each session
-> end (CLAUDE.md session-end protocol).
+> For the next session. Reading order: CLAUDE.md -> HANDOFF.md (its "Pickup 2026-09-12"
+> block first) -> this file. Session plan of record: `SESSION_ROSTER.yaml` (root).
+> Evidence: `TRACE.yaml`, `docs/planning/RECONCILIATION-2026-09-12.md`,
+> `docs/research/discovery-2026-09-12.md`. Previous briefs live in git history of this
+> file (last one 2026-08-11).
 
-## The 60-second brief (refreshed 2026-08-11, post-7-8 + fix-now bucket)
+## The 60-second brief
 
-**Remote intake relay: phases A-D COMPLETE (steps 1-8), reviewed, plus a
-claim-verifier fix-now bucket landed.** Steps 7+8 - the puller `cn intake
-pull` + D8 bundle verification, the biggest step (ureq HTTP in the CLI
-crate ONLY per the D1 fence; full receipts -> fetch -> decrypt -> dedup ->
-stage -> delete loop; D6 reconciliation; I12 report) - landed at 13b8879
-(D-085) with HTTP injected behind a trait/closure and 18+3 tests. An
-independent claim-verifier then confirmed every headline claim and
-surfaced 5 undisclosed issues; all fixed as atomic commits, check-all
-green at each: F1 precondition order, F2 D6 orphan-blob flagging, F11
-timestamp-parse diagnostic, F6 configurable envelope cap, F10 HTTP
-timeouts, F4/F5 conflict + reconciliation + CLI-entrypoint tests, D-086
-dispositions (c39fc70..f92e853). cn crate 52 -> 86 tests. F3 (rotation
-old-key catch-up) is a RECORDED LIMITATION, not built - the binding D3
-cutoff stands; multi-key puller design owed before any real rotation.
-Local `main` is **18 commits ahead of origin, unpushed** (incl. this
-true-up). **NEXT: step 9
-(form-to-graph e2e on synthetic data) is DISPATCH-READY** - a
-comprehensive Opus-4.8-xhigh prompt is drafted at the conductor scratchpad
-(`prompt-step9-e2e-remote-intake.md`); an additive, opt-in e2e that seals
-via the form's real crypto -> local relay -> real-HTTP `cn intake pull`
-(partially closes F12) -> approve -> `cn intake apply` -> `cn export` ->
-assert entity in graph, reusing the proven
-`intake_apply.rs::approve_decide_apply_reload_round_trip` back-half. Then
-steps 10 (deploy runbook) + 11 (docs true-up), then the mandatory
-adversarial round on the whole diff (9 items + step-7/8 residuals + F3).
-The human's queue is unchanged (D-023, committee checkpoint). Deploy bar
-(D-059.8) unmet.
+The remote-intake relay is COMPLETE and accepted (D-089). Nothing has been pushed since
+2026-08-11; local `main` is 31 commits ahead of origin plus this session's four docs
+commits. check-all is 11 of 12: rust-clippy fails on one new 1.98 lint at
+`core/cli/src/intake/keymat.rs:258` (toolchain drift, no `rust-toolchain.toml`) - the
+first session below fixes it. The ATNI convention is 2026-09-14 and the human ruled that
+the mainstage reveal's visuals come first; the deploy bar (D-059.8) stays UNMET and
+nothing goes live for the convention. Roster order: R0, R2, R4a, R4b, R7 before the
+convention; R1, R3, R5, R6, then the maintenance chain after. Standing rulings no
+session may "fix": D-032, D-037, D-051, D-056.4, ADR-004.
 
-## The previous brief (refreshed 2026-08-11, 7+8 dispatched)
+## Launch card: S-R0 - toolchain pin + clippy fix + troika dependency fix (NEXT)
 
-**Remote intake relay: phases A-C COMPLETE (steps 1-6), phase D
-DISPATCHED (steps 7+8).** All six landed steps are reviewed and
-confirmed by independent Sonnet 5 subagents reading committed code and
-re-running tests. Nine adversarial items accumulated for the mandatory
-round after all 11 steps land. Steps 7+8 (the puller CLI `cn intake
-pull` + D8 bundle verification) are combined into one dispatch running
-in an Opus 4.8 session - this is the biggest step: ureq HTTP client in
-CLI crate only (D1 fence), full fetch/decrypt/validate/stage/delete
-loop, receipt-ledger reconciliation, and the D8 manifest-based deployed-
-form verification. After 7+8 land: steps 9-11 are sequential (form-to-
-graph e2e test, deploy runbook draft, docs true-up), then the mandatory
-adversarial round on the full diff. The repo is 10 commits ahead of
-origin (unpushed). The human's queue is unchanged (D-023, committee
-checkpoint). The deploy bar (D-059.8) is unmet.
+**Tier** T1 - **Budget** ~12k tokens - **Gate** `pwsh scripts/check-all.ps1` (12/12)
 
-## The previous brief (refreshed 2026-08-11, pre-step-5+6)
+```powershell
+# PowerShell - launch through the `claude` wrapper only (C:\dev\CLAUDE.md Rule 9)
+Set-Location I:\community-connector
+claude --model claude-sonnet-5 --effort medium
+```
 
-**The remote intake relay director blueprint is WRITTEN**
-(docs/blueprints/intake-relay.md): 11 steps in 5 phases covering the
-full ADR-005 remote path - sealed-box Rust crypto binding with
-cross-impl test vectors, keygen CLI commands (keygen/fingerprint/
-selftest/backup-verify), outer/inner envelope types in cn-ingest,
-Pages form build pipeline under `form/`, Cloudflare Worker relay under
-`relay/`, `cn intake pull` CLI command with D8 bundle verification and
-receipt-ledger reconciliation, and a deploy runbook draft. Permission-
-adjacent: gets a mandatory adversarial round. The deploy bar (D-059.8)
-is unchanged. Next: implementation begins at phase A step 1 (sealed-box
-crypto binding in cn-ingest). The remaining D-080 debts (production
-interactive load path, optional tripwire hardening, deploy gates) are
-tracked separately. The human's queue is unchanged (D-023 consent
-review, committee checkpoint timing).
+Opening prompt (paste as the first message):
 
-## The previous brief (refreshed 2026-08-10)
+> Role: fixer. Three small mechanical fixes, each its own conventional commit, check-all
+> green before each commit.
+> Outcome: `pwsh scripts/check-all.ps1` prints 12 of 12 PASS on this machine.
+> Scope fence: `core/cli/src/intake/keymat.rs` (line 258: remove the redundant `&` in
+> the `format!` argument), a new `rust-toolchain.toml` at the repo root pinned to the
+> version check-all is green on (cargo/rustc 1.98.1 today), and `app/package.json`
+> (move `troika-three-text` from devDependencies to dependencies; `app/src/viz/labels.ts:2`
+> imports it). Touch nothing else. Do not change the pinned versions of anything else.
+> Read first: HANDOFF.md "Pickup 2026-09-12" block; SESSION_ROSTER.yaml entry S-R0;
+> `core/cli/src/intake/keymat.rs` lines 245-262; `app/package.json` whole file.
+> Verification: run `pwsh scripts/check-all.ps1` and paste the summary table before any
+> completion claim. The pre-commit hook must fire (`git config core.hooksPath` must
+> resolve to `I:\community-connector\scripts\hooks`; run `scripts/install-hooks.ps1` if not).
+> Stop when: check-all is 12/12 and the three commits exist. Mark S-R0 done in
+> SESSION_ROSTER.yaml with a one-line outcome.
 
-## The previous brief (refreshed 2026-07-25, end of the implementation-review session)
+Then continue in the same terminal with S-R2 (below) or hand off.
 
-**The intake-pipeline implementation is ACCEPTED** (D-080): the
-mandatory adversarial round became FIVE rounds in one day (D-076..D-080;
-rounds 1-4 FAIL-and-amend, round 5 PASS-WITH-NOTES), and every finding
-was verified against the code before judgment. The hardening that
-landed: recovery re-authorization for all-absent plans (a crash after a
-denial can never recover into an unauthorized append), reviewer-identity
-binding, the literal WRITE_THROUGH durable-rename primitive, sticky
-durable-quarantine disposition, fail-closed native and app IO
-end-to-end, sorted-key canonical digests with golden vectors,
-digest-bound tombstones, a typed submission-schema validator with the
-complete per-type value contract (geo end-to-end, NFC normalization,
-byte-measured caps), durable persistence notices, and an honest
-tripwire self-test. Blueprint step 9 was amended in place (D-078): the
-production interactive path + synthetic decide -> apply -> reload
-rehearsal are owed with the August pilot build BEFORE pilot use. The
-four standing debts are recorded in D-080, visible and unclaimed; the
-deploy bar (D-059.8) remains unmet. The human's D-072 rulings stand
-(consent boilerplate authorized as draft pending D-023; checkpoint =
-convention; ad hoc demos open pathways - demo-readiness is a
-priority). Next: the remote relay implementation (build unlocked,
-deploy barred), the snapshot data pipeline (D-048), and minimal P4.1
-story authoring. Asana was refreshed twice this arc (progress + the
-acceptance update).
+## Launch card: S-R2 - ATNI convention template, 15 committees, synthetic fixture
 
-## The previous brief (refreshed 2026-07-24, end of the ADR-005 acceptance session)
+**Tier** T3 - **Budget** ~60k tokens - **Gate** `pwsh scripts/check-all.ps1` incl.
+`npm run validate:templates`, plus pii-scan clean and every value under `@example.test`
 
-**ADR-005 is ACCEPTED** (D-068) after EIGHT adversarial rounds in one day
-(D-061..D-068; rounds 1-7 FAIL-and-amend with every finding verified
-before judgment, round 8 pass). The remote-intake architecture is now
-binding: native durable owner (`cn intake apply`; the browser app is
-create-only), idempotent decision inbox (decision_generation CAS,
-writeless replays, two-kind history), receipt-ledger reconciliation,
-off-origin full-bundle pin, enforceable rotation cutoff, and consent
-affirmation that survives the purge sweep. The P3.5/P3.6 director
-blueprint (docs/blueprints/intake-pipeline.md) is written, aligned, and
-carries the reviewer's implementation gates in its test lists. The
-consent draft gained section 7: four wording conflicts for the D-023
-pass - the removal-semantics question (no-longer-shown vs erasure) is a
-human decision. Implementation then proceeded the same day: blueprint
-steps 1-10 of 11 are LANDED and pushed: the whole native pipeline
-(durable seam, provenance block, queue formats + admission + recovery,
-near-dup + dedup + plan_approval, `cn intake apply` with the full
-decide -> apply -> reload round trip), the read-only facade with the
-no-leak extension proven on a real projection, AND the app half - the
-P3.6 template-driven entry form with D-072-authorized DRAFT consent
-boilerplate and the structural checkbox gate, the create-only FSA
-adapter over core-built checksummed bytes (D-073 pure builders), the
-P3.5 facilitator wizard (dashboard, review view with the three core
-checks, decisions as create-only files; reject now carries its required
-reason, D-074), and the pii-scan intake tripwires with the pii-selftest
-member (12-member battery, D-075). The human ruled (D-072): consent
-boilerplate authorized as draft; committee checkpoint = the convention;
-ad hoc demos open authorization pathways, so DEMO-READINESS on
-synthetic data is a sequencing priority. check-all green at every
-commit; D-069..D-075 record every deviation. Next: step 11 (synthetic
-intake demo fixtures + MANIFEST/docs true-up), then the MANDATORY
-adversarial round on the whole ten-commit implementation diff.
-An Asana refresh for this session is owed at the next session close.
-The deploy bar (D-059.8) is unchanged - ADR-005 acceptance satisfied its
-first condition; intake pipeline + keygen ceremony + D-023 remain.
+```powershell
+Set-Location I:\community-connector
+claude --model claude-sonnet-5 --effort high --permission-mode plan
+```
 
-## The previous brief (2026-07-24, end of the grill + first-push session)
+> Role: template author (plan first, then code).
+> Outcome: a new synthetic group template + ops fixture under `fixtures/` for the ATNI
+> convention pilot, validated by check-all: a `committee` kind with exactly these 15
+> instances - Energy; Taxation; Education (K-12); ICWA; Law & Justice; Philanthropy;
+> Telecomms & Tech; Food Sovereignty; Economic Development; Native Vote; TERO; Gaming;
+> Drug Abuse & Prevention; Housing; Climate Resilience - a `member_of` edge kind, a
+> `connected_to` edge kind, and person attributes per discovery memo D-094c. Add the
+> alias-table block to the group-template schema as an additive optional field with a
+> version bump (shape only; no matching logic - that is R3).
+> Scope fence: `schemas/group-template.schema.json`, `fixtures/templates/`,
+> `fixtures/groups/`, `app/scripts/` validators if the schema bump needs them. No app UI,
+> no cn-ingest, no cn-perm. All entries T1 (D-034). Synthetic data only.
+> Read first: SESSION_ROSTER.yaml entry S-R2; discovery memo Track B and D-094c;
+> `fixtures/templates/research-network.template.json`; the schema file whole.
+> Verification: check-all summary pasted; `pwsh scripts/pii-scan.ps1` pasted.
+> Stop when: check-all 12/12, the new template validates, and S-R2 is marked done.
 
-**The repo is public.** The grill session resolved every blockage (D-059):
-targeted redactions landed (tenant email out, predecessor exclusion-list
-enumerations moved to gitignored `_private/` with pointers), THE_STORY.md was
-approved as-is, the old form text is marked SUPERSEDED by the 2026-07-24
-consent package, and rejected intake records will be kept for the pilot window
-then purged in one recorded sweep. The stability bar split in two: the PUSH
-bar was met and the first push executed (D-060 - origin
-`atniclimate/community-connector`, plain `git push` now works); the DEPLOY bar
-(Pages form + Workers relay) stays unmet until ADR-005 is accepted, the intake
-pipeline works, the keygen ceremony has run, and D-023 sign-off covers the
-form text. The collective checkpoint's timing is UNKNOWN, so the August
-internal pilots are explicitly conditional and engineering stays on synthetic
-data. Earlier the same day: the R2 EntityDetail fixes landed with a clean
-adversarial round (D-057), and the D-055 sweep unit tracked the three root
-docs (D-058). check-all was 11/11 green at every commit. Next action: the
-ADR-005 adversarial round, then the P3.5/P3.6 intake pipeline.
+## Launch card: S-R1 - deploy-bar clearance (AFTER the convention)
 
-## How to resume work (for the director)
+**Tier** T4 - **Budget** ~150k tokens - **Gate** check-all 12/12 AND the new Playwright
+smoke passes against `wrangler dev` AND `npm test` green in both `relay/` and `form/`
 
-1. Read HANDOFF.md - state, ordered next actions, non-negotiables. Note the
-   repo is PUBLIC: every pushed commit is world-readable.
-2. If the human is present: the two asks are (a) the D-023 solo correctness
-   pass on docs/design/intake-consent-text-draft-2026-07-24.md (checklist
-   inside, ~20 minutes, record as a DECISIONS entry), and (b) any news on
-   committee timing for the bundled checkpoint + consent-text presentation.
-3. If autonomous (conductor seat): steps 1-8 are LANDED + reviewed + fix-now
-   bucket applied (HANDOFF "State of play"). Step 9 is DISPATCH-READY - the
-   Opus-4.8-xhigh prompt is drafted at the conductor scratchpad
-   (`prompt-step9-e2e-remote-intake.md`; if that scratchpad is gone, re-derive
-   from HANDOFF's step-9 summary + blueprint section 8 step 9). Dispatch step 9
-   to a parallel Opus 4.8 session (or review its output if already in flight),
-   then sequence steps 10 (deploy runbook) + 11 (docs true-up), then the
-   MANDATORY adversarial round on the whole diff. Progress claims are grounded
-   in tool results (files/tests/receipts), never a worker's say-so.
-4. Re-arm the 8:00 AM safety cron if the usage-failover directive stands.
+```powershell
+Set-Location I:\community-connector
+claude --model claude-sonnet-5 --effort high --permission-mode plan
+```
 
-## Remaining open questions (defaults keep autonomous work unblocked)
+> Role: deploy engineer (plan first). Outcome: the engineering half of D-059.8 is closed
+> with pasted evidence: (1) a real-browser Playwright smoke of the BUILT form under its
+> real CSP (seal a synthetic submission, POST to a local `wrangler dev`, assert a
+> receipt); (2) `.github/workflows/` GitHub Pages deploy workflow (configure-pages@v5,
+> upload-pages-artifact@v4, deploy-pages@v4; `pages: write`, `id-token: write`;
+> deploys exactly the manifest's file set, never the manifest) with a post-deploy D8
+> fetch-and-hash step against the LOCAL pin; (3) the R4-5 build guard that fails when
+> `CN_FORM_RELAY_ORIGIN` is the localhost default; (4) a keygen ceremony REHEARSAL on
+> synthetic keys via `cn intake selftest --dry` and the ceremony checklist.
+> Scope fence: `form/`, `relay/` tests, `scripts/`, `.github/workflows/` (guarded: ask
+> before writing there), `docs/runbooks/`. Never deploy, never run the real ceremony,
+> never touch `_private/`.
+> Human steps you hand back as a checklist, never perform: D-023 sign-off; the real
+> ceremony; Pages source set to "GitHub Actions"; the Workers tier (D-092c).
+> Read first: SESSION_ROSTER.yaml entry S-R1 (reads with line ranges); discovery memo
+> Track A; `docs/runbooks/intake-relay-deploy.md` (DRAFT, do not execute).
+> Verification: every gate leg pasted; a claim-verifier subagent re-runs the smoke and
+> both vitest suites before any "green" claim.
+> Stop when: all four gate legs pass and the human checklist is written.
 
-**Q-CHK. Collective checkpoint timing (still unknown, D-059.9).** When known,
-bundle the ask with the reviewed consent text (D-059.10). Default: synthetic
-data only; August pilots conditional; no real ingestion.
+## Mid-session rules (all cards)
 
-**Q-TEXT. D-023 solo pass (the human's action, D-059.10).** The package awaits
-your checklist review; your sign-off clears build/synthetic use. Community use
-additionally waits for the committee moment. Default: nothing goes live.
+- Skipped a file or test: raise effort one notch, stay here.
+- Wrong with full context: `/clear`, relaunch on the next model up with this card plus
+  one line naming the missed fact.
+- Two failed corrections on one bug: `/clear`. Context past ~130k: write the handover
+  into HANDOFF.md "next actions", `/clear`, split the task.
 
-**Q-D. Part 7 process items (defaults per D-019):** autonomy = full with
-ARCHITECTURE-redesign parking; spend = approved for the Cloudflare relay only;
-cadence = 8:00 AM safety cron + usage failover stand. Correct in one line.
+## Questions for the human (one-line answers unblock the roster)
 
-**Q-E. Part 8 retrospective (open discussion, never blocking):** what in the
-output so far misses the mark; predecessor-demo reception lessons; anyone else
-who should see the plan (committee members, ATNI staff).
-
-**Q-F. Aesthetic check (deferred from Q5.4, D-038).** Runs inside the DESIGN
-sitting: does Hearthlight feel right; cultural considerations for palette and
-shape language. Default: Hearthlight stands, refined by evidence. The human
-also plans a Claude-Design pass on front-facing text at the later stage
-(D-051).
-
-## Decisions already made that the human may want to revisit
-
-D-008 codex sandbox bypass; D-026 backup risk accepted (re-raised every
-decision session by standing rule - the public remote holds code only, never
-data, so it is not the backup answer); D-032 TSDF codes primary in the UI;
-D-037 in-app story authoring in v0.1; the v0 layout being client-side
-deterministic; D-056.2 ownership-at-approval (unowned, facilitator-created;
-owner-binding later = authority-matrix change + adversarial round); D-059.11
-rejected-record retention (keep for the pilot window + one recorded purge
-sweep - revisiting toward purge-on-reject is a one-line DECISIONS entry).
-Revisiting any is a DECISIONS entry, not a rewrite - say the word.
+1. Record, amend, or reject D-090c..D-096c (`docs/research/discovery-2026-09-12.md`).
+2. Which Claude plan or seat is this? (`SESSION_ROSTER.yaml` `plan_tier` is unverified.)
+3. D-023: will the consent-text sign-off happen before 2026-09-14? If not, the reveal
+   is demo-only on synthetic data (D-091c).

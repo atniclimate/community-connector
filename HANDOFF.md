@@ -7,12 +7,14 @@
 > records, D-086 the claim-verifier review dispositions, D-087 the true-up's
 > pii-scan archived-handoff exemption, D-088 the step-9 timestamp-reconciliation
 > fix, D-089 the steps-1-11 adversarial round acceptance). Every path below was
-> verified on disk at the 2026-08-11 relay close-out.
+> verified on disk at the 2026-08-11 relay close-out and re-verified 2026-09-12
+> (two path-table rows corrected; see the Pickup block under "State of play").
 > **The repo is PUBLIC** - origin is
 > `https://github.com/atniclimate/community-connector`. The local `main` is
-> **~30 commits ahead of origin and UNPUSHED** (all relay-implementation work,
-> steps 1-11 + the D-088 fix + the D-089 adversarial-round fixes + doc true-ups;
-> run `git rev-list --count origin/main..main` for the exact count); pushing is
+> **31 commits ahead of origin and UNPUSHED** (`git rev-list --count
+> origin/main..main` = 31 on 2026-09-12, before this session's docs commits; the
+> 2026-08-11 close-out wrote "~30"; all relay-implementation work, steps 1-11 + the
+> D-088 fix + the D-089 adversarial-round fixes + doc true-ups); pushing is
 > authorized and safe but has not been run this arc. The pre-commit PII scan and
 > I1 are the publication boundary.
 
@@ -50,14 +52,51 @@ on the recorded collective checkpoint (D-059.9).
 | Snapshot scope + byte ledger | `docs/design/snapshot-viewer-scope.md`, `docs/design/snapshot-ledger.md` |
 | Pilot FORM draft (Parts A/C SUPERSEDED) / evidence template / migration recipe | `docs/design/pilot-form-and-template-2026-07-06.md`, `docs/pilot-evidence-template.md`, `docs/cpf-rcn-migration-recipe.md` |
 | Verification battery (12 members incl. pii-selftest) | `scripts/check-all.ps1` (+ `scripts/hooks/pre-commit`) |
-| Rust core | `core/crates/cn-{model,schema,store,perm,graph,api,wasm}`, `core/cli` (`cn`) |
-| Remote-intake relay code (steps 1-11 COMPLETE, D-089) | keygen CLI `core/cli/src/intake/{keygen,keymat,fingerprint,selftest,backup}.rs`; crypto binding `core/crates/cn-ingest/src/{crypto,envelope,dedup,reconcile,consent}.rs`; puller + D8 verify `core/cli/src/intake/{pull,bundle}.rs` (+ tests `core/cli/tests/intake_{pull,pull_cli,bundle}.rs`); Worker `relay/`; Pages/GitHub-Pages form `form/`; form-to-graph e2e `scripts/e2e-remote-intake.ps1` + `scripts/e2e/` + `core/cli/examples/emit-approve-decision.rs`; runbooks `docs/runbooks/{e2e-remote-intake,intake-relay-deploy}.md` |
+| Rust core | `core/crates/cn-{model,schema,store,perm,graph,api,wasm,ingest,sync}` (9 workspace members, `core/Cargo.toml:3-14`; `cn-ingest` and `cn-sync` were missing from this row until 2026-09-12), `core/cli` (`cn`: `main.rs`, `lib.rs`, `validate.rs`, `export.rs`, `intake/`) |
+| Remote-intake relay code (steps 1-11 COMPLETE, D-089) | durable owner `core/cli/src/intake/apply.rs` + queue `core/cli/src/intake/queue.rs` (both omitted from this row until 2026-09-12); keygen CLI `core/cli/src/intake/{keygen,keymat,fingerprint,selftest,backup}.rs`; crypto binding `core/crates/cn-ingest/src/{crypto,envelope,dedup,reconcile,consent}.rs`; puller + D8 verify `core/cli/src/intake/{pull,bundle}.rs` (+ tests `core/cli/tests/intake_{pull,pull_cli,bundle}.rs`); Worker `relay/`; Pages/GitHub-Pages form `form/`; form-to-graph e2e `scripts/e2e-remote-intake.ps1` + `scripts/e2e/` + `core/cli/examples/emit-approve-decision.rs`; runbooks `docs/runbooks/{e2e-remote-intake,intake-relay-deploy}.md` |
 | Relay orchestration ledger (live per-step status) | project memory `relay-orchestration-state` + "State of play" below |
 | App | `app/src/{viz,ui,state,wasm,theme}`; snapshot boot reader `app/src/state/snapshot.ts` |
 | Codex adversarial artifacts | out-of-repo review lane `_reviews/community-connector/` under the dev workspace |
 | Prior handoffs | `docs/archive/handoffs/` |
 
 ## State of play
+
+**Pickup 2026-09-12 (director session; docs-only, nothing built, nothing pushed):**
+- Verified state: HEAD `375e8b2` (2026-08-11), clean tree, 31 ahead of origin.
+  check-all this session = 11 of 12 PASS: rust-clippy FAILS on
+  `useless_borrows_in_formatting` at `core/cli/src/intake/keymat.rs:258:39` under
+  rustc/cargo 1.98.1 - toolchain drift on an unchanged tree (no `rust-toolchain.toml`
+  exists); the fix is roster R0, not done here. The relay and form vitest suites
+  (47/47 each per D-089) were NOT run this session; they are not check-all members.
+- Reconciliation: `docs/planning/RECONCILIATION-2026-09-12.md` (bootstrap mode, no
+  trace yet): of 13 HANDOFF/PLAN "Current Position" claims checked, 2 cleanly
+  verified, 10 partial (stale numbers or omissions), 1 claimed-not-verified; the
+  D-059.8 deploy-bar table; v0.1.0 remaining-work verdicts; an explicit unverified list.
+- Backbone: `TRACE.yaml` and `SESSION_ROSTER.yaml` at the repo root; agent
+  definitions `.claude/agents/scout.md` (haiku, read-only) and
+  `.claude/agents/coordinator.md` (sonnet, charter-scoped writes). Roster order, ruled
+  from the DATE CHECK: R0 pre-step, R2 convention template, R4 presentation mode, R7
+  rehearsal before 2026-09-14; R1 deploy-bar clearance, R3 term normalization (with
+  its adversarial round), R5 snapshot, R6 story authoring after.
+- Discovery: `docs/research/discovery-2026-09-12.md` - Track A deploy gaps against
+  D-059.8, Track B graph measures and the term-normalization design, Track C
+  presenter mode on the ADR-004 layer; candidate decisions D-090c..D-096c.
+- DATE CHECK: the human confirmed the convention as 2026-09-14 and ruled that the
+  reveal's visuals outrank everything for the sprint. The deploy bar stays UNMET and
+  nothing goes live for the convention (D-090c, candidate).
+- Corrections applied to THIS file, with receipts: ahead-count 31 (`git rev-list`);
+  the Rust core and relay rows of the path table (`core/Cargo.toml:3-14`;
+  `core/cli/src/intake/apply.rs` exists); external worker ~2.1MB (check-all log).
+  Known stale elsewhere and NOT edited (outside this session's charter):
+  `CLAUDE.md:66` "3d-force-graph + Three.js to start" contradicts ADR-004;
+  `CLAUDE.md:88` crate list omits `cn-api`; `PLAN_1.0.md` "Current Position" absent-list
+  (ui, schemas, cn-ingest, CLI commands) is the self-disclaimed 2026-07-11 snapshot;
+  `docs/NEXT_SESSION.md` is rewritten this session as the launch card.
+- Findings recorded, not fixed: `troika-three-text` sits in devDependencies while
+  `app/src/viz/labels.ts:2` imports it (R0); the form bakes
+  `research-network.template.json` by default (`form/vite.config.ts:47-79`), so the
+  ATNI template must be selected at build time (R1/R2); `cn-graph` has no external
+  graph crate and no centrality or community measures (R4a).
 
 **DONE and verified (check-all 11/11 green at every 2026-07-24 commit; clean tree;
 remote in sync):**
@@ -304,6 +343,28 @@ as draft; checkpoint = convention; ad hoc demos open pathways).
    not solved (the public remote holds code only, never data - not a backup answer
    for ops); pilot-window close requires the RECORDED rejected-record purge sweep
    (D-059.11).
+4. **Candidate decisions from the 2026-09-12 discovery memo**
+   (`docs/research/discovery-2026-09-12.md`, last section) - record, amend, or
+   reject each in DECISIONS.md; the `c` suffix means candidate, nothing is decided:
+   D-090c sprint priority and roster order (visuals first; deploy bar after the
+   convention); D-091c convention intake path (in-app facilitator entry, which
+   needs the D-023 sign-off first, else the reveal is demo-only on synthetic data);
+   D-092c relay hosting tier (Workers Paid, because KV Free allows 1,000 writes/day
+   and a submission costs about three); D-093c term normalization (alias table in
+   the group template, facilitator-confirmed at plan approval, as-written preserved);
+   D-094c ATNI convention template shape (15 committees as a kind + `member_of`
+   edges); D-095c reveal build = the normal app build on the reference laptop;
+   D-096c toolchain pin (`rust-toolchain.toml`).
+5. **Deploy-bar checklist (D-059.8 as amended by D-089)** - live table at
+   `docs/planning/RECONCILIATION-2026-09-12.md` section 5B. MET: ADR-005 accepted;
+   intake pipeline working. OPEN, engineering (roster R1): real-browser smoke of the
+   built form (no browser test exists); GitHub Pages deploy workflow (`.github/` is
+   absent). OPEN, yours: keygen ceremony executed (an agent rehearses it on
+   synthetic keys first, in R1); D-023 sign-off; Pages source switched to "GitHub
+   Actions" in repo Settings; the Workers tier (D-092c). Nothing goes live until all
+   six are met.
+6. **Human-only gates inside the sprint:** director screenshot review of the
+   presentation mode (R4); the convention rehearsal P5.9 (R7) from its checklist.
 
 ## Non-negotiables a fresh session must not violate
 
@@ -335,7 +396,9 @@ as draft; checkpoint = convention; ad hoc demos open pathways).
   holds readable personal data; the graph never listens. Approved remote entries
   land unowned (D-056.2); rejected records keep-then-recorded-purge (D-059.11).
 - Snapshot targets the CONVENTION build (D-056.3); August pilots run the normal app
-  build. Snapshot is NOT yet self-contained (~1.57MB external worker) - next-action 4.
+  build. Snapshot is NOT yet self-contained (~2.1MB external worker:
+  `dist/worker-CtUIZEL0.js` 2,107.32 kB in the 2026-09-12 check-all log; the earlier
+  "~1.57MB" figure is stale) - next-action 3 / roster R5.
 - TSDF tier codes primary in the UI (D-032); in-app story authoring in v0.1 (D-037) -
   deliberate choices against recommendations; do not "fix" them.
 - Codex offload (gpt-5.6-sol, D-042): the adversary wrapper is healthy (two clean
