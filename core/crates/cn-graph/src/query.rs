@@ -345,6 +345,76 @@ fn all_neighbors(idx: &GraphIndex, node: EntityId) -> impl Iterator<Item = &Adja
     idx.adjacency.get(&node).into_iter().flatten()
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct EccentricityMeasure {
+    pub entity: EntityId,
+    pub steps: usize,
+    pub component: EntityId,
+    pub explanation: String,
+}
+
+/// BFS eccentricity per node (steps to the farthest reachable node),
+/// undirected traversal like `betweenness`. `component` is the smallest
+/// `EntityId` reachable from this node, so two nodes share `component` iff
+/// they are mutually reachable - this is how disconnected nodes report their
+/// own component instead of being silently folded into the whole graph.
+pub fn eccentricity(idx: &GraphIndex) -> BTreeMap<EntityId, EccentricityMeasure> {
+    let components = connected_components(idx);
+    idx.entities
+        .iter()
+        .map(|&node| {
+            let mut dist: BTreeMap<EntityId, usize> = BTreeMap::from([(node, 0)]);
+            let mut queue = VecDeque::from([node]);
+            let mut steps = 0;
+            while let Some(v) = queue.pop_front() {
+                let d = dist[&v];
+                for adj in all_neighbors(idx, v) {
+                    if let std::collections::btree_map::Entry::Vacant(entry) = dist.entry(adj.to) {
+                        entry.insert(d + 1);
+                        steps = steps.max(d + 1);
+                        queue.push_back(adj.to);
+                    }
+                }
+            }
+            let explanation = format!("{steps} steps from the farthest person");
+            (
+                node,
+                EccentricityMeasure {
+                    entity: node,
+                    steps,
+                    component: components[&node],
+                    explanation,
+                },
+            )
+        })
+        .collect()
+}
+
+fn connected_components(idx: &GraphIndex) -> BTreeMap<EntityId, EntityId> {
+    let mut roots: BTreeMap<EntityId, EntityId> = BTreeMap::new();
+    for &start in &idx.entities {
+        if roots.contains_key(&start) {
+            continue;
+        }
+        let mut members = vec![start];
+        let mut seen = BTreeSet::from([start]);
+        let mut queue = VecDeque::from([start]);
+        while let Some(v) = queue.pop_front() {
+            for adj in all_neighbors(idx, v) {
+                if seen.insert(adj.to) {
+                    members.push(adj.to);
+                    queue.push_back(adj.to);
+                }
+            }
+        }
+        let root = *members.iter().min().expect("at least the start node");
+        for member in members {
+            roots.insert(member, root);
+        }
+    }
+    roots
+}
+
 pub fn search(p: &Projection, q: &SearchQuery) -> Vec<SearchHit> {
     let needle = q.text.trim().to_lowercase();
     if needle.is_empty() || q.limit == 0 {

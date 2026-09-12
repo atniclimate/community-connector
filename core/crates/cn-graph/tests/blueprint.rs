@@ -430,6 +430,35 @@ fn betweenness_ranks_the_planted_bridge_above_every_non_bridge_node() {
 }
 
 #[test]
+fn eccentricity_reports_farthest_steps_and_separates_components() {
+    // A 4-node line (1-2-3-4) plus a disconnected pair (5-6).
+    let p = projection(
+        vec![
+            entity(1, "person"),
+            entity(2, "person"),
+            entity(3, "person"),
+            entity(4, "person"),
+            entity(5, "person"),
+            entity(6, "person"),
+        ],
+        vec![
+            edge(1, 1, 2, "connected_to", false, None),
+            edge(2, 2, 3, "connected_to", false, None),
+            edge(3, 3, 4, "connected_to", false, None),
+            edge(4, 5, 6, "connected_to", false, None),
+        ],
+    );
+    let idx = GraphIndex::build(&p);
+    let ecc = eccentricity(&idx);
+    assert_eq!(ecc[&entity_id(1)].steps, 3);
+    assert_eq!(ecc[&entity_id(2)].steps, 2);
+    assert_eq!(ecc[&entity_id(1)].component, ecc[&entity_id(4)].component);
+    assert_ne!(ecc[&entity_id(1)].component, ecc[&entity_id(5)].component);
+    assert_eq!(ecc[&entity_id(5)].steps, 1);
+    assert!(ecc[&entity_id(1)].explanation.contains('3'));
+}
+
+#[test]
 fn search_snippet_truncates_on_char_boundary() {
     let mut entity = entity(1, "person");
     let long = format!("{}harbor", "a".repeat(100));
