@@ -363,18 +363,33 @@ sessions:
       screenshot/live build to review - completion is NOT claimed on the code landing
       alone, since the gate's visual half is human-only"
     status: partial
-    outcome: "2026-09-12: UNIT 1 landed (commit 1999e70) per
-      docs/blueprints/presenter-mode.md - new `present` ViewMode through the state
-      machine (I4), zoomToFit on the camera rig, hidden chrome, present-mode label/halo/
-      fog tokens, app/public/beats.atni.json, Space/Right/Left/Home/F/Escape keyboard
-      beat control. npm run typecheck/build/test (app/) and scripts/check-all.ps1 both
-      12/12 green; no new dependency; I4 mutation audit clean; core/ untouched (a
-      concurrent, unrelated in-flight change to core/crates/cn-graph staged by another
-      process during this session was deliberately excluded from the commit via `git
-      reset`, not committed or altered). UNIT 2 NOT attempted - its precondition
-      (S-R4a's cn-api measures call) had not landed as of this session (confirmed via
-      git log on core/crates/cn-api and core/crates/cn-graph); per the blueprint's own
-      gating, skip and record here rather than block.
+    outcome: "2026-09-12: BOTH units landed (commits 1999e70, dcbd8f4) per
+      docs/blueprints/presenter-mode.md. UNIT 1 - new `present` ViewMode through the
+      state machine (I4), zoomToFit on the camera rig, hidden chrome, present-mode
+      label/halo/fog tokens, app/public/beats.atni.json, Space/Right/Left/Home/F/Escape
+      keyboard beat control. UNIT 2's precondition (S-R4a's cn-api graph_measures call)
+      was confirmed absent at the start of this session (git log on core/crates/cn-api
+      and core/crates/cn-graph) but landed MID-SESSION via a separate, concurrent Claude
+      Code session working the same repo (five commits ending 18d4a09, a different
+      session id and git author) - re-checked before starting UNIT 2, precondition then
+      met, so UNIT 2 proceeded rather than being deferred. UNIT 2 wires graphMeasures
+      (betweenness_top_n/single_tie, each with a plain-language explanation) into
+      beats via a new app/src/viz/presenter.ts and a widened viz/focus.ts
+      (FocusSet.focusedId: string | null, an optional highlightedIds param merged into
+      neighborIds - reusing the existing neighbor-highlight render path). Correction
+      recorded in the blueprint itself: the design brief's 'analysis' focus-priority
+      tier was never actually implemented in viz/focus.ts (contrary to this session's
+      own original blueprint text, which had trusted the discovery memo's claim without
+      checking); the real extension point is the focused/neighbor/unrelated/base model.
+      Both units: npm run typecheck/build/test (app/) and scripts/check-all.ps1 both
+      12/12 green (127 app tests after unit 2); no new dependency; I4 mutation audit
+      clean; core/ untouched by this session (a concurrent, unrelated in-flight change
+      to core/crates/cn-graph staged by the other session during UNIT 1's work was
+      deliberately excluded from that commit via `git reset`, not committed or altered
+      by this session; that session's own SESSION_ROSTER.yaml edits, including this
+      entry's UNIT-1 status text, were also swept into one of its commits (18d4a09) by
+      its own broad `git add` - content intact, just attributed to the other session's
+      commit rather than a commit of this session's own).
       Manual dev-app check attempted on the atni-convention fixture (temporary,
       reverted app/src/main.ts edit, matching S-R2's precedent - no diff remains): the
       Present control and beat-advance keys were confirmed working MECHANICALLY via
@@ -398,10 +413,10 @@ sessions:
       dev` in app/, group id 00000000-0000-0000-0000-0000000dbba0, e.g. via a temporary
       main.ts fixture swap) to do the real visual acceptance pass this gate requires,
       and confirm on their own screen whether nodes render as expected. Next actions for
-      HANDOFF.md: (1) human visual check of UNIT 1 outside this automated screenshot
-      path; (2) UNIT 2 once S-R4a lands; (3) consider adding at least one RoleGrant op
-      to the atni-convention fixture generator so an unprivileged dev-app viewer sees
-      more than their own record."
+      HANDOFF.md: (1) human visual check of both units outside this automated
+      screenshot path - this is the only thing standing between `partial` and `done`;
+      (2) consider adding at least one RoleGrant op to the atni-convention fixture
+      generator so an unprivileged dev-app viewer sees more than their own record."
 
   - id: S-R7
     task_ids: [R7]
