@@ -196,6 +196,64 @@ pub fn degree_measures(idx: &GraphIndex) -> BTreeMap<EntityId, DegreeMeasure> {
         .collect()
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct JaccardMeasure {
+    pub a: EntityId,
+    pub b: EntityId,
+    pub shared: usize,
+    pub union: usize,
+    pub value: f64,
+    pub explanation: String,
+}
+
+/// Jaccard index over committee membership (`member_of`-style edges): the
+/// fraction of the two entities' COMBINED committees that they share.
+pub fn shared_committee_jaccard(
+    idx: &GraphIndex,
+    a: EntityId,
+    b: EntityId,
+    membership_kind: &KindId,
+) -> Result<JaccardMeasure, GraphError> {
+    require_entity(idx, a)?;
+    require_entity(idx, b)?;
+    let committees_a = committees_of(idx, a, membership_kind);
+    let committees_b = committees_of(idx, b, membership_kind);
+    let shared = committees_a.intersection(&committees_b).count();
+    let union = committees_a.union(&committees_b).count();
+    let value = if union == 0 {
+        0.0
+    } else {
+        shared as f64 / union as f64
+    };
+    let explanation = if union == 0 {
+        "belongs to no shared committees".to_string()
+    } else {
+        format!("shares {shared} of {union} committees")
+    };
+    Ok(JaccardMeasure {
+        a,
+        b,
+        shared,
+        union,
+        value,
+        explanation,
+    })
+}
+
+fn committees_of(
+    idx: &GraphIndex,
+    entity: EntityId,
+    membership_kind: &KindId,
+) -> BTreeSet<EntityId> {
+    idx.adjacency
+        .get(&entity)
+        .into_iter()
+        .flatten()
+        .filter(|adj| adj.forward && &adj.kind == membership_kind)
+        .map(|adj| adj.to)
+        .collect()
+}
+
 pub fn search(p: &Projection, q: &SearchQuery) -> Vec<SearchHit> {
     let needle = q.text.trim().to_lowercase();
     if needle.is_empty() || q.limit == 0 {

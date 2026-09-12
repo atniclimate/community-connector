@@ -352,6 +352,45 @@ fn degree_measures_flag_single_tie_and_explain() {
 }
 
 #[test]
+fn shared_committee_jaccard_counts_overlap_and_rejects_missing() {
+    let p = projection(
+        vec![
+            entity(1, "person"),
+            entity(2, "person"),
+            entity(3, "person"),
+            entity(10, "committee"),
+            entity(11, "committee"),
+            entity(12, "committee"),
+        ],
+        vec![
+            edge(1, 1, 10, "member_of", true, None),
+            edge(2, 1, 11, "member_of", true, None),
+            edge(3, 2, 11, "member_of", true, None),
+            edge(4, 2, 12, "member_of", true, None),
+        ],
+    );
+    let idx = GraphIndex::build(&p);
+    let member_of = kind("member_of");
+    let overlap =
+        shared_committee_jaccard(&idx, entity_id(1), entity_id(2), &member_of).expect("query");
+    assert_eq!(overlap.shared, 1);
+    assert_eq!(overlap.union, 3);
+    assert!((overlap.value - 1.0 / 3.0).abs() < 1e-9);
+    assert!(overlap.explanation.contains('1'));
+
+    let none =
+        shared_committee_jaccard(&idx, entity_id(1), entity_id(3), &member_of).expect("query");
+    assert_eq!(none.shared, 0);
+    assert_eq!(none.union, 2);
+    assert_eq!(none.value, 0.0);
+
+    assert_eq!(
+        shared_committee_jaccard(&idx, entity_id(1), entity_id(99), &member_of),
+        Err(GraphError::NotFound)
+    );
+}
+
+#[test]
 fn search_snippet_truncates_on_char_boundary() {
     let mut entity = entity(1, "person");
     let long = format!("{}harbor", "a".repeat(100));
