@@ -34,6 +34,7 @@ export const RENDER_TOKENS = {
     falloffC: 0.6,
     falloffP: 6,
     restingAlpha: 0.15,
+    restingAlphaPresent: 0.35,
     selectedAlpha: 0.8,
     maxVisible: 300,
     tierBDistance: 1600,
@@ -41,6 +42,7 @@ export const RENDER_TOKENS = {
   },
   label: {
     fontSize: 8,
+    presentScaleMultiplier: 1.8,
     offsetGap: 1.3,
     offsetPad: 2,
     maxChars: 28,
@@ -50,6 +52,7 @@ export const RENDER_TOKENS = {
     capTierB: 32,
     capTierC: 16,
     capTierD: 8,
+    capPresent: 30,
     updateIntervalMs: 150,
     cameraEpsilonSq: 16,
     outlineWidthRatio: 0.08,
@@ -71,6 +74,7 @@ export const RENDER_TOKENS = {
   },
   drift: {
     autoRotateSpeed: 0.25,
+    presentAutoRotateSpeed: 0.2,
     idleDelayMs: 5000,
   },
   camera: {
@@ -84,8 +88,10 @@ export const RENDER_TOKENS = {
     nearFlightDistance: 320,
     nearDurationMs: 600,
     standardDurationMs: 800,
+    beatDurationMs: 1200,
     maxDurationMs: 900,
     aimLockFraction: 3,
+    fitAllPaddingWorldUnits: 20,
   },
   scene: {
     fogDensity: 0.0009,
@@ -113,5 +119,6 @@ export const RENDER_COLORS = {
   fallbackBackgroundCenter: "#0d1017",
   fallbackBackgroundEdge: "#06080d",
   labelText: "#e6edf7",
+  labelTextPresent: "#edf3fb",
   labelOutline: "#06080d",
 } as const;

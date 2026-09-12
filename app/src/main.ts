@@ -1,4 +1,4 @@
-import { createInitialState } from "./state/state";
+import { createInitialState, type JsonObject, type PresentBeat } from "./state/state";
 import { createStore } from "./state/store";
 import { selectProjectedEntityCount } from "./state/selectors";
 import { loadGroup } from "./state/effects";
@@ -10,7 +10,6 @@ import { mountSearch } from "./ui/search";
 import { mountDetailPanel } from "./ui/detail";
 import { mountFlatProjection } from "./ui/flat";
 import { mountIntakeWizard } from "./ui/intake/panel";
-import type { JsonObject } from "./state/state";
 
 declare const __CN_SNAPSHOT_MODE__: boolean;
 
@@ -25,9 +24,18 @@ const vizElement = document.createElement("div");
 const detailElement = document.createElement("div");
 const flatElement = document.createElement("div");
 const intakeElement = document.createElement("div");
+const statusText = document.createElement("span");
+const presentButton = document.createElement("button");
 statusElement.className = "cn-status";
-statusElement.setAttribute("role", "status");
-statusElement.setAttribute("aria-live", "polite");
+statusElement.setAttribute("role", "toolbar");
+statusElement.setAttribute("aria-label", "Application controls");
+statusText.setAttribute("role", "status");
+statusText.setAttribute("aria-live", "polite");
+presentButton.className = "cn-present-enter";
+presentButton.type = "button";
+presentButton.textContent = "Present";
+presentButton.setAttribute("aria-label", "Enter presenter mode");
+statusElement.append(statusText, presentButton);
 searchElement.className = "cn-search-region";
 searchElement.setAttribute("role", "search");
 searchElement.setAttribute("aria-label", "Search the current network");
@@ -59,13 +67,31 @@ const DEMO_VIEWER_PERSON = "00000000-0000-0000-0000-0000000003e9";
 
 function render(): void {
   const state = store.getState();
-  statusElement.textContent = [
+  appElement.dataset.viewMode = state.view.mode;
+  statusText.textContent = [
     `Community Navigator`,
     `load: ${state.session.loadState}`,
     `quality: ${state.ui.qualityTier}`,
     `entities: ${selectProjectedEntityCount(state)}`,
     state.session.lastError === null ? "" : `error: ${state.session.lastError.message}`,
   ].filter((part) => part !== "").join(" | ");
+  presentButton.disabled = state.presentation.loadState !== "ready" || state.presentation.beats.length === 0;
+}
+
+const onPresent = (): void => store.dispatch({ kind: "presentEntered", beatIndex: 0 });
+presentButton.addEventListener("click", onPresent);
+
+async function loadPresentBeats(): Promise<void> {
+  try {
+    const response = await fetch("/beats.atni.json");
+    if (!response.ok) {
+      throw new Error(`Failed to fetch presenter beats (${response.status})`);
+    }
+    const beats = await response.json() as readonly PresentBeat[];
+    store.dispatch({ kind: "presentBeatsLoaded", beats });
+  } catch (error) {
+    store.dispatch({ kind: "errorSurfaced", error: client.toErrorEnvelope(error) });
+  }
 }
 
 // Template holder for the intake wizard's form renderer (set at load).
@@ -131,6 +157,7 @@ const unmounts = [
   mountFlatProjection(flatElement, { store }),
 ];
 render();
+void loadPresentBeats();
 
 if (import.meta.env.DEV) {
   Object.defineProperty(window, "__cn_state_snapshot", {
@@ -160,6 +187,7 @@ function teardown(): void {
   }
   tornDown = true;
   reducedMotionMedia.removeEventListener("change", onReducedMotion);
+  presentButton.removeEventListener("click", onPresent);
   for (const unmount of unmounts.reverse()) {
     unmount();
   }

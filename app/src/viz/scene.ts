@@ -18,6 +18,7 @@ import { RENDER_COLORS, RENDER_TOKENS } from "./config";
 
 export type SceneSetup = {
   readonly scene: Scene;
+  readonly setPresentMode: (present: boolean) => void;
   readonly dispose: () => void;
 };
 
@@ -129,6 +130,12 @@ export function createVizScene(theme: Theme | null): SceneSetup {
   scene.add(bg, key, fill, ambient, stars);
   return {
     scene,
+    setPresentMode: (present) => {
+      if (!(scene.fog instanceof FogExp2)) {
+        throw new Error("Visualization scene is missing exponential fog");
+      }
+      scene.fog.density = RENDER_TOKENS.scene.fogDensity * (present ? 0.5 : UNIT);
+    },
     dispose: () => {
       bg.geometry.dispose();
       bg.material.dispose();

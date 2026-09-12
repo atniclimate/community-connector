@@ -1,7 +1,7 @@
 import { Group, Quaternion, Vector3, type Camera } from "three";
 import { Text } from "troika-three-text";
 import labelFontWoff from "@fontsource/atkinson-hyperlegible/files/atkinson-hyperlegible-latin-400-normal.woff";
-import type { KindMeta, ProjectionDto } from "../state/state";
+import type { KindMeta, ProjectionDto, ViewMode } from "../state/state";
 import type { Theme } from "../theme/tokens";
 import { RENDER_COLORS, RENDER_TOKENS } from "./config";
 import type { LayoutResult } from "./layout";
@@ -33,6 +33,7 @@ export type BuildLabelLayerArgs = {
   readonly theme: Theme | null;
   readonly degrees: ReadonlyMap<string, number>;
   readonly tier: QualityTier;
+  readonly viewMode: ViewMode;
   readonly onNeedsRender: () => void;
 };
 
@@ -52,7 +53,10 @@ export function truncateLabel(text: string): string {
   return `${text.slice(ZERO, limit - ELLIPSIS.length).trimEnd()}${ELLIPSIS}`;
 }
 
-export function visibleLabelCap(tier: QualityTier): number {
+export function visibleLabelCap(tier: QualityTier, viewMode: ViewMode = "overview"): number {
+  if (viewMode === "present") {
+    return RENDER_TOKENS.label.capPresent;
+  }
   switch (tier) {
     case "A":
       return RENDER_TOKENS.label.capTierA;
@@ -103,8 +107,9 @@ export function selectVisibleLabels(
   candidates: readonly LabelCandidate[],
   cameraPosition: Vector3,
   tier: QualityTier,
+  viewMode: ViewMode = "overview",
 ): readonly LabelCandidate[] {
-  const cap = visibleLabelCap(tier);
+  const cap = visibleLabelCap(tier, viewMode);
   if (cap <= ZERO) {
     return [];
   }
@@ -127,13 +132,19 @@ function themeHex(theme: Theme | null, key: string, fallback: string): string {
   return theme?.tokens[key]?.hex ?? fallback;
 }
 
-function makeLabel(theme: Theme | null): Text {
+function makeLabel(theme: Theme | null, viewMode: ViewMode): Text {
   const label = new Text();
+  const present = viewMode === "present";
+  const fontSize = present
+    ? RENDER_TOKENS.label.fontSize * RENDER_TOKENS.label.presentScaleMultiplier
+    : RENDER_TOKENS.label.fontSize;
   label.font = labelFontWoff;
-  label.fontSize = RENDER_TOKENS.label.fontSize;
-  label.color = themeHex(theme, "label.text", RENDER_COLORS.labelText);
+  label.fontSize = fontSize;
+  label.color = present
+    ? RENDER_COLORS.labelTextPresent
+    : themeHex(theme, "label.text", RENDER_COLORS.labelText);
   label.outlineColor = themeHex(theme, "label.outline", RENDER_COLORS.labelOutline);
-  label.outlineWidth = RENDER_TOKENS.label.fontSize * RENDER_TOKENS.label.outlineWidthRatio;
+  label.outlineWidth = fontSize * RENDER_TOKENS.label.outlineWidthRatio;
   label.anchorX = "center";
   label.anchorY = "bottom";
   label.material.depthTest = false;
@@ -201,10 +212,10 @@ function applyVisible(
 export function buildLabelLayer(args: BuildLabelLayerArgs): LabelLayer {
   const group = new Group();
   const candidates = labelCandidates(args.projection, args.layout, args.kindMeta, args.degrees);
-  const cap = Math.min(visibleLabelCap(args.tier), candidates.length);
+  const cap = Math.min(visibleLabelCap(args.tier, args.viewMode), candidates.length);
   const slots: LabelSlot[] = [];
   for (let index = 0; index < cap; index += UNIT) {
-    const slot: LabelSlot = { mesh: makeLabel(args.theme), entityId: null };
+    const slot: LabelSlot = { mesh: makeLabel(args.theme, args.viewMode), entityId: null };
     slots.push(slot);
     group.add(slot.mesh);
   }
@@ -219,7 +230,11 @@ export function buildLabelLayer(args: BuildLabelLayerArgs): LabelLayer {
       Number.isNaN(moved) ||
       (sinceRecomputeMs >= RENDER_TOKENS.label.updateIntervalMs && moved > RENDER_TOKENS.label.cameraEpsilonSq);
     if (shouldRecompute) {
-      changed = applyVisible(slots, selectVisibleLabels(candidates, camera.position, args.tier), args.onNeedsRender);
+      changed = applyVisible(
+        slots,
+        selectVisibleLabels(candidates, camera.position, args.tier, args.viewMode),
+        args.onNeedsRender,
+      );
       lastCamera.copy(camera.position);
       sinceRecomputeMs = ZERO;
     }

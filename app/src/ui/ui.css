@@ -14,6 +14,53 @@
   border: 0;
 }
 
+.cn-status {
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.cn-present-enter {
+  flex: none;
+  border: 1px solid var(--cn-text-secondary, #b5c0d0);
+  border-radius: 4px;
+  padding: 0.25rem 0.75rem;
+  background: var(--cn-surface-panel, #151b26);
+  color: var(--cn-text-primary, #e6edf7);
+  font: inherit;
+  cursor: pointer;
+}
+
+.cn-present-enter:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.cn-present-enter:focus-visible {
+  outline: 2px solid var(--cn-accent-focusRing, #ffd38a);
+  outline-offset: 2px;
+}
+
+#app[data-view-mode="present"] {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(320px, 1fr);
+  gap: 0;
+  padding: 0;
+}
+
+#app[data-view-mode="present"] .cn-status,
+#app[data-view-mode="present"] .cn-search-region,
+#app[data-view-mode="present"] .cn-detail-region,
+#app[data-view-mode="present"] .cn-flat-region,
+#app[data-view-mode="present"] .cn-intake-region,
+#app[data-view-mode="present"] .cn-legend {
+  display: none;
+}
+
+#app[data-view-mode="present"] .cn-viz {
+  grid-column: 1;
+  grid-row: 1;
+}
+
 .cn-search,
 .cn-detail,
 .cn-flat {

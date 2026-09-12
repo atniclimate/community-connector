@@ -3,6 +3,7 @@ import type {
   ErrorEnvelopeDto,
   IntakeRecordSummaryDto,
   KindMeta,
+  PresentBeat,
   ProjectionDto,
   QualityTierName,
   RequestIdentity,
@@ -79,6 +80,21 @@ export type Action =
     }
   | {
       readonly kind: "storyExited";
+    }
+  | {
+      readonly kind: "presentBeatsLoaded";
+      readonly beats: readonly PresentBeat[];
+    }
+  | {
+      readonly kind: "presentEntered";
+      readonly beatIndex: number;
+    }
+  | {
+      readonly kind: "presentBeatAdvanced";
+      readonly beatIndex: number;
+    }
+  | {
+      readonly kind: "presentExited";
     }
   | {
       readonly kind: "legendToggled";

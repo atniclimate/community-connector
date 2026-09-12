@@ -1,5 +1,5 @@
 import { WebGLRenderer } from "three";
-import type { AppState, ProjectionDto } from "../state/state";
+import type { AppState, PresentBeat, ProjectionDto, ViewMode } from "../state/state";
 import type { Store } from "../state/store";
 import { RENDER_TOKENS } from "./config";
 import { buildEdgeLayer, setEdgeFocusBlend, writeFocusTargetColors, type EdgeLayer } from "./edges";
@@ -10,7 +10,7 @@ import { buildNodeLayer, degreesForProjection, type NodeLayer } from "./nodes";
 import { PickingController } from "./picking";
 import { projectedEntities } from "./projection";
 import { createVizScene, type SceneSetup } from "./scene";
-import { createCameraRig, type CameraRig } from "./camera";
+import { createCameraRig, zoomToFit, type CameraRig } from "./camera";
 import { applyFocusToNodeLayer, computeFocusSet, FocusBlend } from "./focus";
 import { QualityManager, type QualityProfile } from "./quality";
 
@@ -40,6 +40,8 @@ type RenderState = {
   focusBlend: FocusBlend;
   projectionRevision: number | null;
   themeKey: string;
+  viewMode: ViewMode;
+  presentBeatIndex: number | null;
   dirty: boolean;
   frame: number | null;
   lastTime: number | null;
@@ -80,6 +82,8 @@ export function mountViz(container: HTMLElement, store: Store): MountedViz {
     focusBlend: new FocusBlend(),
     projectionRevision: null,
     themeKey: "",
+    viewMode: "overview",
+    presentBeatIndex: null,
     dirty: true,
     frame: null,
     lastTime: null,
@@ -91,11 +95,14 @@ export function mountViz(container: HTMLElement, store: Store): MountedViz {
   renderState.picking = new PickingController(canvas, cameraRig.camera, () => renderState.nodes, store);
   const unsubscribe = store.subscribe(() => handleState(renderState, container, store));
   const onVisibility = (): void => schedule(renderState, store);
+  const onKeydown = (event: KeyboardEvent): void => handlePresenterKeydown(event, renderState, store);
   document.addEventListener("visibilitychange", onVisibility);
+  window.addEventListener("keydown", onKeydown);
   handleState(renderState, container, store);
   return () => {
     unsubscribe();
     document.removeEventListener("visibilitychange", onVisibility);
+    window.removeEventListener("keydown", onKeydown);
     disposeRenderState(renderState);
     container.replaceChildren();
   };
@@ -117,7 +124,7 @@ function handleState(renderState: RenderState, container: HTMLElement, store: St
 function rebuildIfNeeded(renderState: RenderState, state: AppState, onNeedsRender: () => void): boolean {
   const projection = state.data.projection;
   const themeKey = JSON.stringify(state.theme.resolved?.tokens ?? {});
-  if (projection === null || !needsRebuild(renderState, projection, themeKey)) {
+  if (projection === null || !needsRebuild(renderState, projection, themeKey, state.view.mode)) {
     return false;
   }
   disposeGraphLayers(renderState);
@@ -140,6 +147,7 @@ function rebuildIfNeeded(renderState: RenderState, state: AppState, onNeedsRende
     theme: state.theme.resolved,
     tier: renderState.profile.tier,
     cameraPosition: renderState.cameraRig.camera.position.clone(),
+    viewMode: state.view.mode,
   });
   renderState.labels = buildLabelLayer({
     projection,
@@ -148,6 +156,7 @@ function rebuildIfNeeded(renderState: RenderState, state: AppState, onNeedsRende
     theme: state.theme.resolved,
     degrees,
     tier: renderState.profile.tier,
+    viewMode: state.view.mode,
     onNeedsRender,
   });
   renderState.sceneSetup.scene.add(
@@ -158,6 +167,7 @@ function rebuildIfNeeded(renderState: RenderState, state: AppState, onNeedsRende
   );
   renderState.projectionRevision = projection.revision ?? ZERO;
   renderState.themeKey = themeKey;
+  renderState.viewMode = state.view.mode;
   return true;
 }
 
@@ -168,14 +178,22 @@ function rebuildIfNeeded(renderState: RenderState, state: AppState, onNeedsRende
  */
 function syncMotion(renderState: RenderState, state: AppState, rebuilt: boolean): void {
   const reduced = state.ui.reducedMotion;
+  const present = state.view.mode === "present";
   renderState.cameraRig.setReducedMotion(reduced);
-  renderState.cameraRig.setDrift(state.view.mode === "overview" && !reduced);
+  renderState.cameraRig.setDrift(
+    (state.view.mode === "overview" || present) && !reduced,
+    present ? RENDER_TOKENS.drift.presentAutoRotateSpeed : RENDER_TOKENS.drift.autoRotateSpeed,
+  );
+  renderState.sceneSetup.setPresentMode(present);
   const focusedId = state.view.mode === "focus" ? state.view.focusedEntityId : null;
   const focusChanged = focusedId !== renderState.focusedEntityId;
-  if (!focusChanged && !rebuilt) {
+  const presentBeatIndex = present ? state.presentation.beatIndex : null;
+  const presentBeatChanged = presentBeatIndex !== renderState.presentBeatIndex;
+  if (!focusChanged && !presentBeatChanged && !rebuilt) {
     return;
   }
   renderState.focusedEntityId = focusedId;
+  renderState.presentBeatIndex = presentBeatIndex;
   const projection = state.data.projection;
   if (projection === null || renderState.nodes === null || renderState.edges === null || renderState.degrees === null) {
     return;
@@ -189,11 +207,71 @@ function syncMotion(renderState: RenderState, state: AppState, rebuilt: boolean)
     if (position !== undefined) {
       renderState.cameraRig.flyTo(position.clone(), reduced);
     }
+  } else if (present && (presentBeatChanged || rebuilt) && renderState.layout !== null) {
+    const beat = state.presentation.beats[state.presentation.beatIndex];
+    zoomToFit(renderState.cameraRig, positionsForBeat(projection, renderState.layout, beat), {
+      paddingWorldUnits: RENDER_TOKENS.camera.fitAllPaddingWorldUnits,
+      reducedMotion: reduced,
+    });
   }
 }
 
-function needsRebuild(renderState: RenderState, projection: ProjectionDto, themeKey: string): boolean {
-  return renderState.projectionRevision !== (projection.revision ?? ZERO) || renderState.themeKey !== themeKey;
+function positionsForBeat(
+  projection: ProjectionDto,
+  layout: LayoutResult,
+  beat: PresentBeat | undefined,
+): readonly import("three").Vector3[] {
+  const kinds = beat?.filter?.kinds;
+  return projectedEntities(projection).flatMap((entity) => {
+    if (kinds !== undefined && !kinds.includes(entity.kind ?? "")) {
+      return [];
+    }
+    const position = layout.positions.get(entity.id);
+    return position === undefined ? [] : [position];
+  });
+}
+
+function handlePresenterKeydown(event: KeyboardEvent, renderState: RenderState, store: Store): void {
+  const state = store.getState();
+  if (state.view.mode !== "present") {
+    return;
+  }
+  const lastBeatIndex = Math.max(ZERO, state.presentation.beats.length - UNIT);
+  let beatIndex: number | null = null;
+  if (event.key === " " || event.code === "Space" || event.key === "ArrowRight") {
+    beatIndex = Math.min(lastBeatIndex, state.presentation.beatIndex + UNIT);
+  } else if (event.key === "ArrowLeft") {
+    beatIndex = Math.max(ZERO, state.presentation.beatIndex - UNIT);
+  } else if (event.key === "Home") {
+    beatIndex = ZERO;
+  } else if (event.key.toLowerCase() === "f") {
+    const projection = state.data.projection;
+    if (projection !== null && renderState.layout !== null) {
+      zoomToFit(renderState.cameraRig, positionsForBeat(projection, renderState.layout, undefined), {
+        paddingWorldUnits: RENDER_TOKENS.camera.fitAllPaddingWorldUnits,
+        reducedMotion: state.ui.reducedMotion,
+      });
+    }
+  } else if (event.key === "Escape") {
+    store.dispatch({ kind: "presentExited" });
+  } else {
+    return;
+  }
+  event.preventDefault();
+  if (beatIndex !== null) {
+    store.dispatch({ kind: "presentBeatAdvanced", beatIndex });
+  }
+}
+
+function needsRebuild(
+  renderState: RenderState,
+  projection: ProjectionDto,
+  themeKey: string,
+  viewMode: ViewMode,
+): boolean {
+  return renderState.projectionRevision !== (projection.revision ?? ZERO)
+    || renderState.themeKey !== themeKey
+    || renderState.viewMode !== viewMode;
 }
 
 function updateAria(renderState: RenderState, state: AppState): void {

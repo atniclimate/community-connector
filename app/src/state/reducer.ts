@@ -1,5 +1,5 @@
 import type { Action } from "./actions";
-import type { AppState } from "./state";
+import type { AppState, PresentBeat } from "./state";
 import { initialIntakeState, initialSearchState } from "./state";
 import type { RequestIdentity } from "./state";
 
@@ -34,6 +34,16 @@ function storyView(storyId: string, step: number): AppState["view"] {
     hoveredEntityId: null,
     storyId,
     storyStep: Math.max(0, step),
+  };
+}
+
+function presentView(beat: PresentBeat | undefined): AppState["view"] {
+  return {
+    mode: "present",
+    focusedEntityId: beat?.focusEntityId ?? null,
+    hoveredEntityId: null,
+    storyId: null,
+    storyStep: 0,
   };
 }
 
@@ -186,6 +196,20 @@ export function reduce(state: AppState, action: Action): AppState {
         view: storyView(state.view.storyId, action.step),
       };
     case "storyExited":
+      return { ...state, view: resetView() };
+    case "presentBeatsLoaded":
+      return {
+        ...state,
+        presentation: { beats: action.beats, beatIndex: 0, loadState: "ready" },
+      };
+    case "presentEntered":
+    case "presentBeatAdvanced":
+      return {
+        ...state,
+        view: presentView(state.presentation.beats[action.beatIndex]),
+        presentation: { ...state.presentation, beatIndex: action.beatIndex },
+      };
+    case "presentExited":
       return { ...state, view: resetView() };
     case "legendToggled":
       return { ...state, ui: { ...state.ui, legendOpen: !state.ui.legendOpen } };

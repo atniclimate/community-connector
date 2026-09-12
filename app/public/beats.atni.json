@@ -1,0 +1,27 @@
+[
+  {
+    "id": "network-overview",
+    "label": "Convention network overview"
+  },
+  {
+    "id": "members",
+    "label": "Members",
+    "filter": {
+      "kinds": ["person"]
+    }
+  },
+  {
+    "id": "committees",
+    "label": "Standing committees",
+    "filter": {
+      "kinds": ["committee"]
+    }
+  },
+  {
+    "id": "organizations",
+    "label": "Partner organizations",
+    "filter": {
+      "kinds": ["organization"]
+    }
+  }
+]

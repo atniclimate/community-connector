@@ -117,6 +117,29 @@ describe("state reducer", () => {
     });
   });
 
+  it("loads presenter beats and changes presenter mode only through actions", () => {
+    const beats = [
+      { id: "all", label: "All" },
+      { id: "people", label: "People", focusEntityId: "entity-focus", filter: { kinds: ["person"] } },
+    ] as const;
+    const loaded = reduce(createInitialState(), { kind: "presentBeatsLoaded", beats });
+    const entered = reduce(loaded, { kind: "presentEntered", beatIndex: 0 });
+    const advanced = reduce(entered, { kind: "presentBeatAdvanced", beatIndex: 1 });
+    const exited = reduce(advanced, { kind: "presentExited" });
+
+    expect(loaded.presentation).toEqual({ beats, beatIndex: 0, loadState: "ready" });
+    expect(entered.view.mode).toBe("present");
+    expect(advanced.presentation.beatIndex).toBe(1);
+    expect(advanced.view).toEqual({
+      mode: "present",
+      focusedEntityId: "entity-focus",
+      hoveredEntityId: null,
+      storyId: null,
+      storyStep: 0,
+    });
+    expect(exited.view.mode).toBe("overview");
+  });
+
   it("stores derived theme results without revision staleness rules", () => {
     const initial = reduce(createInitialState(), {
       kind: "projectionReceived",

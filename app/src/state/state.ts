@@ -77,9 +77,26 @@ export type SearchState = {
 };
 
 export type LoadState = "idle" | "loading" | "ready" | "error";
-export type ViewMode = "overview" | "focus" | "story";
+export type ViewMode = "overview" | "focus" | "story" | "present";
 export type QualityTierName = "A" | "B" | "C" | "D";
 export type ShapeName = "sphere" | "cube" | "octahedron" | "tetrahedron" | "torus" | "cone";
+
+export type PresentBeat = {
+  readonly id: string;
+  readonly label: string;
+  readonly focusEntityId?: string;
+  readonly filter?: {
+    readonly kinds?: readonly string[];
+  };
+  readonly measure?: string;
+  readonly topN?: number;
+};
+
+export type PresentationState = {
+  readonly beats: readonly PresentBeat[];
+  readonly beatIndex: number;
+  readonly loadState: LoadState;
+};
 
 export type KindMeta = {
   readonly shape: ShapeName;
@@ -173,6 +190,7 @@ export interface AppState {
     readonly kindMeta: Readonly<Record<string, KindMeta>>;
   };
   readonly search: SearchState;
+  readonly presentation: PresentationState;
   /** Intake queue slice: survives group reloads (the queue is the
    * facilitator's ops directory, not group-session data). */
   readonly intake: IntakeState;
@@ -189,6 +207,14 @@ export function initialSearchState(): SearchState {
     hits: [],
     error: null,
     request: null,
+  };
+}
+
+export function initialPresentationState(): PresentationState {
+  return {
+    beats: [],
+    beatIndex: 0,
+    loadState: "idle",
   };
 }
 
@@ -224,6 +250,7 @@ export function createInitialState(reducedMotion = false): AppState {
       kindMeta: {},
     },
     search: initialSearchState(),
+    presentation: initialPresentationState(),
     intake: initialIntakeState(),
     theme: {
       resolved: null,

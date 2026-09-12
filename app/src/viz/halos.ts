@@ -8,7 +8,7 @@ import {
   ShaderMaterial,
   Vector3,
 } from "three";
-import type { KindMeta, ProjectionDto, ShapeName } from "../state/state";
+import type { KindMeta, ProjectionDto, ShapeName, ViewMode } from "../state/state";
 import type { Theme } from "../theme/tokens";
 import { RENDER_TOKENS } from "./config";
 import type { LayoutResult } from "./layout";
@@ -18,6 +18,7 @@ import type { QualityTier } from "./quality";
 
 export type HaloLayer = {
   readonly group: Group;
+  readonly restingAlpha: number;
   readonly dispose: () => void;
 };
 
@@ -32,14 +33,14 @@ type HaloCandidate = {
   readonly distance: number;
 };
 
-function haloMaterial(color: Color): ShaderMaterial {
+function haloMaterial(color: Color, restingAlpha: number): ShaderMaterial {
   return new ShaderMaterial({
     side: BackSide,
     transparent: true,
     depthWrite: false,
     uniforms: {
       uColor: { value: color },
-      uAlpha: { value: RENDER_TOKENS.halo.restingAlpha },
+      uAlpha: { value: restingAlpha },
       uFalloffC: { value: RENDER_TOKENS.halo.falloffC },
       uFalloffP: { value: RENDER_TOKENS.halo.falloffP },
     },
@@ -106,8 +107,12 @@ export function buildHaloLayer(args: {
   readonly theme: Theme | null;
   readonly tier: QualityTier;
   readonly cameraPosition: Vector3;
+  readonly viewMode: ViewMode;
 }): HaloLayer {
   const group = new Group();
+  const restingAlpha = args.viewMode === "present"
+    ? RENDER_TOKENS.halo.restingAlphaPresent
+    : RENDER_TOKENS.halo.restingAlpha;
   const geometry = new IcosahedronGeometry(UNIT, RENDER_TOKENS.node.geometryDetail);
   const byKind = new Map<string, number[]>();
   const entities = args.projection.entities ?? [];
@@ -122,6 +127,7 @@ export function buildHaloLayer(args: {
   }
   return {
     group,
+    restingAlpha,
     dispose: () => {
       geometry.dispose();
       for (const child of group.children) {
@@ -138,7 +144,7 @@ export function buildHaloLayer(args: {
  * focused node's emphasis comes from its scale, color, and label instead.
  */
 export function setHaloFocusDim(layer: HaloLayer, blend: number): void {
-  const resting = RENDER_TOKENS.halo.restingAlpha;
+  const resting = layer.restingAlpha;
   const dimmed = resting * RENDER_TOKENS.focus.haloDimFactor;
   const alpha = resting + (dimmed - resting) * blend;
   for (const child of layer.group.children) {
@@ -158,7 +164,13 @@ function addKindHalos(
   kind: string,
   indexes: readonly number[],
 ): void {
-  const mesh = new InstancedMesh(geometry, haloMaterial(new Color(kindColor(kind, args.theme))), indexes.length);
+  const mesh = new InstancedMesh(
+    geometry,
+    haloMaterial(new Color(kindColor(kind, args.theme)), args.viewMode === "present"
+      ? RENDER_TOKENS.halo.restingAlphaPresent
+      : RENDER_TOKENS.halo.restingAlpha),
+    indexes.length,
+  );
   const entities = args.projection.entities ?? [];
   const shape = args.kindMeta[kind]?.shape ?? "sphere";
   const degrees = degreeByEntityId(entities, projectedEdges(args.projection));

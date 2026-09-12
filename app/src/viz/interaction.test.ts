@@ -227,6 +227,7 @@ describe("focus halo dim", () => {
       theme: theme(),
       tier: "B",
       cameraPosition: new Vector3(0, 0, RENDER_TOKENS.camera.initialZ),
+      viewMode: "overview",
     });
     const alphas = (): readonly number[] =>
       layer.group.children.map((child) => {

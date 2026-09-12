@@ -12,10 +12,16 @@ export type CameraRig = {
   readonly camera: PerspectiveCamera;
   readonly controls: OrbitControls;
   readonly flyTo: (position: Vector3, reducedMotion: boolean) => void;
-  readonly setDrift: (enabled: boolean) => void;
+  readonly zoomToFit: (positions: readonly Vector3[], opts: ZoomToFitOptions) => void;
+  readonly setDrift: (enabled: boolean, autoRotateSpeed?: number) => void;
   readonly setReducedMotion: (reduced: boolean) => void;
   readonly update: (deltaSeconds: number) => boolean;
   readonly dispose: () => void;
+};
+
+export type ZoomToFitOptions = {
+  readonly paddingWorldUnits: number;
+  readonly reducedMotion: boolean;
 };
 
 const MOTION_ON = 1;
@@ -87,7 +93,7 @@ export function createCameraRig(canvas: HTMLCanvasElement, onViewChange?: () => 
   controls.dampingFactor = RENDER_TOKENS.camera.dampingFactor;
   controls.autoRotateSpeed = RENDER_TOKENS.drift.autoRotateSpeed;
   controls.target.copy(TARGET_ORIGIN);
-  const state: RigState = {
+  const rigState: RigState = {
     flight: null,
     driftEnabled: false,
     reducedMotion: false,
@@ -95,12 +101,12 @@ export function createCameraRig(canvas: HTMLCanvasElement, onViewChange?: () => 
     msSinceInteraction: MOTION_OFF,
   };
   const onStart = (): void => {
-    state.interacting = true;
-    state.msSinceInteraction = MOTION_OFF;
+    rigState.interacting = true;
+    rigState.msSinceInteraction = MOTION_OFF;
   };
   const onEnd = (): void => {
-    state.interacting = false;
-    state.msSinceInteraction = MOTION_OFF;
+    rigState.interacting = false;
+    rigState.msSinceInteraction = MOTION_OFF;
   };
   const onChange = (): void => onViewChange?.();
   controls.addEventListener("start", onStart);
@@ -110,16 +116,24 @@ export function createCameraRig(canvas: HTMLCanvasElement, onViewChange?: () => 
     camera,
     controls,
     flyTo: (position, reducedMotion) => {
-      state.msSinceInteraction = MOTION_OFF;
-      state.flight = beginFlight(camera, controls, position, reducedMotion);
+      rigState.msSinceInteraction = MOTION_OFF;
+      rigState.flight = beginFlight(camera, controls, position, reducedMotion);
     },
-    setDrift: (enabled) => {
-      state.driftEnabled = enabled;
+    zoomToFit: (positions, opts) => {
+      if (positions.length === 0) {
+        return;
+      }
+      rigState.msSinceInteraction = MOTION_OFF;
+      rigState.flight = beginZoomToFit(camera, controls, positions, opts);
+    },
+    setDrift: (enabled, autoRotateSpeed = RENDER_TOKENS.drift.autoRotateSpeed) => {
+      rigState.driftEnabled = enabled;
+      controls.autoRotateSpeed = autoRotateSpeed;
     },
     setReducedMotion: (reduced) => {
-      applyReducedMotion(camera, controls, state, reduced);
+      applyReducedMotion(camera, controls, rigState, reduced);
     },
-    update: (deltaSeconds) => updateRig(camera, controls, state, deltaSeconds),
+    update: (deltaSeconds) => updateRig(camera, controls, rigState, deltaSeconds),
     dispose: () => {
       controls.removeEventListener("start", onStart);
       controls.removeEventListener("end", onEnd);
@@ -132,17 +146,17 @@ export function createCameraRig(canvas: HTMLCanvasElement, onViewChange?: () => 
 function applyReducedMotion(
   camera: PerspectiveCamera,
   controls: OrbitControls,
-  state: RigState,
+  rigState: RigState,
   reduced: boolean,
 ): void {
-  state.reducedMotion = reduced;
+  rigState.reducedMotion = reduced;
   controls.enableDamping = motionSettings(reduced).dampingEnabled;
-  if (reduced && state.flight !== null) {
+  if (reduced && rigState.flight !== null) {
     // An in-flight animation snaps to its destination; the end state is kept.
-    camera.position.copy(state.flight.toPosition);
-    controls.target.copy(state.flight.toTarget);
+    camera.position.copy(rigState.flight.toPosition);
+    controls.target.copy(rigState.flight.toTarget);
     controls.update();
-    state.flight = null;
+    rigState.flight = null;
   }
 }
 
@@ -152,13 +166,31 @@ function beginFlight(
   target: Vector3,
   reducedMotion: boolean,
 ): Flight | null {
-  const settings = motionSettings(reducedMotion);
   const direction = target.length() > MIN_TARGET_LENGTH ? target.clone().normalize() : new Vector3(0, 0, 1);
   const toPosition = target.clone().add(direction.multiplyScalar(RENDER_TOKENS.camera.targetDistance));
+  return beginFlightTo(
+    camera,
+    controls,
+    toPosition,
+    target,
+    flightDurationMs(camera.position.distanceTo(toPosition)),
+    reducedMotion,
+  );
+}
+
+function beginFlightTo(
+  camera: PerspectiveCamera,
+  controls: OrbitControls,
+  toPosition: Vector3,
+  toTarget: Vector3,
+  durationMs: number,
+  reducedMotion: boolean,
+): Flight | null {
+  const settings = motionSettings(reducedMotion);
   controls.enableDamping = settings.dampingEnabled;
   if (settings.durationMs === MOTION_OFF) {
     camera.position.copy(toPosition);
-    controls.target.copy(target);
+    controls.target.copy(toTarget);
     controls.update();
     return null;
   }
@@ -166,22 +198,54 @@ function beginFlight(
     fromPosition: camera.position.clone(),
     toPosition,
     fromTarget: controls.target.clone(),
-    toTarget: target.clone(),
-    durationMs: Math.min(
-      flightDurationMs(camera.position.distanceTo(toPosition)),
-      RENDER_TOKENS.camera.maxDurationMs,
-    ),
+    toTarget: toTarget.clone(),
+    durationMs: Math.min(durationMs, RENDER_TOKENS.camera.maxDurationMs),
     elapsedMs: MOTION_OFF,
   };
+}
+
+function beginZoomToFit(
+  camera: PerspectiveCamera,
+  controls: OrbitControls,
+  positions: readonly Vector3[],
+  opts: ZoomToFitOptions,
+): Flight | null {
+  const centroid = positions.reduce((sum, position) => sum.add(position), new Vector3()).divideScalar(positions.length);
+  const boundingRadius = positions.reduce(
+    (radius, position) => Math.max(radius, position.distanceTo(centroid)),
+    MOTION_OFF,
+  ) + opts.paddingWorldUnits;
+  const direction = centroid.length() > MIN_TARGET_LENGTH
+    ? centroid.clone().normalize()
+    : new Vector3(0, 0, 1);
+  const halfFovRadians = camera.fov * Math.PI / 360;
+  const distance = boundingRadius / Math.sin(halfFovRadians);
+  const toPosition = centroid.clone().add(direction.multiplyScalar(distance));
+  return beginFlightTo(
+    camera,
+    controls,
+    toPosition,
+    centroid,
+    RENDER_TOKENS.camera.beatDurationMs,
+    opts.reducedMotion,
+  );
+}
+
+export function zoomToFit(
+  rig: CameraRig,
+  positions: readonly Vector3[],
+  opts: ZoomToFitOptions,
+): void {
+  rig.zoomToFit(positions, opts);
 }
 
 function advanceFlight(
   camera: PerspectiveCamera,
   controls: OrbitControls,
-  state: RigState,
+  rigState: RigState,
   deltaMs: number,
 ): void {
-  const flight = state.flight;
+  const flight = rigState.flight;
   if (flight === null) {
     return;
   }
@@ -191,28 +255,28 @@ function advanceFlight(
   const targetT = Math.min(MOTION_ON, t * RENDER_TOKENS.camera.aimLockFraction);
   controls.target.lerpVectors(flight.fromTarget, flight.toTarget, easeOutQuad(targetT));
   if (flight.elapsedMs >= flight.durationMs) {
-    state.flight = null;
+    rigState.flight = null;
   }
 }
 
 function updateRig(
   camera: PerspectiveCamera,
   controls: OrbitControls,
-  state: RigState,
+  rigState: RigState,
   deltaSeconds: number,
 ): boolean {
   const deltaMs = deltaSeconds * RENDER_TOKENS.time.secondsToMs;
-  if (state.flight !== null) {
-    advanceFlight(camera, controls, state, deltaMs);
+  if (rigState.flight !== null) {
+    advanceFlight(camera, controls, rigState, deltaMs);
     controls.update();
     return true;
   }
-  state.msSinceInteraction += deltaMs;
+  rigState.msSinceInteraction += deltaMs;
   controls.autoRotate = driftActive(
-    state.driftEnabled,
-    state.interacting,
-    state.msSinceInteraction,
-    state.reducedMotion,
+    rigState.driftEnabled,
+    rigState.interacting,
+    rigState.msSinceInteraction,
+    rigState.reducedMotion,
   );
   const needsLoop = controls.autoRotate || controls.enableDamping;
   if (needsLoop) {

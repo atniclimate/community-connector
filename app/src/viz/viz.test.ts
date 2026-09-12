@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import {
   Color,
+  FogExp2,
   InstancedMesh,
   Matrix4,
   Mesh,
@@ -181,6 +182,7 @@ describe("halos", () => {
       theme: theme(),
       tier: "B",
       cameraPosition: new Vector3(0, 0, RENDER_TOKENS.camera.initialZ),
+      viewMode: "overview",
     });
     const haloCount = layer.group.children.reduce(
       (sum, child) => sum + (child instanceof InstancedMesh ? child.count : 0),
@@ -248,6 +250,7 @@ describe("labels", () => {
     expect(visibleLabelCap("D")).toBeLessThan(visibleLabelCap("C"));
     expect(visibleLabelCap("C")).toBeLessThan(visibleLabelCap("B"));
     expect(visibleLabelCap("B")).toBeLessThan(visibleLabelCap("A"));
+    expect(visibleLabelCap("D", "present")).toBe(RENDER_TOKENS.label.capPresent);
   });
 
   it("is zoom-adaptive: near leaves label, far leaves do not, hubs label from farther out", () => {
@@ -282,6 +285,13 @@ describe("scene", () => {
     expect(background.material.depthTest).toBe(false);
     expect(background.material.fragmentShader).toContain("colorspace_fragment");
     expect(setup.scene.fog?.color.getHexString()).toBe("06080d");
+    if (!(setup.scene.fog instanceof FogExp2)) {
+      throw new Error("missing exponential fog");
+    }
+    setup.setPresentMode(true);
+    expect(setup.scene.fog.density).toBe(RENDER_TOKENS.scene.fogDensity * 0.5);
+    setup.setPresentMode(false);
+    expect(setup.scene.fog.density).toBe(RENDER_TOKENS.scene.fogDensity);
     setup.dispose();
   });
 });
