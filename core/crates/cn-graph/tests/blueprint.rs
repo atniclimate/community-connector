@@ -332,7 +332,11 @@ fn search_matches_projected_attribute_values_with_stable_ordering() {
 #[test]
 fn degree_measures_flag_single_tie_and_explain() {
     let p = projection(
-        vec![entity(1, "person"), entity(2, "person"), entity(3, "person")],
+        vec![
+            entity(1, "person"),
+            entity(2, "person"),
+            entity(3, "person"),
+        ],
         vec![
             edge(1, 1, 2, "connected_to", false, None),
             edge(2, 1, 3, "connected_to", false, None),
