@@ -13,7 +13,7 @@ machine-checkable contract used by fixture validation and external tooling.
 
 | Schema | $id | Documents |
 |---|---|---|
-| `group-template.schema.json` | `.../group-template/0.1.0` | Authored group-template documents (`fixtures/templates/*.template.json`), the R2 extensible-attribute contract parsed by `cn-schema`. |
+| `group-template.schema.json` | `.../group-template/0.1.0` | Authored group-template documents (`fixtures/templates/*.template.json`), the R2 extensible-attribute contract parsed by `cn-schema`. 0.1.1 (PATCH, D-090) added the optional top-level `aliases` block (shape only, D-093c/D-094c). |
 | `op-log.schema.json` | `.../op-log/0.1.0` | One `cn-store` operation record (the line format of `fixtures/groups/*.ops.jsonl`) and the `cn-api` `export_snapshot` envelope. Root is a `oneOf` of the two; use `#/$defs/operation` or `#/$defs/export_snapshot` to target one shape. |
 | `story-path.schema.json` | `.../story-path/0.1.0` | A curated story path (`cn_model::Story`), the R7 stories-are-data format. Referenced by `op-log.schema.json` for `StoryCreate`/`StoryUpdate` payloads. |
 | `snapshot-envelope.schema.json` | `.../snapshot-envelope/0.1.0` | The data envelope embedded in the single-file offline snapshot (P2.3, D-044.5): explicit baked `viewer_scope` (anonymous or group-member only), the exact `viewer_context`, the embedded export, and resolved theme tokens. |

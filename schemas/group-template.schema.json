@@ -1,6 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://community-navigator.example.test/schemas/group-template/0.1.0",
+  "description": "Authored group-template document (R2), parsed by cn-schema (cn_schema::types::GroupTemplate). Version semantics: this schema documents the 0.1 line. Instances carry schema_version; readers accept the same major - and, while the major is 0, the same minor (cn_model::accepts_schema) - and MUST reject unknown majors loudly (I7, I3). 0.1.1 adds the optional top-level `aliases` block (shape only, additive - D-093c/D-094c); matching logic lands with a later session. A breaking change to the shape bumps the major and mints a new $id.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -11,10 +12,16 @@
     "kinds",
     "edge_kinds"
   ],
+  "$defs": {
+    "accepted_schema_version": {
+      "description": "schema_version accepted by 0.1-line readers: major 0, minor 1 (cn_model::accepts_schema).",
+      "type": "string",
+      "pattern": "^0\\.1\\.[0-9]+$"
+    }
+  },
   "properties": {
     "schema_version": {
-      "type": "string",
-      "const": "0.1.0"
+      "$ref": "#/$defs/accepted_schema_version"
     },
     "template_id": {
       "type": "string",
@@ -219,6 +226,41 @@
               "optional",
               "forbidden"
             ]
+          }
+        }
+      }
+    },
+    "aliases": {
+      "description": "Optional term-normalization alias table (0.1.1, D-093c/D-094c). Shape only in this schema; matching runs in cn-ingest at plan-approval time only, never here and never in the app (Track B, discovery-2026-09-12.md). Each entry maps a set of as-written terms for one or more attribute ids to one canonical tag; the as-written term is always preserved (I6).",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "canonical",
+          "attribute_ids",
+          "terms"
+        ],
+        "properties": {
+          "canonical": {
+            "type": "string",
+            "minLength": 1
+          },
+          "attribute_ids": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_]*$"
+            }
+          },
+          "terms": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
           }
         }
       }
