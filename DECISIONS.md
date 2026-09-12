@@ -2290,4 +2290,39 @@ Accepted with a named mitigation: the findings are concrete and file:line-verifi
 the dedup ordering, the parser rollover), the fixes are small and independently
 tested (check-all 12/12, relay 47/47, form 47/47), and a REAL-BROWSER smoke of the
 built form is now an explicit pre-deploy gate owed before the D-059.8 bar can clear.
+
+## D-090 (2026-09-12) - group-template schema_version bump: PATCH (0.1.1), not MINOR (0.2.0)
+
+Trigger: S-R2 (ATNI convention template) ruled "an additive `aliases` field with a
+minor version bump" for `schemas/group-template.schema.json`. `cn_model::accepts_schema`
+(`core/crates/cn-model/src/lib.rs:45-52`, proven by its own test at
+`core/crates/cn-model/tests/blueprint.rs:374`, `assert!(!accepts_schema(&Version::new(0,
+2, 0)))`) requires the SAME minor while major is 0 - a literal 0.1.0 -> 0.2.0 bump
+would be silently rejected by every real reader (`cn-schema::validate_schema_version`,
+`cn-api::wire.rs:91`), including the dev-app WASM path this session's own fixture had
+to load through. S-R2's scope fence names only `schemas/`, `fixtures/`, `app/scripts/`,
+and this session never touches `core/` to teach the model a new accepted minor.
+
+Decision: bump the group-template schema's declared version to **0.1.1** (a PATCH
+bump in the 0.1.x line), not 0.2.0. This mirrors the identical precedent already in
+this repo: `MODEL_SCHEMA_VERSION` moved 0.1.0 -> 0.1.1 for the optional
+`IntakeProvenance` block (`core/crates/cn-model/src/lib.rs:33-37`), also a PATCH bump
+for an additive-optional field, for the exact same `accepts_schema` reason.
+`schemas/group-template.schema.json`'s own `schema_version` property changed from a
+hard `const: "0.1.0"` to an `accepted_schema_version` $ref/pattern (`^0\.1\.[0-9]+$`),
+matching the sibling schemas (op-log, story-path). The new optional top-level
+`aliases` array (shape only, D-093c/D-094c; matching logic is R3's, not this
+session's) is added as a recognized property. `fixtures/templates/atni-convention.
+template.json` declares `schema_version: "0.1.1"` and does NOT populate `aliases`
+(the Rust `GroupTemplate` struct has `#[serde(deny_unknown_fields)]` and has no
+`aliases` field yet, so an instance that populated it would fail to parse on the
+real core - confirmed by smoke-loading the fixture through `cn-wasm`'s Node package,
+which parsed and projected 87 entities / 291 edges without error). `research-network.
+template.json` and `fisheries-committee.template.json` are untouched at 0.1.0
+(still valid under the same 0.1.x line; no reason to touch unrelated fixtures).
+
+This is a `CLAUDE.md` "yours to decide autonomously" item (schema drafts while
+versions are 0.x). Strongest surviving objection: a literal reading of "minor version
+bump" was not honored to the letter. Reversible if a future session teaches
+`accepts_schema` a wider acceptance window and wants the true semver-minor instead.
 Nothing ships on the un-browser-tested path while the bar stands.

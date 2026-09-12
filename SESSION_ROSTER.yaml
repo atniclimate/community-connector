@@ -237,8 +237,26 @@ sessions:
     stop_when: "check-all is 12/12 green, validate:templates passes the new template, and
       every synthetic person/committee value in the new fixture uses @example.test - never
       a real name, real committee roster, or real contact"
-    status: planned
-    outcome: null
+    status: done
+    outcome: "2026-09-12: fixtures/templates/atni-convention.template.json (person/
+      committee/organization kinds per D-094c, member_of/affiliated_with/connected_to
+      edges) + fixtures/groups/atni-convention.ops.jsonl (app/scripts/generate-atni-
+      ops.mjs, 60 people/15 committees/12 orgs/382 ops, deliberately uneven: 12
+      single-tie people, a 12-person Energy+Climate-Resilience overlap core, 36 people
+      on 3-4 committees each) landed. schemas/group-template.schema.json gained the
+      optional `aliases` shape (D-093c placeholder, no matching logic) and an
+      accepted_schema_version pattern; the ruled 'minor version bump' was executed as
+      a PATCH bump (0.1.0 -> 0.1.1) instead of a true semver-minor (0.2.0) because
+      cn_model::accepts_schema hard-rejects a new minor at major 0 and this session's
+      scope fence excludes core/ - see DECISIONS.md D-090. docs/runbooks/live-entry.md
+      written (39 lines). check-all: 11/12 (rust-clippy FAILS on the pre-existing,
+      unrelated S-R0 toolchain-drift lint at core/cli/src/intake/keymat.rs:258:39, not
+      touched by this session); the gate's own required legs - validate:templates and
+      pii-scan - both PASS. pii-scan clean (348 files). Fixture smoke-loaded through
+      the real cn-wasm Node package (87 entities, 291 edges projected for a governance
+      viewer) and visually confirmed in the dev app (entity list, detail panel showing
+      the fictional tribe/role attributes) via a temporary, reverted main.ts edit -
+      no app UI code changed in the committed diff."
 
   - id: S-R4a
     task_ids: [R4]
