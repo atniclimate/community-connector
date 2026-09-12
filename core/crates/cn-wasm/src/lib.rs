@@ -99,6 +99,16 @@ mod bindings {
             self.inner.search(group_id, viewer_ctx_json, query_json)
         }
 
+        pub fn graph_measures(
+            &mut self,
+            group_id: &str,
+            viewer_ctx_json: &str,
+            request_json: &str,
+        ) -> String {
+            self.inner
+                .graph_measures(group_id, viewer_ctx_json, request_json)
+        }
+
         pub fn validation_report(&self, group_id: &str, viewer_ctx_json: &str) -> String {
             self.inner.validation_report(group_id, viewer_ctx_json)
         }

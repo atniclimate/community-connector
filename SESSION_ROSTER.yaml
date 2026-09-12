@@ -323,8 +323,46 @@ sessions:
       confirms 30 FPS and the reduced-motion variant, and the director has been handed a
       screenshot/live build to review - completion is NOT claimed on the code landing
       alone, since the gate's visual half is human-only"
-    status: planned
-    outcome: null
+    status: partial
+    outcome: "2026-09-12: UNIT 1 landed (commit 1999e70) per
+      docs/blueprints/presenter-mode.md - new `present` ViewMode through the state
+      machine (I4), zoomToFit on the camera rig, hidden chrome, present-mode label/halo/
+      fog tokens, app/public/beats.atni.json, Space/Right/Left/Home/F/Escape keyboard
+      beat control. npm run typecheck/build/test (app/) and scripts/check-all.ps1 both
+      12/12 green; no new dependency; I4 mutation audit clean; core/ untouched (a
+      concurrent, unrelated in-flight change to core/crates/cn-graph staged by another
+      process during this session was deliberately excluded from the commit via `git
+      reset`, not committed or altered). UNIT 2 NOT attempted - its precondition
+      (S-R4a's cn-api measures call) had not landed as of this session (confirmed via
+      git log on core/crates/cn-api and core/crates/cn-graph); per the blueprint's own
+      gating, skip and record here rather than block.
+      Manual dev-app check attempted on the atni-convention fixture (temporary,
+      reverted app/src/main.ts edit, matching S-R2's precedent - no diff remains): the
+      Present control and beat-advance keys were confirmed working MECHANICALLY via
+      state inspection (view.mode toggled present/overview correctly on click/Escape;
+      presentation.beatIndex advanced; chrome DOM elements visibly hidden/restored in
+      screenshots). However, the WebGL canvas content (nodes, halos, starfield,
+      background gradient) rendered as flat near-black in EVERY automated screenshot
+      taken this session, including in plain overview mode on the known-good
+      research-network fixture (120 entities) with orbit-drag interaction forced - so
+      this is not a presenter-mode regression, but this session could not rule out
+      either (a) a real rendering defect or (b) a remote-screenshot/GPU-compositing
+      capture limitation of this environment (WebGL context itself was healthy:
+      ANGLE/Iris Xe D3D11, not context-lost). Also found and worked around, but did not
+      fix (out of scope, no role grants exist in fixtures/groups/atni-convention.ops.jsonl):
+      a person viewer with no active role only reaches Circle::Network, so the
+      atni-convention fixture shows just 1 entity (the viewer's own) in the app for any
+      unprivileged person viewer - S-R2's '87 entities for a governance viewer' figure
+      was from a direct cn-wasm Node smoke call, not the browser app's viewer path.
+      Screenshots were not saved to docs/design/screenshots/ because they showed no
+      canvas content worth keeping; the human should run the dev app locally (`npm run
+      dev` in app/, group id 00000000-0000-0000-0000-0000000dbba0, e.g. via a temporary
+      main.ts fixture swap) to do the real visual acceptance pass this gate requires,
+      and confirm on their own screen whether nodes render as expected. Next actions for
+      HANDOFF.md: (1) human visual check of UNIT 1 outside this automated screenshot
+      path; (2) UNIT 2 once S-R4a lands; (3) consider adding at least one RoleGrant op
+      to the atni-convention fixture generator so an unprivileged dev-app viewer sees
+      more than their own record."
 
   - id: S-R7
     task_ids: [R7]
