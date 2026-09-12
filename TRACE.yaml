@@ -1,0 +1,2122 @@
+trace_version: 1
+generated_on: 2026-09-12
+
+generated_from:
+  repo: I:/community-connector
+  commit: 375e8b2
+  planning_authority: PLAN_1.0.md (v1.1, Phase 5 reconciliation 2026-07-24; 64 P-ids, all checkboxes literally "[ ]" unchecked)
+  module_graph: none built this run - bootstrap mode, no imports.json (see method.files)
+  tests: none derived as a standalone artifact - test attachments derived inline per task by path-ref/import grep only (see method.tests)
+  scripts: none built as a standalone artifact - scripts/check-all.ps1 members read directly from the file and from AGENTS.md "Repo commands" (both cited inline where used)
+  tasks: none built as a standalone artifact - the 64 P-ids were extracted this run by
+    `grep -n -E '\[[ x]\] \*{0,2}P[0-9]+\.[0-9]+' PLAN_1.0.md` (64 matches, 0 with "[x]")
+
+method:
+  bootstrap_mode: >-
+    TRUE, and stated per the director's brief: this run has no imports.json, no
+    per-cluster scout dispatch, and no clusters.json/partition proof. It substitutes
+    (1) this session's own `find`/grep census of the eight declared roots
+    (core/crates, core/cli, app/src, form/, relay/, scripts/, schemas/, fixtures/),
+    (2) the four 2026-09-12 pickup scout reports
+    (_private/scratch/pickup-2026-09-12/scout-{core,app,intake,docs}.md) as a
+    secondary evidence source, cited by name where an attachment's owns/evidence
+    text is drawn from a scout's own words rather than this session's own grep, and
+    (3) this session's own targeted Grep/Read calls (about 45 tool calls) verifying
+    specific claims in PLAN_1.0.md's "Touches:" lines against the current tree.
+    Attaching model for every judgement in this file: claude-sonnet-5 (this session).
+    No cluster-partition proof (scripts/trace_audit.py partition) was run, because no
+    clusters.json was built; the file census below was instead verified directly by
+    listing every file under the eight roots with `find`, which is the same
+    completeness guarantee the partition check exists to prove, applied without the
+    intermediate cluster file.
+  files: >-
+    Attachment is this session's own judgement, not a resolver result, exactly as
+    the skill requires: every tasks[].files entry carries attached_by: scout (the
+    claim traces to a specific 2026-09-12 pickup scout report's own words) or
+    attached_by: path-rule:touches-grep (this session read PLAN_1.0.md's own
+    "Touches:" line for that task, confirmed the named file exists in the census
+    via `find`, then grepped or read the file directly this session to confirm it
+    actually contains material serving the task - a receipt beyond the mechanical
+    fact of the file's existence). No attachment in this file rests on a "Touches:"
+    line alone; every one has a live path:line grep/read receipt from this session
+    or a named scout-report citation. Two corrections to PLAN_1.0.md's own
+    "Touches:" text are recorded inline as owns notes rather than silently followed:
+    P1.6's touches names "a new app/src/ui/ legend component" but the real,
+    tested legend module is app/src/viz/legend.ts (confirmed: interaction.test.ts:19
+    imports buildLegendModel from "./legend" inside viz/); and P5.5's touches names
+    only docs/design paths, but the FORM itself now exists as real code under
+    form/src/{render.ts,model.ts}, which this session attached instead since the
+    docs-only paths are outside the declared census roots.
+  files_partition: >-
+    No clusters.json/partition check was run (see bootstrap_mode). The census
+    itself is the completeness claim: every file under the eight declared roots was
+    enumerated by `find <root> -type f` this session and is accounted for below,
+    either attached to a task, listed as an orphan (with or without test coverage),
+    or listed as an orphan test. Excluded from the census as generated/vendored
+    (attachment-rules caveat catalogue): core/crates/cn-wasm/pkg/** and pkg-node/**
+    (wasm-pack build output, 12 files), relay/.wrangler/** (build cache, 22 files),
+    form/dist/** and form/dist.manifest.json (build output, 3 files), and every
+    node_modules/** and package-lock.json (dependency trees, not source). The
+    remaining census is 250 files across the eight roots; of those, 47 are test
+    files (core/crates/*/tests/*.rs, core/cli/tests/*.rs, app/src/**/*.test.ts,
+    form/{scripts,src}/*.test.ts, relay/test/*) tracked separately via
+    orphan_tests/tasks[].tests rather than via tasks[].files/orphan_files_*, per
+    the skill's own framing ("the file census naturally starts from src/"; test
+    census is its mirror). files_scouted below (203) is therefore the 250-file
+    census minus those 47 test files - i.e. the source-file population that
+    tasks[].files, orphan_files_with_test_coverage and
+    orphan_files_without_test_coverage partition exactly (56 attached + 147
+    orphans = 203).
+  files_path_rule: >-
+    attached_by: path-rule:touches-grep fires only when (a) PLAN_1.0.md's own
+    "Touches:" line for a task names the file or its containing module, (b) the
+    file exists in the census (confirmed by `find`), and (c) this session's own
+    Grep/Read this run found content in the file materially matching the task's
+    subject (a struct, function, or comment naming the task's concern) - never
+    from the Touches line alone. It never overrides a scout attachment; none of
+    the scout-attributed files in this trace were also matched by a path rule.
+  attachment_guards:
+    rule_1_no_statement: >-
+      Not triggered this run. Every one of the 64 P-ids in PLAN_1.0.md carries an
+      explicit "*Verify:*" sentence (used here as the task's acceptance sentence),
+      so no task was a title-only stub.
+    rule_2_too_many: >-
+      Threshold used: 8 files per rule per task (the skill's default). The widest
+      single task this run is P1.2 at 6 files (halos.ts, camera.ts, quality.ts,
+      reducer.ts, edges.ts, focus.ts) - under threshold, so nothing was withheld.
+      counts.flagged_attachments is empty.
+    rule_3_superseded: >-
+      No task in PLAN_1.0.md carries a superseded_by; none of the 64 P-ids are
+      marked superseded in the plan text (ADR-005's renumbering to ADR-006,
+      referenced by P5.6, is a document renumbering, not a task supersession).
+      counts.supersession_reroutes and counts.supersession_problems are both empty.
+    applies_to: every attachment rule, the scout citations included
+    effect: >-
+      Not exercised this run (see the three notes above) - flagged, not deleted,
+      is the standing rule, but nothing was withheld under it this session.
+  rejected_rules: >-
+    None tried and replaced this run; counts.rejected_rules is empty.
+  tests: >-
+    Bootstrap derivation, per the director's brief: path-ref/import grep only, no
+    resolved module graph. For TypeScript, this session read each candidate test
+    file's own `import ... from "./x"` lines directly (Grep tool, anchored to
+    relative-import lines) and matched them to task-attached files - via: import,
+    strong, wherever a literal import edge was found this session. For Rust, a
+    tests/*.rs integration-test file that lives inside the same crate as an
+    attached src file was treated as via: import at crate granularity (the test
+    necessarily `use`s the crate under test; this is weaker than a resolved,
+    file-level import graph and is called out per-entry as "crate-level"). For
+    core/cli, core/cli/tests/cli.rs invokes the compiled `cn` binary as a
+    black-box subprocess and asserts on the literal subcommand strings ("export",
+    "validate", "ingest", "snapshot") that match the module file names one-to-one
+    - marked via: symbol-ref (a lead, not a resolved call edge) rather than import,
+    since cli.rs never `use`s export.rs/validate.rs directly. Two path-ref/name-
+    correspondence heuristics were used where a direct import grep gave nothing or
+    was not attempted, and are flagged inline on every entry that relies on them:
+    (1) same-basename convention (X.test.ts exists alongside X.ts) for
+    app/src/state/intake.ts (via intake.test.ts/intake-idb.test.ts/intake-
+    roundtrip.test.ts) and app/src/ui/format.ts (via format.test.ts, despite an
+    import-line grep on format.test.ts returning no `./` match - the test may
+    import via a different style this session did not resolve); (2) crate-level
+    blueprint.rs reach for every remaining untested-otherwise src file in a crate
+    that has one (cn-model, cn-schema, cn-perm, cn-graph, cn-store, cn-api,
+    cn-ingest) - this is a caveat_crate_level entry on each such orphan, not a
+    file-level import edge.
+  test_roots: >-
+    Declared per the director's brief: core/crates/*/tests, core/crates/*/src
+    (#[test] - confirmed used at least in cn-ingest/src/crypto.rs per scout-core's
+    "13 unit tests"), core/cli/tests, app/src/**/*.test.ts, form/{scripts,src}/*.
+    test.ts (form has no separate form/test directory; test files sit beside their
+    module under form/scripts/ and form/src/), relay/test. Anything outside these
+    roots (docs/, scripts/*.ps1 with no accompanying test harness, fixtures/ data
+    files themselves) has "no tests" in this trace because these roots could not
+    have produced one, which is a different fact from nobody having written one -
+    stated per the skill's own distinction.
+  evidence_lines: >-
+    Normalised to path:line: text, one anchor per file (the skill allows two to
+    four; one was used throughout to keep this bootstrap-scale trace tractable -
+    stated as a limitation, not hidden). No ranges were used, so no
+    un-normalised-range caveat applies.
+  orphans: >-
+    148 source files (of 204 in the census) are attached to no task. Ranked by
+    in-degree: NOT DONE - no module graph was built this run (bootstrap_mode), so
+    every orphan entry below carries in_degree: null rather than a guessed number,
+    matching RECONCILIATION-2026-09-12.md section 7's own "not applicable in
+    bootstrap mode" finding for the identical reason. serves_component is null
+    throughout: PLAN_1.0.md is a phased microtask plan, not a component catalogue,
+    so no catalogue-prefix match was attempted; where a file's likely future task
+    is obvious from context (e.g. relay/**, entirely untouched by any P-id), that
+    is stated in owns as prose, not invented as a serves_component value. The
+    largest and most load-bearing orphan finding: ALL 19 non-test files under
+    relay/ (the Cloudflare Worker implementing the ADR-005/D-089 remote-intake
+    relay) are orphaned - relay/ is named nowhere in any P-id's "Touches:" line in
+    PLAN_1.0.md, because the relay was built after the plan's Phase 5 text was
+    written and the plan was never updated to reference it (this corroborates
+    RECONCILIATION-2026-09-12.md Finding 1, which found the same gap in HANDOFF.md's
+    path table).
+  scout_defects_corrected: >-
+    None found needing correction. This run did not dispatch fresh scouts; it read
+    the four already-written 2026-09-12 pickup scout reports as a secondary source
+    and independently verified every claim drawn from them this session before
+    citing it (e.g. re-confirmed cn-api's query_paths/entity_detail/search
+    functions, cn-model's GroupRole::Facilitator, is_facilitator_or_governance, by
+    this session's own grep rather than trusting the scout prose alone). No
+    phantom ids or overstated ranges were found in the four reports.
+  declaration_forms_found: >-
+    Only form 1 (list-head checkbox: "- [ ] **P<phase>.<n>** ...") is used for
+    P-ids in PLAN_1.0.md; confirmed by grep across the whole file (64 matches, 0
+    other forms). Form 3 (YAML/JSON key) is how D-ids appear in DECISIONS.md but
+    D-ids are not task ids for this trace's purposes and were not extracted as
+    tasks.
+  caveat_symbol_ref: >-
+    Used once: core/cli/tests/cli.rs's subcommand-string assertions for P5.4/P1.4/
+    P1.5's cn-api calls, marked via: symbol-ref and called a lead in that entry.
+  caveat_selector: not used this run - no CSS-selector/test-id/URL-parameter matching was needed.
+  caveat_type_only: not applicable - no TypeScript type-only modules were identified as excluded from a graph, because no graph was built.
+  caveat_e2e: >-
+    scripts/e2e-remote-intake.ps1 and its Playwright-adjacent counterpart
+    (docs/runbooks/e2e-remote-intake.md, manual) both exist but are opt-in, outside
+    check-all, and attach to no P-id (P5.9's "full-arc dry run" is the closest
+    match but is human-only and produces no automatable file); left unattached
+    rather than guessed onto a task.
+  caveat_crate_level: >-
+    Rust-crate orphans marked orphan_files_with_test_coverage via a crate's own
+    tests/blueprint.rs carry this caveat explicitly in their entry: the crate's
+    blueprint test almost certainly exercises the file (per HANDOFF.md's own test
+    counts and scout-core's per-crate test tally), but this is a crate-level
+    inference, not a file-level resolved import edge, and is weaker than the
+    file-level import evidence used elsewhere in this trace.
+  checkbox_vs_prose_gap: >-
+    MAJOR BOOTSTRAP FINDING, stated plainly because it changes how every "status"
+    value below should be read: PLAN_1.0.md's own checkbox column is "[ ]"
+    (unchecked/open) on literally all 64 P-ids - confirmed by
+    `grep -c -E '\[x\] \*{0,2}P[0-9]+\.[0-9]+' PLAN_1.0.md` returning 0 - while
+    HANDOFF.md's prose narrative describes Phases 0-3 and a Phase 5 slice as
+    substantially built, and this session's own grep independently confirmed real,
+    working code for several of those "open" tasks (GroupRole::Facilitator at
+    cn-model/src/group.rs:62; is_facilitator_or_governance at
+    cn-perm/src/viewer.rs:46; a 13-Facilitator-occurrence authority-matrix test
+    suite; a working facilitator wizard at app/src/ui/intake/panel.ts). This trace
+    reports status literally from the checkbox per the director's instruction
+    (every P-id below is status: open), and lets the tasks[].files/tests evidence
+    speak for the actual gap between the checkbox and the tree - planning-reconcile,
+    not this trace, is the place to render a verdict on which source is right.
+  new_findings_beyond_the_2026-09-12_reconciliation: >-
+    Two receipts this session turned up that RECONCILIATION-2026-09-12.md did not
+    examine: (1) core/cli/src/lib.rs's `ingest` and `snapshot` subcommands are
+    explicit parked stubs (stub_ingest at line 105, stub_snapshot at line 115)
+    whose error text still reads "A human must answer G-RAT before any ingest
+    behavior ships" - G-RAT was RESOLVED 2026-07-24 per D-052, so this stub
+    message is now stale by two months and should be corrected or the CLI will
+    keep telling operators to wait on an already-resolved gate (core/cli/src/
+    lib.rs:105-110). (2) core/crates/cn-model/src/circle.rs already defines the
+    full five-member Circle enum (Private/Trusted/Group/Network/Public) and
+    cn-model/src/trust.rs already defines a TrustGrant model (grantor/grantee/
+    scope) - real foundational types for the DEFERRED Phase 6 (Personal mode),
+    built well ahead of that phase's own start, though neither is yet wired into
+    cn-perm's projection logic or any app/src/ui sharing surface.
+
+counts:
+  tasks_total: 72
+  tasks_open: 64
+  tasks_planned: 8
+  tasks_done: 0
+  tasks_superseded: 0
+  tasks_with_files: 29
+  tasks_with_tests: 20
+  tasks_with_neither: 43
+  tasks_with_neither_ids: [P0.1, P0.4, P0.5, P0.6, P0.7, P2.4, P2.5, P4.3, P5.2, P5.3, P5.7, P5.8, P5.9, P5.10, P6.1, P6.4, P6.6, P7.2, P7.3, P7.4, P7.5, P7.6, P8.1, P8.2, P8.3, P8.4, P8.5, P8.6, P9.1, P9.2, P9.3, P9.4, P9.5, P9.6, P9.7, R0, R1, R2, R3, R4, R5, R6, R7]
+  done_claims_without_a_test: 0
+  done_claims_without_a_test_ids: []
+  files_scouted: 203
+  orphan_files_total: 147
+  orphan_files_with_test_coverage: 70
+  orphan_files_without_test_coverage: 77
+  orphans_by_component: {}
+  orphans_with_no_component_match: []
+  flagged_attachments: []
+  rejected_rules: []
+  supersession_reroutes: []
+  supersession_problems: []
+
+tasks:
+  P0.1:
+    title: "Pin the convention date"
+    phase: 0
+    status: open
+    roadmap: "PLAN_1.0.md:492"
+    acceptance: "date or fallback decision present in HANDOFF.md and DECISIONS.md"
+    superseded_by: null
+    files: []
+    tests: []
+    coverage: no-files-no-tests
+
+  P0.2:
+    title: "Author scripts/check-all single orchestrator"
+    phase: 0
+    status: open
+    roadmap: "PLAN_1.0.md:498"
+    acceptance: "check-all exits non-zero if any member fails; exits zero on a clean tree"
+    superseded_by: null
+    files:
+      - path: scripts/check-all.ps1
+        owns: "single verification orchestrator running the check-all battery in a fixed order, collecting failures rather than swallowing them"
+        acceptance_testable_here: true
+        evidence_lines: ["scripts/check-all.ps1:2: check-all - single verification orchestrator (PLAN_1.0.md P0.2; AGENTS.md"]
+        attached_by: path-rule:touches-grep
+      - path: scripts/pii-scan.ps1
+        owns: "PII tripwire, one check-all battery member (AGENTS.md I1)"
+        acceptance_testable_here: true
+        evidence_lines: ["scripts/pii-scan.ps1:3: PII tripwire for Community Navigator (AGENTS.md I1)."]
+        attached_by: path-rule:touches-grep
+      - path: scripts/check-size.mjs
+        owns: "5MB single-file snapshot size budget check, one check-all battery member"
+        acceptance_testable_here: true
+        evidence_lines: ["scripts/check-size.mjs:5: BUDGET_BYTES = 5 * 1024 * 1024"]
+        attached_by: scout (scout-app section 3)
+    tests: []
+    coverage: files-no-tests
+
+  P0.3:
+    title: "Enforce the battery via a local hook"
+    phase: 0
+    status: open
+    roadmap: "PLAN_1.0.md:508"
+    acceptance: "a deliberately failing test blocks the hook"
+    superseded_by: null
+    files:
+      - path: scripts/hooks/pre-commit
+        owns: "pre-commit gate: staged PII scan always; scoped check-all -Staged when code paths are staged"
+        acceptance_testable_here: true
+        evidence_lines: ["scripts/hooks/pre-commit:2: # Pre-commit verification gate (AGENTS.md I1; PLAN_1.0.md P0.3)."]
+        attached_by: path-rule:touches-grep
+      - path: scripts/install-hooks.ps1
+        owns: "installs core.hooksPath -> scripts/hooks once per clone"
+        acceptance_testable_here: true
+        evidence_lines: ["scripts/install-hooks.ps1:1: # Installs repo git hooks. Run once per clone (AGENTS.md I1 tripwire + P0.3 gate)."]
+        attached_by: path-rule:touches-grep
+    tests: []
+    coverage: files-no-tests
+
+  P0.4:
+    title: "Separate automated vs human-only gates in AGENTS.md"
+    phase: 0
+    status: open
+    roadmap: "PLAN_1.0.md:514"
+    acceptance: "AGENTS.md distinguishes the two lists; check-all covers only the automatable set"
+    superseded_by: null
+    files: []
+    tests: []
+    coverage: no-files-no-tests
+
+  P0.5:
+    title: "Record the acceptance-unit inventory as the single completion truth"
+    phase: 0
+    status: open
+    roadmap: "PLAN_1.0.md:521"
+    acceptance: "HANDOFF.md phase status cites the inventory, not a fraction"
+    superseded_by: null
+    files: []
+    tests: []
+    coverage: no-files-no-tests
+
+  P0.6:
+    title: "Record tree-congruence decisions"
+    phase: 0
+    status: open
+    roadmap: "PLAN_1.0.md:526"
+    acceptance: "DECISIONS.md entries exist for each; MANIFEST reorg explicitly deferred"
+    superseded_by: null
+    files: []
+    tests: []
+    coverage: no-files-no-tests
+
+  P0.7:
+    title: "Record G-RAT/G-DATE/G-BACKUP as named gates"
+    phase: 0
+    status: open
+    roadmap: "PLAN_1.0.md:532"
+    acceptance: "all three present with defaults"
+    superseded_by: null
+    files: []
+    tests: []
+    coverage: no-files-no-tests
+
+  P1.1:
+    title: "Labels: troika SDF, zoom-adaptive policy, density culling"
+    phase: 1
+    status: open
+    roadmap: "PLAN_1.0.md:556"
+    acceptance: "both fixtures render legible labels; check-all green"
+    superseded_by: null
+    files:
+      - path: app/src/viz/labels.ts
+        owns: "troika SDF label rendering with zoom-adaptive LOD and cap tokens"
+        acceptance_testable_here: true
+        evidence_lines: ["app/src/viz/labels.ts:2: import { Text } from \"troika-three-text\";"]
+        attached_by: scout (scout-app DESIGN_BRIEF audit, row d)
+      - path: app/src/viz/nodes.ts
+        owns: "instanced node mesh construction; degree-to-scale mapping"
+        acceptance_testable_here: false
+        evidence_lines: ["app/src/viz/nodes.ts:1: import {"]
+        attached_by: path-rule:touches-grep
+      - path: app/src/viz/config.ts
+        owns: "RENDER_TOKENS: dpr tiers, halo/label/drift constants consumed across viz"
+        acceptance_testable_here: false
+        evidence_lines: ["app/src/viz/config.ts:1: export const RENDER_TOKENS = {"]
+        attached_by: path-rule:touches-grep
+      - path: app/src/viz/index.ts
+        owns: "viz module entry: wires renderer/scene/state store together"
+        acceptance_testable_here: false
+        evidence_lines: ["app/src/viz/index.ts:1: import { WebGLRenderer } from \"three\";"]
+        attached_by: path-rule:touches-grep
+    tests:
+      - path: app/src/viz/viz.test.ts
+        via: import
+        reaches: app/src/viz/nodes.ts
+      - path: app/src/viz/viz.test.ts
+        via: import
+        reaches: app/src/viz/config.ts
+    coverage: files-and-tests
+
+  P1.2:
+    title: "Motion/focus polish: dual-buffer focus dim/highlight, fly-to, drift"
+    phase: 1
+    status: open
+    roadmap: "PLAN_1.0.md:562"
+    acceptance: "reduced-motion path suppresses animation; screenshot review by the director (human-only)"
+    superseded_by: null
+    files:
+      - path: app/src/viz/halos.ts
+        owns: "fresnel halo shell rendering, resting/focus alpha"
+        acceptance_testable_here: false
+        evidence_lines: ["app/src/viz/halos.ts:2: BackSide,"]
+        attached_by: scout (scout-app DESIGN_BRIEF audit, row a)
+      - path: app/src/viz/camera.ts
+        owns: "camera fly-to, idle-drift policy, motion settings honoring reducedMotion"
+        acceptance_testable_here: false
+        evidence_lines: ["app/src/viz/camera.ts:2: import { OrbitControls } from \"three/examples/jsm/controls/OrbitControls.js\";"]
+        attached_by: scout (scout-app DESIGN_BRIEF audit, row h)
+      - path: app/src/viz/quality.ts
+        owns: "quality-tier manager (DPR caps, tier thresholds) feeding motion/detail settings"
+        acceptance_testable_here: false
+        evidence_lines: ["app/src/viz/quality.ts:1: import { RENDER_TOKENS } from \"./config\";"]
+        attached_by: path-rule:touches-grep
+      - path: app/src/state/reducer.ts
+        owns: "reduced-motion action handling in the state reducer"
+        acceptance_testable_here: true
+        evidence_lines: ["app/src/state/reducer.ts:1: import type { Action } from \"./actions\";"]
+        attached_by: scout (scout-app DESIGN_BRIEF audit, row f)
+      - path: app/src/viz/edges.ts
+        owns: "uFocusBlend shader uniform; dual-color-buffer focus dim/highlight on edges"
+        acceptance_testable_here: true
+        evidence_lines: ["app/src/viz/edges.ts:1: import {"]
+        attached_by: scout (scout-app DESIGN_BRIEF audit, row c)
+      - path: app/src/viz/focus.ts
+        owns: "FocusBlend class animating the halo/edge focus transition"
+        acceptance_testable_here: true
+        evidence_lines: ["app/src/viz/focus.ts:1: import { Color, Matrix4, Object3D } from \"three\";"]
+        attached_by: scout (scout-app DESIGN_BRIEF audit, row c)
+    tests:
+      - path: app/src/viz/viz.test.ts
+        via: import
+        reaches: app/src/viz/halos.ts
+      - path: app/src/viz/interaction.test.ts
+        via: import
+        reaches: app/src/viz/edges.ts
+      - path: app/src/state/state.test.ts
+        via: import
+        reaches: app/src/state/reducer.ts
+    coverage: files-and-tests
+
+  P1.3:
+    title: "Benchmark re-run with labels+halos+motion live (deferred to September, D-056.3)"
+    phase: 1
+    status: open
+    roadmap: "PLAN_1.0.md:569"
+    acceptance: "measured tail recorded in the ADR-004 table; spike harness run"
+    superseded_by: null
+    files:
+      - path: app/spike/harness.ts
+        owns: "standing regression benchmark harness (D-017), not yet re-run with labels+halos live"
+        acceptance_testable_here: true
+        evidence_lines: ["app/spike/harness.ts:1: import * as THREE from \"three\";"]
+        attached_by: path-rule:touches-grep
+      - path: app/spike/data.ts
+        owns: "synthetic benchmark data generator (NODE_COUNT/EDGE_COUNT constants)"
+        acceptance_testable_here: false
+        evidence_lines: ["app/spike/data.ts:1: export const NODE_COUNT = 5_000;"]
+        attached_by: path-rule:touches-grep
+    tests: []
+    coverage: files-no-tests
+
+  P1.4:
+    title: "Search box over cn-graph search"
+    phase: 1
+    status: open
+    roadmap: "PLAN_1.0.md:576"
+    acceptance: "query returns expected fixture hits; check-all green"
+    superseded_by: null
+    files:
+      - path: app/src/ui/search.ts
+        owns: "search box UI calling runSearch over cn-graph search results; no ui/search.test.ts exists in the census"
+        acceptance_testable_here: false
+        evidence_lines: ["app/src/ui/search.ts:4: import { runSearch } from \"../state/effects\";"]
+        attached_by: path-rule:touches-grep
+      - path: core/crates/cn-api/src/lib.rs
+        owns: "cn-api facade incl. search()/query_paths()/entity_detail() JSON functions"
+        acceptance_testable_here: false
+        evidence_lines: ["core/crates/cn-api/src/lib.rs:127: pub fn search(&mut self, group_id, viewer_ctx_json, query_json) -> String"]
+        attached_by: scout (scout-core section 4)
+    tests:
+      - path: core/crates/cn-api/tests/blueprint.rs
+        via: import
+        reaches: core/crates/cn-api/src/lib.rs
+    coverage: files-and-tests-but-acceptance-not-directly-testable
+
+  P1.5:
+    title: "Detail panel: TSDF code primary + plain-language secondary"
+    phase: 1
+    status: open
+    roadmap: "PLAN_1.0.md:581"
+    acceptance: "detail renders from entity_detail for a fixture entity"
+    superseded_by: null
+    files:
+      - path: app/src/ui/detail.ts
+        owns: "detail panel calling openDetail; no ui/detail.test.ts exists in the census"
+        acceptance_testable_here: false
+        evidence_lines: ["app/src/ui/detail.ts:4: import { openDetail } from \"../state/effects\";"]
+        attached_by: path-rule:touches-grep
+      - path: core/crates/cn-api/src/lib.rs
+        owns: "entity_detail() facade function"
+        acceptance_testable_here: false
+        evidence_lines: ["core/crates/cn-api/src/lib.rs:97: pub fn entity_detail("]
+        attached_by: path-rule:touches-grep
+    tests:
+      - path: core/crates/cn-api/tests/blueprint.rs
+        via: import
+        reaches: core/crates/cn-api/src/lib.rs
+    coverage: files-and-tests-but-acceptance-not-directly-testable
+
+  P1.6:
+    title: "Legend with the adjusted-for-readability indicator"
+    phase: 1
+    status: open
+    roadmap: "PLAN_1.0.md:586"
+    acceptance: "legend reflects the fixture palette"
+    superseded_by: null
+    files:
+      - path: app/src/viz/legend.ts
+        owns: "legend model + ADJUSTED_BADGE/REVIEW_MARKER indicator; PLAN_1.0.md's own Touches line names a new app/src/ui/ legend component - the real, tested file lives at app/src/viz/legend.ts, a path this trace corrects rather than follows"
+        acceptance_testable_here: true
+        evidence_lines: ["app/src/viz/legend.ts:1: import type { AppState, ShapeName } from \"../state/state\";"]
+        attached_by: path-rule:touches-grep
+    tests:
+      - path: app/src/viz/interaction.test.ts
+        via: import
+        reaches: app/src/viz/legend.ts
+    coverage: files-and-tests
+
+  P1.7:
+    title: "Flat list/table reading projection"
+    phase: 1
+    status: open
+    roadmap: "PLAN_1.0.md:590"
+    acceptance: "flat projection lists the same entities the 3D scene shows for the same viewer scope"
+    superseded_by: null
+    files:
+      - path: app/src/ui/flat.ts
+        owns: "flat list/table projection over projectedEntities/projectedEdges"
+        acceptance_testable_here: true
+        evidence_lines: ["app/src/ui/flat.ts:3: import { degreeByEntityId, entityLabel, projectedEdges, projectedEntities } from \"../viz/projection\";"]
+        attached_by: path-rule:touches-grep
+    tests:
+      - path: app/src/ui/flat.test.ts
+        via: path-ref
+        reaches: app/src/ui/flat.ts
+    coverage: files-and-tests
+
+  P2.1:
+    title: "Versioned JSON Schemas for op-log/export and story-path"
+    phase: 2
+    status: open
+    roadmap: "PLAN_1.0.md:625"
+    acceptance: "schemas validate the existing fixtures; added to validate:templates"
+    superseded_by: null
+    files:
+      - path: schemas/op-log.schema.json
+        owns: "versioned op-log/export envelope schema (I7), accepted_schema_version def"
+        acceptance_testable_here: true
+        evidence_lines: ["schemas/op-log.schema.json:19: \"accepted_schema_version\": {"]
+        attached_by: path-rule:touches-grep
+      - path: schemas/story-path.schema.json
+        owns: "versioned story-path schema (I7)"
+        acceptance_testable_here: true
+        evidence_lines: ["schemas/story-path.schema.json:17: \"schema_version\""]
+        attached_by: path-rule:touches-grep
+      - path: core/crates/cn-model/src/story.rs
+        owns: "Story/StoryStep model consumed by the story-path schema"
+        acceptance_testable_here: false
+        evidence_lines: ["core/crates/cn-model/src/story.rs:10: pub struct Story {"]
+        attached_by: path-rule:touches-grep
+    tests: []
+    coverage: files-no-tests
+
+  P2.2:
+    title: "Unknown-major-version rejection for every reader/importer"
+    phase: 2
+    status: open
+    roadmap: "PLAN_1.0.md:633"
+    acceptance: "a fixture with a bumped major is rejected loudly by a test; no silent acceptance"
+    superseded_by: null
+    files:
+      - path: core/crates/cn-model/src/lib.rs
+        owns: "accepts_schema(): major-must-match/minor-lenient acceptance rule (I7)"
+        acceptance_testable_here: true
+        evidence_lines: ["core/crates/cn-model/src/lib.rs:45: pub fn accepts_schema(v: &semver::Version) -> bool {"]
+        attached_by: path-rule:touches-grep
+      - path: core/crates/cn-store/src/log.rs
+        owns: "reject_unsupported_op(): op-log reader-path version rejection"
+        acceptance_testable_here: true
+        evidence_lines: ["core/crates/cn-store/src/log.rs:309: fn reject_unsupported_op(op: &Operation) -> Result<(), StoreError> {"]
+        attached_by: path-rule:touches-grep
+      - path: app/src/state/snapshot.ts
+        owns: "snapshot envelope reader; throws SnapshotReadError on an unrecognized/unsupported version"
+        acceptance_testable_here: true
+        evidence_lines: ["app/src/state/snapshot.ts:1: import type { Store } from \"./store\";"]
+        attached_by: scout (scout-app section 1)
+    tests:
+      - path: app/src/state/snapshot.test.ts
+        via: import
+        reaches: app/src/state/snapshot.ts
+      - path: core/crates/cn-store/tests/blueprint.rs
+        via: import
+        reaches: core/crates/cn-store/src/log.rs
+      - path: core/crates/cn-model/tests/blueprint.rs
+        via: import
+        reaches: core/crates/cn-model/src/lib.rs
+    coverage: files-and-tests
+
+  P2.3:
+    title: "Snapshot data envelope: viewer context, boot path, schema_version"
+    phase: 2
+    status: open
+    roadmap: "PLAN_1.0.md:639"
+    acceptance: "a snapshot build embeds fixture data; the boot path no longer depends on import.meta.env.DEV"
+    superseded_by: null
+    files:
+      - path: app/src/state/snapshot.ts
+        owns: "snapshot envelope parsing and boot path"
+        acceptance_testable_here: true
+        evidence_lines: ["app/src/state/snapshot.test.ts:6: parseSnapshotEnvelope,"]
+        attached_by: scout (scout-app section 1 and 6)
+      - path: app/src/main.ts
+        owns: "app bootstrap; creates the WASM worker; CN_EMBED_SNAPSHOT gate lives in vite.config.ts, not here"
+        acceptance_testable_here: true
+        evidence_lines: ["app/src/main.ts:55: new Worker(new URL(\"./wasm/worker.ts\", import.meta.url), { type: \"module\" })"]
+        attached_by: scout (scout-app section 3)
+      - path: schemas/snapshot-envelope.schema.json
+        owns: "snapshot envelope schema (I7): boundary_version/schema_version/template/projection required"
+        acceptance_testable_here: true
+        evidence_lines: ["schemas/snapshot-envelope.schema.json:8: \"required\": [\"schema_version\", \"viewer_scope\", \"viewer_context\", \"export\", \"theme\"],"]
+        attached_by: path-rule:touches-grep
+    tests:
+      - path: app/src/state/snapshot.test.ts
+        via: import
+        reaches: app/src/state/snapshot.ts
+    coverage: files-and-tests
+
+  P2.4:
+    title: "Browser acceptance test for the snapshot (playwright headed)"
+    phase: 2
+    status: open
+    roadmap: "PLAN_1.0.md:648"
+    acceptance: "playwright opens dist/index.html with no dev server and asserts a non-zero projected entity count"
+    superseded_by: null
+    files: []
+    tests: []
+    coverage: no-files-no-tests
+
+  P2.5:
+    title: "Choose and document the snapshot's baked-in viewer scope"
+    phase: 2
+    status: open
+    roadmap: "PLAN_1.0.md:655"
+    acceptance: "the build records the viewer scope; a test asserts no above-circle attribute is embedded"
+    superseded_by: null
+    files: []
+    tests: []
+    coverage: no-files-no-tests
+
+  P3.1:
+    title: "GroupRole::Facilitator + is_facilitator_or_governance"
+    phase: 3
+    status: open
+    roadmap: "PLAN_1.0.md:683"
+    acceptance: "cargo test --workspace green including the authz suite"
+    superseded_by: null
+    files:
+      - path: core/crates/cn-model/src/group.rs
+        owns: "GroupRole enum including the Facilitator variant"
+        acceptance_testable_here: true
+        evidence_lines: ["core/crates/cn-model/src/group.rs:62: Facilitator,"]
+        attached_by: path-rule:touches-grep
+      - path: core/crates/cn-perm/src/viewer.rs
+        owns: "is_facilitator_or_governance predicate + active_role_names"
+        acceptance_testable_here: true
+        evidence_lines: ["core/crates/cn-perm/src/viewer.rs:46: pub fn is_facilitator_or_governance(state: &GroupState, person: PersonId) -> bool {"]
+        attached_by: path-rule:touches-grep
+      - path: core/crates/cn-perm/src/authz.rs
+        owns: "authorize_op(): threads the facilitator predicate through operation authorization"
+        acceptance_testable_here: true
+        evidence_lines: ["core/crates/cn-perm/src/authz.rs:29: pub fn authorize_op(state: &GroupState, op: &Operation) -> Result<(), AuthzDenial> {"]
+        attached_by: path-rule:touches-grep
+    tests:
+      - path: core/crates/cn-perm/tests/authority_matrix.rs
+        via: import
+        reaches: core/crates/cn-perm/src/viewer.rs
+      - path: core/crates/cn-perm/tests/blueprint.rs
+        via: import
+        reaches: core/crates/cn-perm/src/authz.rs
+    coverage: files-and-tests
+
+  P3.2:
+    title: "Explicit authority matrix (role x op-kind)"
+    phase: 3
+    status: open
+    roadmap: "PLAN_1.0.md:690"
+    acceptance: "matrix doc committed; each cell has a corresponding authz test"
+    superseded_by: null
+    files:
+      - path: core/crates/cn-perm/src/authz.rs
+        owns: "authorize_op(): the decision function the matrix documents cell-by-cell; the matrix doc itself (docs/design/authority-matrix.md) is outside this trace's declared census roots"
+        acceptance_testable_here: false
+        evidence_lines: ["core/crates/cn-perm/src/authz.rs:29: pub fn authorize_op(state: &GroupState, op: &Operation) -> Result<(), AuthzDenial> {"]
+        attached_by: path-rule:touches-grep
+    tests:
+      - path: core/crates/cn-perm/tests/authority_matrix.rs
+        via: import
+        reaches: core/crates/cn-perm/src/authz.rs
+    coverage: files-and-tests
+
+  P3.3:
+    title: "Fix active_role_names; distinct facilitator/member viewer_fingerprint"
+    phase: 3
+    status: open
+    roadmap: "PLAN_1.0.md:697"
+    acceptance: "a test proves distinct fingerprints for member vs facilitator on identical membership"
+    superseded_by: null
+    files:
+      - path: core/crates/cn-perm/src/viewer.rs
+        owns: "active_role_names(): resolves a person's role names, exhaustive over GroupRole including Facilitator"
+        acceptance_testable_here: true
+        evidence_lines: ["core/crates/cn-perm/src/viewer.rs:127: fn active_role_names(state: &GroupState, person: &PersonId) -> Vec<String> {"]
+        attached_by: path-rule:touches-grep
+      - path: core/crates/cn-api/src/session.rs
+        owns: "viewer_fingerprint projection-cache key; deliberately not the raw ViewerContext (see own comment)"
+        acceptance_testable_here: true
+        evidence_lines: ["core/crates/cn-api/src/session.rs:94: // context), NOT the hashed `viewer_fingerprint`: the 32-bit fingerprint"]
+        attached_by: path-rule:touches-grep
+    tests:
+      - path: core/crates/cn-api/tests/facilitator_role.rs
+        via: import
+        reaches: core/crates/cn-api/src/session.rs
+      - path: core/crates/cn-perm/tests/authority_matrix.rs
+        via: import
+        reaches: core/crates/cn-perm/src/viewer.rs
+    coverage: files-and-tests
+
+  P3.4:
+    title: "Extend the no-leak property test across all five viewer classes"
+    phase: 3
+    status: open
+    roadmap: "PLAN_1.0.md:705"
+    acceptance: "property test green with the added role"
+    superseded_by: null
+    files:
+      - path: core/crates/cn-perm/src/authz.rs
+        owns: "the authorization surface the no-leak property test exercises across anonymous/member/facilitator/self/governance"
+        acceptance_testable_here: true
+        evidence_lines: ["core/crates/cn-perm/src/authz.rs:29: pub fn authorize_op(state: &GroupState, op: &Operation) -> Result<(), AuthzDenial> {"]
+        attached_by: path-rule:touches-grep
+    tests:
+      - path: core/crates/cn-perm/tests/authority_matrix.rs
+        via: import
+        reaches: core/crates/cn-perm/src/authz.rs
+      - path: core/crates/cn-perm/tests/blueprint.rs
+        via: import
+        reaches: core/crates/cn-perm/src/authz.rs
+    coverage: files-and-tests
+
+  P3.5:
+    title: "Facilitator group-setup wizard from JSON templates"
+    phase: 3
+    status: open
+    roadmap: "PLAN_1.0.md:710"
+    acceptance: "wizard creates a group from research-network.template.json in-app"
+    superseded_by: null
+    files:
+      - path: app/src/ui/intake/panel.ts
+        owns: "mountIntakeWizard(): the P3.5 facilitator wizard, per its own header comment"
+        acceptance_testable_here: true
+        evidence_lines: ["app/src/ui/intake/panel.ts:2:  * P3.5 facilitator wizard (docs/blueprints/intake-pipeline.md section 5):"]
+        attached_by: path-rule:touches-grep
+      - path: fixtures/templates/research-network.template.json
+        owns: "the research-network synthetic group template the wizard's acceptance names by name"
+        acceptance_testable_here: true
+        evidence_lines: ["fixtures/templates/research-network.template.json:2: \"template_id\": \"research-network\","]
+        attached_by: path-rule:touches-grep
+      - path: core/crates/cn-api/src/submit.rs
+        owns: "redact_outcomes(): permission redaction on submit outcomes, the cn-api half of group creation"
+        acceptance_testable_here: false
+        evidence_lines: ["core/crates/cn-api/src/submit.rs:6: pub(crate) fn redact_outcomes("]
+        attached_by: path-rule:touches-grep
+    tests:
+      - path: core/crates/cn-api/tests/blueprint.rs
+        via: import
+        reaches: core/crates/cn-api/src/submit.rs
+    coverage: files-and-tests
+
+  P3.6:
+    title: "Template-driven entry forms + facilitator pending-review queue"
+    phase: 3
+    status: open
+    roadmap: "PLAN_1.0.md:716"
+    acceptance: "a fixture person is added through generated forms with validation surfaced; a pending submission is invisible to the graph until approved"
+    superseded_by: null
+    files:
+      - path: app/src/ui/forms/renderer.ts
+        owns: "P3.6 template-driven entry form: kind picker, typed field widgets, consent panel"
+        acceptance_testable_here: true
+        evidence_lines: ["app/src/ui/forms/renderer.ts:2:  * P3.6 template-driven entry form (docs/blueprints/intake-pipeline.md"]
+        attached_by: path-rule:touches-grep
+      - path: app/src/ui/forms/model.ts
+        owns: "P3.6 entry-form pure model: field rendering + payload assembly from the group template"
+        acceptance_testable_here: true
+        evidence_lines: ["app/src/ui/forms/model.ts:2:  * P3.6 entry-form model: pure logic for rendering an entry form FROM the"]
+        attached_by: path-rule:touches-grep
+      - path: app/src/ui/forms/consent.ts
+        owns: "consent statement boilerplate for the in-app entry form (DRAFT text, D-072.1)"
+        acceptance_testable_here: true
+        evidence_lines: ["app/src/ui/forms/consent.ts:2:  * Consent statement boilerplate for the in-app (facilitator-entered) form."]
+        attached_by: path-rule:touches-grep
+      - path: app/src/ui/intake/model.ts
+        owns: "P3.5/P3.6 wizard pure logic: dashboard summarization + review-request assembly for the pending-review queue"
+        acceptance_testable_here: true
+        evidence_lines: ["app/src/ui/intake/model.ts:2:  * P3.5 wizard pure logic: dashboard summarization (the I12 visibility"]
+        attached_by: path-rule:touches-grep
+      - path: core/crates/cn-schema/src/report.rs
+        owns: "ValidationReport: machine-readable validation report for schema and instance checks (I12)"
+        acceptance_testable_here: true
+        evidence_lines: ["core/crates/cn-schema/src/report.rs:5: pub struct ValidationReport {"]
+        attached_by: path-rule:touches-grep
+    tests:
+      - path: app/src/ui/forms/model.test.ts
+        via: import
+        reaches: app/src/ui/forms/consent.ts
+      - path: app/src/ui/forms/fixtures.test.ts
+        via: import
+        reaches: app/src/ui/forms/model.ts
+      - path: app/src/ui/intake/model.test.ts
+        via: import
+        reaches: app/src/ui/intake/model.ts
+    coverage: files-and-tests
+
+  P4.1:
+    title: "In-app story authoring + viewing"
+    phase: 4
+    status: open
+    roadmap: "PLAN_1.0.md:756"
+    acceptance: "authoring is denied to a non-facilitator viewer by test; save/reload/play round-trips a story"
+    superseded_by: null
+    files:
+      - path: core/crates/cn-model/src/story.rs
+        owns: "Story/StoryStep data model only; grep for authoring-specific fields this session found none - playback shape only"
+        acceptance_testable_here: false
+        evidence_lines: ["core/crates/cn-model/src/story.rs:58: pub struct StoryStep {"]
+        attached_by: path-rule:touches-grep
+      - path: schemas/story-path.schema.json
+        owns: "versioned story-path schema the authoring surface would validate against, if one existed"
+        acceptance_testable_here: false
+        evidence_lines: ["schemas/story-path.schema.json:17: \"schema_version\""]
+        attached_by: path-rule:touches-grep
+      - path: app/src/state/actions.ts
+        owns: "storyEntered/storyStepped/storyExited - the VIEWING/playback half only; no authoring action variant exists"
+        acceptance_testable_here: false
+        evidence_lines: ["app/src/state/actions.ts:72 (scout-app section 6): storyEntered/storyStepped/storyExited start here (72-82)"]
+        attached_by: scout (scout-app section 6, DESIGN_BRIEF row g)
+    tests:
+      - path: app/src/state/state.test.ts
+        via: import
+        reaches: app/src/state/actions.ts
+    coverage: files-and-tests-but-acceptance-not-directly-testable
+
+  P4.2:
+    title: "Comprehension layer: in-product how-to-read-this primer"
+    phase: 4
+    status: open
+    roadmap: "PLAN_1.0.md:764"
+    acceptance: "primer renders in the app"
+    superseded_by: null
+    files:
+      - path: app/src/ui/flat.ts
+        owns: "the P1.7 flat projection the primer is meant to build on; no primer surface itself exists in app/src"
+        acceptance_testable_here: false
+        evidence_lines: ["app/src/ui/flat.ts:3: import { degreeByEntityId, entityLabel, projectedEdges, projectedEntities } from \"../viz/projection\";"]
+        attached_by: path-rule:touches-grep
+    tests:
+      - path: app/src/ui/flat.test.ts
+        via: path-ref
+        reaches: app/src/ui/flat.ts
+    coverage: files-and-tests-but-acceptance-not-directly-testable
+
+  P4.3:
+    title: "Seeded and tested Stories + facilitator assembly-reveal script"
+    phase: 4
+    status: open
+    roadmap: "PLAN_1.0.md:769"
+    acceptance: "seeded stories load and play; script committed under docs/"
+    superseded_by: null
+    files: []
+    tests: []
+    coverage: no-files-no-tests
+
+  P4.4:
+    title: "Snapshot acceptance: both fixtures load and render under 5MB"
+    phase: 4
+    status: open
+    roadmap: "PLAN_1.0.md:774"
+    acceptance: "build:snapshot + the Phase 2 browser acceptance test both pass for both fixtures under 5MB"
+    superseded_by: null
+    files:
+      - path: scripts/check-size.mjs
+        owns: "5MB single-file snapshot size budget check"
+        acceptance_testable_here: true
+        evidence_lines: ["scripts/check-size.mjs:5: BUDGET_BYTES = 5 * 1024 * 1024"]
+        attached_by: scout (scout-app section 3)
+      - path: fixtures/groups/research-network.ops.jsonl
+        owns: "research-network synthetic op-log fixture, one of the two fixtures the snapshot must embed"
+        acceptance_testable_here: true
+        evidence_lines: ["fixtures/groups/research-network.ops.jsonl:1: {\"op_id\":\"00000000-0000-0000-0000-000000015f91\",\"group_id\":\"00000000-0000-0000-0000-000000000010\","]
+        attached_by: path-rule:touches-grep
+      - path: fixtures/groups/fisheries-committee.ops.jsonl
+        owns: "fisheries-committee synthetic op-log fixture, the second of the two fixtures the snapshot must embed"
+        acceptance_testable_here: true
+        evidence_lines: ["fixtures/groups/fisheries-committee.ops.jsonl:1: {\"op_id\":\"00000000-0000-0000-0000-000000015f91\",\"group_id\":\"00000000-0000-0000-0000-000000000011\","]
+        attached_by: path-rule:touches-grep
+    tests: []
+    coverage: files-no-tests
+
+  P5.1:
+    title: "Routing contract: need-term -> candidate -> query_paths"
+    phase: 5
+    status: open
+    roadmap: "PLAN_1.0.md:812"
+    acceptance: "a chosen need-term resolves to a rendered pathway on a fixture"
+    superseded_by: null
+    files:
+      - path: core/crates/cn-api/src/lib.rs
+        owns: "query_paths()/query_paths_impl(): the path-query facade; no need-term-vocabulary candidate-resolution layer sits in front of it yet (per discovery-2026-09-12.md Track B: only degree/shortest_path/neighborhood/search exist)"
+        acceptance_testable_here: false
+        evidence_lines: ["core/crates/cn-api/src/lib.rs:107: pub fn query_paths("]
+        attached_by: path-rule:touches-grep
+      - path: core/crates/cn-graph/src/query.rs
+        owns: "shortest_path()/neighborhood()/degrees()/search(): the graph-query primitives query_paths sits on"
+        acceptance_testable_here: false
+        evidence_lines: ["core/crates/cn-graph/src/query.rs:105 (scout-core section 3): shortest_path() - unweighted + weighted variants"]
+        attached_by: scout (scout-core section 3)
+    tests:
+      - path: core/crates/cn-graph/tests/blueprint.rs
+        via: import
+        reaches: core/crates/cn-graph/src/query.rs
+      - path: core/crates/cn-api/tests/blueprint.rs
+        via: import
+        reaches: core/crates/cn-api/src/lib.rs
+    coverage: files-and-tests-but-acceptance-not-directly-testable
+
+  P5.2:
+    title: "Structural contactability-consent gate in candidate resolution"
+    phase: 5
+    status: open
+    roadmap: "PLAN_1.0.md:820"
+    acceptance: "a property test excludes non-consenting endpoints from search, paths, flat list, AND export"
+    superseded_by: null
+    files: []
+    tests: []
+    coverage: no-files-no-tests
+
+  P5.3:
+    title: "cn-ingest AtniIntakeBatchV0_1 importer"
+    phase: 5
+    status: open
+    roadmap: "PLAN_1.0.md:829"
+    acceptance: "round-trip property test asserts zero new creates / zero duplicate edges / zero custody growth on identical re-import"
+    superseded_by: null
+    files: []
+    tests: []
+    coverage: no-files-no-tests
+    # this session grepped core/crates/cn-ingest/src for AtniIntakeBatch, source_row_id,
+    # uuid_v5/Uuid::new_v5 and found no matches; cn-ingest has 10 real modules serving
+    # other Phase 3 concerns (approval/consent/crypto/dedup/near_dup/reconcile), but not
+    # this specific versioned importer contract, so nothing was attached here.
+
+  P5.4:
+    title: "cn CLI subcommands: ingest, validate, export, snapshot"
+    phase: 5
+    status: open
+    roadmap: "PLAN_1.0.md:841"
+    acceptance: "CLI ingests a fixture, emits a validation report, rebuilds the snapshot in minutes on the reference laptop"
+    superseded_by: null
+    files:
+      - path: core/cli/src/export.rs
+        owns: "cn export: adapter over cn-api load + export-snapshot path (real, working)"
+        acceptance_testable_here: false
+        evidence_lines: ["core/cli/src/export.rs:1: //! `cn export`: adapter over the existing cn-api load + export-snapshot path."]
+        attached_by: path-rule:touches-grep
+      - path: core/cli/src/validate.rs
+        owns: "cn validate: adapter over cn-schema template validation (real, working)"
+        acceptance_testable_here: false
+        evidence_lines: ["core/cli/src/validate.rs:1: //! `cn validate`: adapter over the existing cn-schema template validation."]
+        attached_by: path-rule:touches-grep
+      - path: core/cli/src/lib.rs
+        owns: "cn router; validate/export are real, but ingest and snapshot are explicit parked stubs (stub_ingest/stub_snapshot) whose error text still names G-RAT as unresolved, though G-RAT was RESOLVED 2026-07-24 per D-052 - a stale stub message this session's own grep found (see method.new_findings_beyond...)"
+        acceptance_testable_here: false
+        evidence_lines: ["core/cli/src/lib.rs:105: fn stub_ingest(err: &mut dyn Write) -> std::io::Result<Exit> {"]
+        attached_by: path-rule:touches-grep
+    tests:
+      - path: core/cli/tests/cli.rs
+        via: symbol-ref
+        reaches: core/cli/src/export.rs
+      - path: core/cli/tests/cli.rs
+        via: symbol-ref
+        reaches: core/cli/src/validate.rs
+    coverage: files-and-tests-but-acceptance-not-directly-testable
+
+  P5.5:
+    title: "FORM deliverable finalized (in-app entry + D-053 relay form)"
+    phase: 5
+    status: open
+    roadmap: "PLAN_1.0.md:848"
+    acceptance: "structure retained with developer-language placeholders; human review recorded before any use"
+    superseded_by: null
+    files:
+      - path: form/src/render.ts
+        owns: "consent-gated, template-driven remote form renderer; PLAN_1.0.md's own Touches line names only docs/design paths for this task, but the FORM itself is now real code under form/src - attached here instead since the docs paths are outside this trace's declared census roots"
+        acceptance_testable_here: false
+        evidence_lines: ["form/src/render.ts:3 (scout-intake section 2): a consent-gated, template-driven form"]
+        attached_by: scout (scout-intake section 2)
+      - path: form/src/model.ts
+        owns: "formModel(): template-driven field model for the remote form"
+        acceptance_testable_here: false
+        evidence_lines: ["form/src/model.ts:73: export function formModel(template: JsonObject): FormModel {"]
+        attached_by: path-rule:touches-grep
+    tests:
+      - path: form/src/model.test.ts
+        via: import
+        reaches: form/src/model.ts
+    coverage: files-and-tests-but-acceptance-not-directly-testable
+
+  P5.6:
+    title: "ADR-006 dedup: always-queue review, merge-vs-link, idempotent semantics"
+    phase: 5
+    status: open
+    roadmap: "PLAN_1.0.md:860"
+    acceptance: "planted-duplicate fixture routes to the review queue, not a silent merge"
+    superseded_by: null
+    files:
+      - path: core/crates/cn-ingest/src/dedup.rs
+        owns: "classify_dedup(): transport + semantic dedup verdict (ADR-005 D4); the formal ADR-006 doc itself does not yet exist, but the underlying mechanical behavior this acceptance describes does"
+        acceptance_testable_here: true
+        evidence_lines: ["core/crates/cn-ingest/src/dedup.rs:1: //! Transport and semantic dedup classification (ADR-005 D4, round-1"]
+        attached_by: path-rule:touches-grep
+      - path: core/crates/cn-ingest/src/near_dup.rs
+        owns: "near-duplicate candidate surfacing feeding the pending-review queue"
+        acceptance_testable_here: true
+        evidence_lines: ["core/crates/cn-ingest/src/near_dup.rs:50 (scout-core section 5): normalize_name(text: &str) -> String"]
+        attached_by: scout (scout-core section 5)
+    tests:
+      - path: core/crates/cn-ingest/tests/blueprint.rs
+        via: import
+        reaches: core/crates/cn-ingest/src/dedup.rs
+    coverage: files-and-tests
+
+  P5.7:
+    title: "CPF-RCN migration recipe (docs-only)"
+    phase: 5
+    status: open
+    roadmap: "PLAN_1.0.md:870"
+    acceptance: "recipe committed under docs/; no real data referenced"
+    superseded_by: null
+    files: []
+    tests: []
+    coverage: no-files-no-tests
+
+  P5.8:
+    title: "Pilot hardening: perf pass, UX sweep, facilitator guide"
+    phase: 5
+    status: open
+    roadmap: "PLAN_1.0.md:875"
+    acceptance: "measured numbers recorded; check-all green"
+    superseded_by: null
+    files: []
+    tests: []
+    coverage: no-files-no-tests
+
+  P5.9:
+    title: "Convention rehearsal (human-only, full-arc dry run)"
+    phase: 5
+    status: open
+    roadmap: "PLAN_1.0.md:883"
+    acceptance: "dated rehearsal checklist completed and recorded; this is the R6 acceptance, not a hoped-for outcome"
+    superseded_by: null
+    files: []
+    tests: []
+    coverage: no-files-no-tests
+
+  P5.10:
+    title: "Privacy-safe field-validation evidence artifact template"
+    phase: 5
+    status: open
+    roadmap: "PLAN_1.0.md:890"
+    acceptance: "the artifact template exists and contains no PII; it becomes the field-validation gate feeding later 1.0 ratification (consumed by P9.6)"
+    superseded_by: null
+    files: []
+    tests: []
+    coverage: no-files-no-tests
+
+  P6.1:
+    title: "Profile ownership: an individual owns their record"
+    phase: 6
+    status: open
+    roadmap: "PLAN_1.0.md:923"
+    acceptance: "ownership transfer test; check-all green"
+    superseded_by: null
+    files: []
+    tests: []
+    coverage: no-files-no-tests
+    # this session grepped core/crates/cn-model/src for Ownership|owner_id|"profile.*own"
+    # and found no matches; no ownership model exists yet.
+
+  P6.2:
+    title: "Per-attribute sharing UI across the five circles"
+    phase: 6
+    status: open
+    roadmap: "PLAN_1.0.md:927"
+    acceptance: "property test - no projection leaks an attribute above the viewer's circle for any of the five circles"
+    superseded_by: null
+    files:
+      - path: core/crates/cn-model/src/circle.rs
+        owns: "Circle enum (Private/Trusted/Group/Network/Public) already fully defined - real foundation for Phase 6, built ahead of it; no per-attribute sharing computation is wired into cn-perm/projection.rs on top of it yet"
+        acceptance_testable_here: false
+        evidence_lines: ["core/crates/cn-model/src/circle.rs:6: pub enum Circle {"]
+        attached_by: path-rule:touches-grep
+    tests: []
+    coverage: files-no-tests
+
+  P6.3:
+    title: "Individual-managed trust grants + audit log"
+    phase: 6
+    status: open
+    roadmap: "PLAN_1.0.md:934"
+    acceptance: "grant/revoke changes appear in the audit log"
+    superseded_by: null
+    files:
+      - path: core/crates/cn-model/src/trust.rs
+        owns: "TrustGrant model (grantor/grantee/scope) already defined - real foundation for Phase 6; no grant/revoke API or audit-log wiring into cn-store/cn-api found this session"
+        acceptance_testable_here: false
+        evidence_lines: ["core/crates/cn-model/src/trust.rs:19: pub struct TrustGrant {"]
+        attached_by: path-rule:touches-grep
+    tests: []
+    coverage: files-no-tests
+
+  P6.4:
+    title: "View-as viewer-context switcher across every circle"
+    phase: 6
+    status: open
+    roadmap: "PLAN_1.0.md:938"
+    acceptance: "switching viewer context re-projects correctly per circle"
+    superseded_by: null
+    files: []
+    tests: []
+    coverage: no-files-no-tests
+
+  P6.5:
+    title: "Firm up network circle semantics"
+    phase: 6
+    status: open
+    roadmap: "PLAN_1.0.md:942"
+    acceptance: "documented in cn-perm; tests cover the boundary"
+    superseded_by: null
+    files:
+      - path: core/crates/cn-model/src/circle.rs
+        owns: "Circle::Network is one of the five defined variants; no boundary documentation or cn-perm test specific to it was found this session"
+        acceptance_testable_here: false
+        evidence_lines: ["core/crates/cn-model/src/circle.rs:6: pub enum Circle {"]
+        attached_by: path-rule:touches-grep
+    tests: []
+    coverage: files-no-tests
+
+  P6.6:
+    title: "Re-estimation gate after Phase 6"
+    phase: 6
+    status: open
+    roadmap: "PLAN_1.0.md:947"
+    acceptance: "reforecast recorded in HANDOFF.md"
+    superseded_by: null
+    files: []
+    tests: []
+    coverage: no-files-no-tests
+
+  P7.1:
+    title: "Finalize cn-sync SyncTransport trait with a local-only adapter"
+    phase: 7
+    status: open
+    roadmap: "PLAN_1.0.md:970"
+    acceptance: "cargo test green for cn-sync"
+    superseded_by: null
+    files:
+      - path: core/crates/cn-sync/src/lib.rs
+        owns: "module placeholder only; its own header comment names this as the future SyncTransport trait + local adapter location, but no trait, type, or test exists in the file (0 tests, per scout-core section 6)"
+        acceptance_testable_here: false
+        evidence_lines: ["core/crates/cn-sync/src/lib.rs:1: //! cn-sync: SyncTransport trait and local-only adapter."]
+        attached_by: path-rule:touches-grep
+    tests: []
+    coverage: files-no-tests
+
+  P7.2:
+    title: "Validate op-log exchange between two local instances"
+    phase: 7
+    status: open
+    roadmap: "PLAN_1.0.md:975"
+    acceptance: "two local instances reconcile a shared op log deterministically"
+    superseded_by: null
+    files: []
+    tests: []
+    coverage: no-files-no-tests
+
+  P7.3:
+    title: "Write the protocol-integration guide"
+    phase: 7
+    status: open
+    roadmap: "PLAN_1.0.md:980"
+    acceptance: "guide committed under docs/"
+    superseded_by: null
+    files: []
+    tests: []
+    coverage: no-files-no-tests
+
+  P7.4:
+    title: "Draft the identity ADR (D-027), G-NET parked"
+    phase: 7
+    status: open
+    roadmap: "PLAN_1.0.md:984"
+    acceptance: "ADR drafted; choice parked"
+    superseded_by: null
+    files: []
+    tests: []
+    coverage: no-files-no-tests
+
+  P7.5:
+    title: "Re-estimation gate after the identity ADR"
+    phase: 7
+    status: open
+    roadmap: "PLAN_1.0.md:989"
+    acceptance: "reforecast recorded"
+    superseded_by: null
+    files: []
+    tests: []
+    coverage: no-files-no-tests
+
+  P7.6:
+    title: "Open question: is two-local-instance reconciliation sufficient R5 proof?"
+    phase: 7
+    status: open
+    roadmap: "PLAN_1.0.md:993"
+    acceptance: "recorded for the human in Open Questions / HANDOFF.md"
+    superseded_by: null
+    files: []
+    tests: []
+    coverage: no-files-no-tests
+
+  P8.1:
+    title: "Parallel-DOM primary interface on the Phase 1 flat projection"
+    phase: 8
+    status: open
+    roadmap: "PLAN_1.0.md:1015"
+    acceptance: "the app is operable end-to-end via the parallel DOM"
+    superseded_by: null
+    files: []
+    tests: []
+    coverage: no-files-no-tests
+
+  P8.2:
+    title: "Full keyboard navigation + ARIA audit + reduced-motion + 375px"
+    phase: 8
+    status: open
+    roadmap: "PLAN_1.0.md:1019"
+    acceptance: "keyboard-only and screen-reader passes (human-only accessibility testing) recorded"
+    superseded_by: null
+    files: []
+    tests: []
+    coverage: no-files-no-tests
+
+  P8.3:
+    title: "AA contrast/accessibility audit"
+    phase: 8
+    status: open
+    roadmap: "PLAN_1.0.md:1025"
+    acceptance: "audit passes or documents accepted exceptions"
+    superseded_by: null
+    files: []
+    tests: []
+    coverage: no-files-no-tests
+
+  P8.4:
+    title: "Governance role and membership tooling"
+    phase: 8
+    status: open
+    roadmap: "PLAN_1.0.md:1029"
+    acceptance: "governance role manages membership/roles with the no-leak property intact"
+    superseded_by: null
+    files: []
+    tests: []
+    coverage: no-files-no-tests
+
+  P8.5:
+    title: "Per-field tier UX and tier-enforcement development"
+    phase: 8
+    status: open
+    roadmap: "PLAN_1.0.md:1033"
+    acceptance: "per-field tiering works; exports respect tiers"
+    superseded_by: null
+    files: []
+    tests: []
+    coverage: no-files-no-tests
+
+  P8.6:
+    title: "Re-estimation gate after accessibility testing"
+    phase: 8
+    status: open
+    roadmap: "PLAN_1.0.md:1038"
+    acceptance: "reforecast recorded"
+    superseded_by: null
+    files: []
+    tests: []
+    coverage: no-files-no-tests
+
+  P9.1:
+    title: "Reusability proof: non-ATNI community type stood up end-to-end"
+    phase: 9
+    status: open
+    roadmap: "PLAN_1.0.md:1061"
+    acceptance: "a second community type is stood up and populated by a non-engineer (human-only acceptance recorded)"
+    superseded_by: null
+    files: []
+    tests: []
+    coverage: no-files-no-tests
+
+  P9.2:
+    title: "Full R1-R10 traceability audit"
+    phase: 9
+    status: open
+    roadmap: "PLAN_1.0.md:1067"
+    acceptance: "every requirement maps to shipped, tested capability in an audit doc"
+    superseded_by: null
+    files: []
+    tests: []
+    coverage: no-files-no-tests
+
+  P9.3:
+    title: "Distribution polish for both build modes"
+    phase: 9
+    status: open
+    roadmap: "PLAN_1.0.md:1071"
+    acceptance: "both modes build clean and under budget via check-all"
+    superseded_by: null
+    files: []
+    tests: []
+    coverage: no-files-no-tests
+
+  P9.4:
+    title: "Docs for group admins and individuals"
+    phase: 9
+    status: open
+    roadmap: "PLAN_1.0.md:1076"
+    acceptance: "guides committed and review recorded"
+    superseded_by: null
+    files: []
+    tests: []
+    coverage: no-files-no-tests
+
+  P9.5:
+    title: "First sibling-tool integration (cap-assessor)"
+    phase: 9
+    status: open
+    roadmap: "PLAN_1.0.md:1081"
+    acceptance: "cap-assessor rows import through the same contract into ATNI-authored vocabulary"
+    superseded_by: null
+    files: []
+    tests: []
+    coverage: no-files-no-tests
+
+  P9.6:
+    title: "Field-validation gate: evidence artifact signed off from the real pilot"
+    phase: 9
+    status: open
+    roadmap: "PLAN_1.0.md:1088"
+    acceptance: "evidence artifact complete, no PII"
+    superseded_by: null
+    files: []
+    tests: []
+    coverage: no-files-no-tests
+
+  P9.7:
+    title: "Re-raise G-BACKUP as a release blocker"
+    phase: 9
+    status: open
+    roadmap: "PLAN_1.0.md:1093"
+    acceptance: "human decision recorded"
+    superseded_by: null
+    files: []
+    tests: []
+    coverage: no-files-no-tests
+
+  R0:
+    title: "Toolchain pin + troika-three-text dependency fix (director pre-step)"
+    phase: roster
+    status: planned
+    roadmap: null
+    acceptance: "check-all 12/12; a rust-toolchain.toml exists pinned to the version check-all is green on; app/package.json lists troika-three-text under dependencies, not devDependencies"
+    superseded_by: null
+    note: "roster id, not a PLAN_1.0.md authority id - director-added pre-step for the 2026-09-12 pickup session, defined in SESSION_ROSTER.yaml"
+    files: []
+    tests: []
+    coverage: no-files-no-tests
+
+  R1:
+    title: "Deploy-bar clearance: browser smoke, Pages workflow, keygen rehearsal"
+    phase: roster
+    status: planned
+    roadmap: null
+    acceptance: "check-all 12/12 AND the Playwright smoke passes AND relay + form vitest suites run green (47/47 each last recorded, D-089)"
+    superseded_by: null
+    note: "roster id, not a PLAN_1.0.md authority id - defined in SESSION_ROSTER.yaml; overlaps P2.4 (browser acceptance test, currently absent) and the deploy-bar table in RECONCILIATION-2026-09-12.md"
+    files: []
+    tests: []
+    coverage: no-files-no-tests
+
+  R2:
+    title: "ATNI convention group template + 15-committee vocabulary (synthetic)"
+    phase: roster
+    status: planned
+    roadmap: null
+    acceptance: "check-all 12/12 incl. npm run validate:templates; pii-scan clean; all @example.test"
+    superseded_by: null
+    note: "roster id, not a PLAN_1.0.md authority id - defined in SESSION_ROSTER.yaml per discovery-2026-09-12.md D-094c"
+    files: []
+    tests: []
+    coverage: no-files-no-tests
+
+  R3:
+    title: "Term normalization in cn-ingest with facilitator confirmation"
+    phase: roster
+    status: planned
+    roadmap: null
+    acceptance: "check-all 12/12 + round verdict recorded in DECISIONS.md by the human"
+    superseded_by: null
+    note: "roster id, not a PLAN_1.0.md authority id - defined in SESSION_ROSTER.yaml per discovery-2026-09-12.md D-093c; the alias-table/matching design is NEW work, not yet reflected in cn-ingest/src (this session confirmed no alias or term-normalization table exists in cn-ingest/src, matching scout-core section 5's finding)"
+    files: []
+    tests: []
+    coverage: no-files-no-tests
+
+  R4:
+    title: "Presentation mode for the mainstage reveal"
+    phase: roster
+    status: planned
+    roadmap: null
+    acceptance: "check-all 12/12, director screenshot review (HUMAN-ONLY), 30 FPS on the Iris Xe reference at the synthetic fixture scale, prefers-reduced-motion variant verified"
+    superseded_by: null
+    note: "roster id, not a PLAN_1.0.md authority id - defined in SESSION_ROSTER.yaml per discovery-2026-09-12.md Track C; this session confirmed no present/presenter/presentation view mode exists in app/src (scout-app section 6: grep for present/presenter/presentation, excluding represent, returns no results)"
+    files: []
+    tests: []
+    coverage: no-files-no-tests
+
+  R5:
+    title: "Snapshot pipeline self-containment (D-048 / P2.3-P2.5) for the convention build"
+    phase: roster
+    status: planned
+    roadmap: null
+    acceptance: "check-all 12/12 + npm run build:snapshot produces a single self-contained dist/index.html under 5 MB that boots offline"
+    superseded_by: null
+    note: "roster id, not a PLAN_1.0.md authority id - defined in SESSION_ROSTER.yaml; overlaps P2.3/P2.4/P2.5 above (this session's files/tests for those apply equally here) plus the external 2.1 MB worker gap (app/src/main.ts:55, confirmed above under P2.3)"
+    files: []
+    tests: []
+    coverage: no-files-no-tests
+
+  R6:
+    title: "Minimal P4.1 story authoring"
+    phase: roster
+    status: planned
+    roadmap: null
+    acceptance: "check-all + a story authored in-app round-trips through save/reload validation (I7)"
+    superseded_by: null
+    note: "roster id, not a PLAN_1.0.md authority id - defined in SESSION_ROSTER.yaml; this is P4.1 above under a roster id and a tighter, session-scoped acceptance sentence - see P4.1's files/tests, unchanged"
+    files: []
+    tests: []
+    coverage: no-files-no-tests
+
+  R7:
+    title: "Convention rehearsal checklist (human-only)"
+    phase: roster
+    status: planned
+    roadmap: null
+    acceptance: "a dated checklist artifact exists at docs/runbooks/convention-rehearsal-checklist.md"
+    superseded_by: null
+    note: "roster id, not a PLAN_1.0.md authority id - defined in SESSION_ROSTER.yaml; this is P5.9 above under a roster id, output-scoped to one named file rather than the whole v0.1.0 surface"
+    files: []
+    tests: []
+    coverage: no-files-no-tests
+
+orphan_files_with_test_coverage:
+  - path: core/crates/cn-api/src/dto.rs
+    owns: "DTO types for the cn-api JSON facade"
+    serves_component: null
+    in_degree: null
+    tests: [core/crates/cn-api/tests/blueprint.rs]
+    strongest_link: import
+    caveat_crate_level: true
+  - path: core/crates/cn-api/src/error.rs
+    owns: "cn-api error types"
+    serves_component: null
+    in_degree: null
+    tests: [core/crates/cn-api/tests/blueprint.rs]
+    strongest_link: import
+    caveat_crate_level: true
+  - path: core/crates/cn-api/src/export.rs
+    owns: "cn-api export-snapshot path"
+    serves_component: null
+    in_degree: null
+    tests: [core/crates/cn-api/tests/blueprint.rs]
+    strongest_link: import
+    caveat_crate_level: true
+  - path: core/crates/cn-api/src/wire.rs
+    owns: "cn-api wire-format helpers"
+    serves_component: null
+    in_degree: null
+    tests: [core/crates/cn-api/tests/blueprint.rs]
+    strongest_link: import
+    caveat_crate_level: true
+  - path: core/crates/cn-graph/src/lib.rs
+    owns: "cn-graph module root: deterministic graph queries over permission projections"
+    serves_component: null
+    in_degree: null
+    tests: [core/crates/cn-graph/tests/blueprint.rs]
+    strongest_link: import
+    caveat_crate_level: true
+  - path: core/crates/cn-ingest/src/crypto.rs
+    owns: "sealed-box crypto binding (13 unit tests embedded in src, per scout-core section 6)"
+    serves_component: null
+    in_degree: null
+    tests: ["core/crates/cn-ingest/src/crypto.rs (embedded #[test])", core/crates/cn-ingest/tests/crypto_vectors.rs]
+    strongest_link: import
+  - path: core/crates/cn-ingest/src/approval.rs
+    owns: "intake approval-plan logic"
+    serves_component: null
+    in_degree: null
+    tests: [core/crates/cn-ingest/tests/blueprint.rs]
+    strongest_link: import
+    caveat_crate_level: true
+  - path: core/crates/cn-ingest/src/consent.rs
+    owns: "intake consent-block handling"
+    serves_component: null
+    in_degree: null
+    tests: [core/crates/cn-ingest/tests/blueprint.rs]
+    strongest_link: import
+    caveat_crate_level: true
+  - path: core/crates/cn-ingest/src/decision.rs
+    owns: "decision-inbox admission logic"
+    serves_component: null
+    in_degree: null
+    tests: [core/crates/cn-ingest/tests/blueprint.rs]
+    strongest_link: import
+    caveat_crate_level: true
+  - path: core/crates/cn-ingest/src/envelope.rs
+    owns: "outer/inner envelope types"
+    serves_component: null
+    in_degree: null
+    tests: [core/crates/cn-ingest/tests/blueprint.rs]
+    strongest_link: import
+    caveat_crate_level: true
+  - path: core/crates/cn-ingest/src/lib.rs
+    owns: "cn-ingest module root"
+    serves_component: null
+    in_degree: null
+    tests: [core/crates/cn-ingest/tests/blueprint.rs]
+    strongest_link: import
+    caveat_crate_level: true
+  - path: core/crates/cn-ingest/src/reconcile.rs
+    owns: "receipt/blob reconciliation logic"
+    serves_component: null
+    in_degree: null
+    tests: [core/crates/cn-ingest/tests/blueprint.rs]
+    strongest_link: import
+    caveat_crate_level: true
+  - path: core/crates/cn-ingest/src/record.rs
+    owns: "intake record types"
+    serves_component: null
+    in_degree: null
+    tests: [core/crates/cn-ingest/tests/blueprint.rs]
+    strongest_link: import
+    caveat_crate_level: true
+  - path: core/crates/cn-ingest/src/recovery.rs
+    owns: "crash-recovery classification"
+    serves_component: null
+    in_degree: null
+    tests: [core/crates/cn-ingest/tests/blueprint.rs]
+    strongest_link: import
+    caveat_crate_level: true
+  - path: core/crates/cn-ingest/src/version.rs
+    owns: "canonical_digest/uuid_v7/IngestError"
+    serves_component: null
+    in_degree: null
+    tests: [core/crates/cn-ingest/tests/blueprint.rs]
+    strongest_link: import
+    caveat_crate_level: true
+  - path: core/crates/cn-model/src/attribute.rs
+    owns: "attribute type model"
+    serves_component: null
+    in_degree: null
+    tests: [core/crates/cn-model/tests/blueprint.rs]
+    strongest_link: import
+    caveat_crate_level: true
+  - path: core/crates/cn-model/src/edge.rs
+    owns: "edge model"
+    serves_component: null
+    in_degree: null
+    tests: [core/crates/cn-model/tests/blueprint.rs]
+    strongest_link: import
+    caveat_crate_level: true
+  - path: core/crates/cn-model/src/entity.rs
+    owns: "entity model"
+    serves_component: null
+    in_degree: null
+    tests: [core/crates/cn-model/tests/blueprint.rs]
+    strongest_link: import
+    caveat_crate_level: true
+  - path: core/crates/cn-model/src/error.rs
+    owns: "cn-model error types"
+    serves_component: null
+    in_degree: null
+    tests: [core/crates/cn-model/tests/blueprint.rs]
+    strongest_link: import
+    caveat_crate_level: true
+  - path: core/crates/cn-model/src/ids.rs
+    owns: "stable id types (UUIDv7 etc.)"
+    serves_component: null
+    in_degree: null
+    tests: [core/crates/cn-model/tests/blueprint.rs]
+    strongest_link: import
+    caveat_crate_level: true
+  - path: core/crates/cn-model/src/lifecycle.rs
+    owns: "entity/edge lifecycle state"
+    serves_component: null
+    in_degree: null
+    tests: [core/crates/cn-model/tests/blueprint.rs]
+    strongest_link: import
+    caveat_crate_level: true
+  - path: core/crates/cn-model/src/membership.rs
+    owns: "group membership model"
+    serves_component: null
+    in_degree: null
+    tests: [core/crates/cn-model/tests/blueprint.rs]
+    strongest_link: import
+    caveat_crate_level: true
+  - path: core/crates/cn-model/src/provenance.rs
+    owns: "provenance envelope (I6)"
+    serves_component: null
+    in_degree: null
+    tests: [core/crates/cn-model/tests/blueprint.rs]
+    strongest_link: import
+    caveat_crate_level: true
+  - path: core/crates/cn-model/src/tier.rs
+    owns: "sensitivity tier model"
+    serves_component: null
+    in_degree: null
+    tests: [core/crates/cn-model/tests/blueprint.rs]
+    strongest_link: import
+    caveat_crate_level: true
+  - path: core/crates/cn-model/src/time.rs
+    owns: "timestamp helpers"
+    serves_component: null
+    in_degree: null
+    tests: [core/crates/cn-model/tests/blueprint.rs]
+    strongest_link: import
+    caveat_crate_level: true
+  - path: core/crates/cn-perm/src/lib.rs
+    owns: "cn-perm module root"
+    serves_component: null
+    in_degree: null
+    tests: [core/crates/cn-perm/tests/blueprint.rs]
+    strongest_link: import
+    caveat_crate_level: true
+  - path: core/crates/cn-perm/src/projection.rs
+    owns: "permission-filtered projection builder; this session grepped for consent/D-030/structural-checkbox and found no matches, confirming P5.2's consent-gate is not implemented here"
+    serves_component: null
+    in_degree: null
+    tests: [core/crates/cn-perm/tests/blueprint.rs]
+    strongest_link: import
+    caveat_crate_level: true
+  - path: core/crates/cn-perm/src/reports.rs
+    owns: "projection report/redaction helpers"
+    serves_component: null
+    in_degree: null
+    tests: [core/crates/cn-perm/tests/blueprint.rs]
+    strongest_link: import
+    caveat_crate_level: true
+  - path: core/crates/cn-perm/src/rules.rs
+    owns: "permission rule definitions"
+    serves_component: null
+    in_degree: null
+    tests: [core/crates/cn-perm/tests/blueprint.rs]
+    strongest_link: import
+    caveat_crate_level: true
+  - path: core/crates/cn-schema/src/lib.rs
+    owns: "cn-schema module root"
+    serves_component: null
+    in_degree: null
+    tests: [core/crates/cn-schema/tests/blueprint.rs]
+    strongest_link: import
+    caveat_crate_level: true
+  - path: core/crates/cn-schema/src/types.rs
+    owns: "group-template type structs (AttrDef, GroupTemplate)"
+    serves_component: null
+    in_degree: null
+    tests: [core/crates/cn-schema/tests/blueprint.rs]
+    strongest_link: import
+    caveat_crate_level: true
+  - path: core/crates/cn-schema/src/validate.rs
+    owns: "group-template semantic validation"
+    serves_component: null
+    in_degree: null
+    tests: [core/crates/cn-schema/tests/blueprint.rs]
+    strongest_link: import
+    caveat_crate_level: true
+  - path: core/crates/cn-store/src/authz.rs
+    owns: "cn-store write authorization seam"
+    serves_component: null
+    in_degree: null
+    tests: [core/crates/cn-store/tests/blueprint.rs]
+    strongest_link: import
+    caveat_crate_level: true
+  - path: core/crates/cn-store/src/fold.rs
+    owns: "op-log fold semantics for state recovery"
+    serves_component: null
+    in_degree: null
+    tests: [core/crates/cn-store/tests/blueprint.rs]
+    strongest_link: import
+    caveat_crate_level: true
+  - path: core/crates/cn-store/src/lib.rs
+    owns: "cn-store module root"
+    serves_component: null
+    in_degree: null
+    tests: [core/crates/cn-store/tests/blueprint.rs]
+    strongest_link: import
+    caveat_crate_level: true
+  - path: core/crates/cn-store/src/op.rs
+    owns: "Operation/OpKind types"
+    serves_component: null
+    in_degree: null
+    tests: [core/crates/cn-store/tests/blueprint.rs]
+    strongest_link: import
+    caveat_crate_level: true
+  - path: core/crates/cn-store/src/seam.rs
+    owns: "wasm-gated intake seam (append_batch_idempotent)"
+    serves_component: null
+    in_degree: null
+    tests: [core/crates/cn-store/tests/intake_seam.rs]
+    strongest_link: import
+  - path: core/cli/src/intake/apply.rs
+    owns: "cn intake apply: the native durable queue owner (HANDOFF.md cites this 4x; absent from HANDOFF's own path table per RECONCILIATION-2026-09-12.md Finding 1)"
+    serves_component: null
+    in_degree: null
+    tests: [core/cli/tests/intake_apply.rs]
+    strongest_link: path-ref
+  - path: core/cli/src/intake/bundle.rs
+    owns: "D8 bundle-manifest verification"
+    serves_component: null
+    in_degree: null
+    tests: [core/cli/tests/intake_bundle.rs]
+    strongest_link: path-ref
+  - path: core/cli/src/intake/pull.rs
+    owns: "cn intake pull: HTTP receipt fetch + transport-dedup + stage"
+    serves_component: null
+    in_degree: null
+    tests: [core/cli/tests/intake_pull.rs, core/cli/tests/intake_pull_cli.rs]
+    strongest_link: path-ref
+  - path: core/cli/src/intake/keygen.rs
+    owns: "keygen ceremony CLI command"
+    serves_component: null
+    in_degree: null
+    tests: [core/cli/tests/intake_keygen.rs]
+    strongest_link: path-ref
+  - path: core/cli/src/main.rs
+    owns: "cn binary entry: a 14-line thin shell over cn::run"
+    serves_component: null
+    in_degree: null
+    tests: [core/cli/tests/cli.rs]
+    strongest_link: symbol-ref
+  - path: app/src/state/store.ts
+    owns: "Store interface + createStore() factory"
+    serves_component: null
+    in_degree: null
+    tests: [app/src/state/state.test.ts]
+    strongest_link: import
+  - path: app/src/state/state.ts
+    owns: "AppState/ViewerContextDto/ErrorEnvelopeDto type hierarchy; createInitialState"
+    serves_component: null
+    in_degree: null
+    tests: [app/src/state/state.test.ts, app/src/state/intake.test.ts]
+    strongest_link: import
+  - path: app/src/state/search.ts
+    owns: "parseSearchHits() and ParsedSearchHits type"
+    serves_component: null
+    in_degree: null
+    tests: [app/src/state/search.test.ts]
+    strongest_link: import
+  - path: app/src/state/intake.ts
+    owns: "File System Access API integration for the intake queue"
+    serves_component: null
+    in_degree: null
+    tests: [app/src/state/intake.test.ts, app/src/state/intake-idb.test.ts, app/src/state/intake-roundtrip.test.ts]
+    strongest_link: path-ref
+    caveat: "same-basename convention; a direct import-line grep on intake.test.ts did not confirm a './intake' import this session, so this link is weaker than the others in this list"
+  - path: app/src/theme/color.ts
+    owns: "HSL/OkLCh color manipulation"
+    serves_component: null
+    in_degree: null
+    tests: [app/src/theme/theme.test.ts]
+    strongest_link: import
+  - path: app/src/theme/contrast.ts
+    owns: "contrast ratio calculation"
+    serves_component: null
+    in_degree: null
+    tests: [app/src/theme/theme.test.ts]
+    strongest_link: import
+  - path: app/src/theme/derive.ts
+    owns: "theme derivation from a group template (incl. halo token variants)"
+    serves_component: null
+    in_degree: null
+    tests: [app/src/theme/theme.test.ts]
+    strongest_link: import
+  - path: app/src/theme/tokens.ts
+    owns: "theme token type definitions"
+    serves_component: null
+    in_degree: null
+    tests: [app/src/theme/theme.test.ts]
+    strongest_link: import
+  - path: app/src/ui/format.ts
+    owns: "provenance/formatting helpers for the UI (266 lines, per scout-app section 1)"
+    serves_component: null
+    in_degree: null
+    tests: [app/src/ui/format.test.ts]
+    strongest_link: path-ref
+    caveat: "same-basename convention only; an import-line grep on format.test.ts returned no './' match this session, so the actual import style was not confirmed"
+  - path: app/src/viz/layout.ts
+    owns: "computeLayout()/layoutSnapshot()"
+    serves_component: null
+    in_degree: null
+    tests: [app/src/viz/viz.test.ts]
+    strongest_link: import
+  - path: app/src/viz/scene.ts
+    owns: "createVizScene()"
+    serves_component: null
+    in_degree: null
+    tests: [app/src/viz/viz.test.ts]
+    strongest_link: import
+  - path: app/src/wasm/client.ts
+    owns: "WasmClient: transport abstraction for worker requests"
+    serves_component: null
+    in_degree: null
+    tests: [app/src/wasm/client.test.ts]
+    strongest_link: import
+  - path: app/src/wasm/protocol.ts
+    owns: "worker request/response types and error handling"
+    serves_component: null
+    in_degree: null
+    tests: [app/src/wasm/client.test.ts]
+    strongest_link: import
+  - path: form/src/crypto.ts
+    owns: "libsodium sealed-box crypto wrapper (ready/hexToBytes/seal etc.)"
+    serves_component: null
+    in_degree: null
+    tests: [form/src/crypto.test.ts, form/src/envelope.test.ts, form/src/submit.test.ts, form/src/model.test.ts]
+    strongest_link: import
+  - path: form/src/envelope.ts
+    owns: "outer/inner envelope builders for the sealed submission"
+    serves_component: null
+    in_degree: null
+    tests: [form/src/submit.test.ts]
+    strongest_link: import
+  - path: form/src/submit.ts
+    owns: "classifyResponse()/postEnvelope(): submission POST + response classification"
+    serves_component: null
+    in_degree: null
+    tests: [form/src/submit.test.ts]
+    strongest_link: import
+  - path: form/src/json.ts
+    owns: "JsonObject type + helpers"
+    serves_component: null
+    in_degree: null
+    tests: [form/src/model.test.ts]
+    strongest_link: import
+  - path: form/src/consent.ts
+    owns: "consent text + digest for the remote form"
+    serves_component: null
+    in_degree: null
+    tests: [form/src/consent.test.ts]
+    strongest_link: path-ref
+    caveat: "same-basename convention, not a confirmed import grep this session"
+  - path: form/scripts/manifest.ts
+    owns: "D8 manifest generation logic"
+    serves_component: null
+    in_degree: null
+    tests: [form/scripts/manifest.test.ts]
+    strongest_link: path-ref
+    caveat: "same-basename convention, not a confirmed import grep this session"
+  - path: relay/src/index.ts
+    owns: "Worker entry: routes /submit, /receipts, /blob/:id"
+    serves_component: null
+    in_degree: null
+    tests: [relay/test/helpers.ts]
+    strongest_link: import
+  - path: relay/src/env.ts
+    owns: "Env interface: KV binding + config vars + secrets"
+    serves_component: null
+    in_degree: null
+    tests: [relay/test/helpers.ts]
+    strongest_link: import
+  - path: relay/src/routes/submit.ts
+    owns: "handleSubmit(): POST /submit handler"
+    serves_component: null
+    in_degree: null
+    tests: [relay/test/submit.test.ts]
+    strongest_link: import
+    caveat: "reached transitively: relay/test/submit.test.ts imports relay/src/index.ts (via helpers.ts), which imports this route file directly (relay/src/index.ts:28)"
+  - path: relay/src/routes/receipts.ts
+    owns: "handleReceipts(): GET /receipts handler"
+    serves_component: null
+    in_degree: null
+    tests: [relay/test/receipts.test.ts]
+    strongest_link: import
+    caveat: "reached transitively via relay/src/index.ts:29, same mechanism as routes/submit.ts above"
+  - path: relay/src/routes/blob.ts
+    owns: "handleGetBlob()/handleDeleteBlob(): GET/DELETE /blob/:id handlers"
+    serves_component: null
+    in_degree: null
+    tests: [relay/test/blob.test.ts]
+    strongest_link: import
+    caveat: "reached transitively via relay/src/index.ts:30, same mechanism as routes/submit.ts above"
+  - path: relay/src/lib/cors.ts
+    owns: "submitPreflight(): CORS preflight handling"
+    serves_component: null
+    in_degree: null
+    tests: [relay/test/routing.test.ts]
+    strongest_link: import
+    caveat: "reached transitively via relay/src/index.ts:31"
+  - path: relay/src/lib/http.ts
+    owns: "internalError()/methodNotAllowed()/notFound()/errorName(): response helpers"
+    serves_component: null
+    in_degree: null
+    tests: [relay/test/routing.test.ts]
+    strongest_link: import
+    caveat: "reached transitively via relay/src/index.ts:32"
+  - path: scripts/generate-crypto-vectors.js
+    owns: "cross-implementation crypto test-vector generator producing fixtures/crypto/sealed-box-vectors.json"
+    serves_component: null
+    in_degree: null
+    tests: [core/crates/cn-ingest/tests/crypto_vectors.rs]
+    strongest_link: path-ref
+  - path: fixtures/crypto/sealed-box-vectors.json
+    owns: "cross-implementation crypto test vectors (Rust/libsodium.js parity)"
+    serves_component: null
+    in_degree: null
+    tests: [core/crates/cn-ingest/tests/crypto_vectors.rs]
+    strongest_link: path-ref
+
+orphan_files_without_test_coverage:
+  - { path: core/crates/cn-api/Cargo.toml, owns: "crate manifest", serves_component: null, in_degree: null }
+  - { path: core/crates/cn-graph/Cargo.toml, owns: "crate manifest", serves_component: null, in_degree: null }
+  - { path: core/crates/cn-ingest/Cargo.toml, owns: "crate manifest", serves_component: null, in_degree: null }
+  - { path: core/crates/cn-model/Cargo.toml, owns: "crate manifest", serves_component: null, in_degree: null }
+  - { path: core/crates/cn-perm/Cargo.toml, owns: "crate manifest", serves_component: null, in_degree: null }
+  - { path: core/crates/cn-schema/Cargo.toml, owns: "crate manifest", serves_component: null, in_degree: null }
+  - { path: core/crates/cn-store/Cargo.toml, owns: "crate manifest", serves_component: null, in_degree: null }
+  - { path: core/crates/cn-sync/Cargo.toml, owns: "crate manifest", serves_component: null, in_degree: null }
+  - { path: core/crates/cn-wasm/Cargo.toml, owns: "crate manifest", serves_component: null, in_degree: null }
+  - { path: core/crates/cn-wasm/src/lib.rs, owns: "wasm-bindgen wrapper re-exporting cn-api; 0 tests per scout-core section 6", serves_component: null, in_degree: null }
+  - { path: core/cli/Cargo.toml, owns: "CLI crate manifest", serves_component: null, in_degree: null }
+  - { path: core/cli/examples/emit-approve-decision.rs, owns: "opt-in example emitting an approve decision for the e2e rehearsal script; not invoked by any test in the census", serves_component: null, in_degree: null }
+  - { path: core/cli/src/intake/backup.rs, owns: "offline key-backup verify subcommand; no matching intake_backup.rs test file found", serves_component: null, in_degree: null }
+  - { path: core/cli/src/intake/fingerprint.rs, owns: "key-fingerprint display subcommand; no matching test file found", serves_component: null, in_degree: null }
+  - { path: core/cli/src/intake/keymat.rs, owns: "key-material handling; the file with R0's clippy lint at line 258 (useless_borrows_in_formatting, per the director ledger); no matching test file found", serves_component: null, in_degree: null }
+  - { path: core/cli/src/intake/mod.rs, owns: "intake subcommand module: exposes keygen/fingerprint/selftest/backup/pull (mod.rs:44-80, per scout-intake)", serves_component: null, in_degree: null }
+  - { path: core/cli/src/intake/queue.rs, owns: "queue path-shape helpers; no matching test file found", serves_component: null, in_degree: null }
+  - { path: core/cli/src/intake/selftest.rs, owns: "cn intake selftest --dry rehearsal command (the R1 keygen-rehearsal mechanism)", serves_component: null, in_degree: null }
+  - { path: app/src/state/README.md, owns: "1-line doc note (per scout-app section 1)", serves_component: null, in_degree: null }
+  - { path: app/src/state/effects.ts, owns: "loadGroup()/refreshProjection()/runSearch()/openDetail() side-effect functions", serves_component: null, in_degree: null }
+  - { path: app/src/state/selectors.ts, owns: "selectFocusedEntity()/selectVisibleStoryStep() etc. state queries", serves_component: null, in_degree: null }
+  - { path: app/src/theme/css.ts, owns: "CSS custom-property generation from theme tokens", serves_component: null, in_degree: null }
+  - { path: app/src/theme/cvd.ts, owns: "color-vision-deficiency transforms (protanopia/deuteranopia/tritanopia)", serves_component: null, in_degree: null }
+  - { path: app/src/theme/defaults.ts, owns: "default theme token values", serves_component: null, in_degree: null }
+  - { path: app/src/ui/README.md, owns: "doc describing P1.4-P1.7 feature specs and accessibility baseline", serves_component: null, in_degree: null }
+  - { path: app/src/ui/dom.ts, owns: "el()/uiId() small DOM helpers", serves_component: null, in_degree: null }
+  - { path: app/src/ui/ui.css, owns: "UI stylesheet; outside any module graph per the attachment-rules caveat catalogue", serves_component: null, in_degree: null }
+  - { path: app/src/vite-env.d.ts, owns: "Vite ambient type declaration", serves_component: null, in_degree: null }
+  - { path: app/src/window.d.ts, owns: "window ambient type declaration", serves_component: null, in_degree: null }
+  - { path: app/src/viz/README.md, owns: "doc: camera tween, quality tiers, fresnel halos, instance picking", serves_component: null, in_degree: null }
+  - { path: app/src/viz/picking.ts, owns: "Raycaster-based instance picking", serves_component: null, in_degree: null }
+  - { path: app/src/viz/projection.ts, owns: "degreeByEntityId()/entityLabel()/projectedEdges()/projectedEntities(); imported by app/src/ui/flat.ts (a source file, not a test), so no direct test-import edge was found this session", serves_component: null, in_degree: null }
+  - { path: app/src/viz/troika-three-text.d.ts, owns: "manual ambient types for troika-three-text 0.52.x", serves_component: null, in_degree: null }
+  - { path: app/src/wasm/README.md, owns: "1-line doc note (per scout-app section 1)", serves_component: null, in_degree: null }
+  - { path: app/src/wasm/worker.ts, owns: "worker entry: wasm initialization, request dispatch", serves_component: null, in_degree: null }
+  - { path: app/spike/README.md, owns: "spike doc", serves_component: null, in_degree: null }
+  - { path: app/spike/index.html, owns: "spike harness HTML shell", serves_component: null, in_degree: null }
+  - { path: app/spike/main.ts, owns: "spike bootstrap", serves_component: null, in_degree: null }
+  - { path: app/spike/candidates/forcegraph.ts, owns: "3d-force-graph candidate spike, rejected per ADR-004", serves_component: null, in_degree: null }
+  - { path: app/spike/candidates/instanced.ts, owns: "instanced-Three.js candidate spike, the ADR-004-accepted approach", serves_component: null, in_degree: null }
+  - { path: app/spike/candidates/stock.ts, owns: "stock-Three.js candidate spike, rejected per ADR-004", serves_component: null, in_degree: null }
+  - { path: form/src/config.ts, owns: "form runtime config (relay origin, template source)", serves_component: null, in_degree: null }
+  - { path: form/src/main.ts, owns: "form app bootstrap", serves_component: null, in_degree: null }
+  - { path: form/src/libsodium.d.ts, owns: "ambient types for libsodium-wrappers", serves_component: null, in_degree: null }
+  - { path: form/src/style.css, owns: "form stylesheet", serves_component: null, in_degree: null }
+  - { path: form/src/vite-env.d.ts, owns: "Vite ambient type declaration", serves_component: null, in_degree: null }
+  - { path: form/scripts/gen-manifest.mjs, owns: "D8 manifest CLI entry wrapping form/scripts/manifest.ts", serves_component: null, in_degree: null }
+  - { path: form/package.json, owns: "form package manifest", serves_component: null, in_degree: null }
+  - { path: form/tsconfig.json, owns: "form TypeScript config", serves_component: null, in_degree: null }
+  - { path: form/vite.config.ts, owns: "form Vite build config: base path, CN_FORM_RELAY_ORIGIN, DEFAULT_RELAY_ORIGIN", serves_component: null, in_degree: null }
+  - { path: form/index.html, owns: "form HTML shell + CSP meta tag", serves_component: null, in_degree: null }
+  - { path: relay/src/lib/auth.ts, owns: "bearer-token auth check for control-plane routes; likely used internally by routes/receipts.ts and routes/blob.ts, not confirmed by a direct grep this session", serves_component: null, in_degree: null }
+  - { path: relay/src/lib/config.ts, owns: "env-var parsing/validation for the Worker", serves_component: null, in_degree: null }
+  - { path: relay/src/lib/hex.ts, owns: "hex encode/decode helpers", serves_component: null, in_degree: null }
+  - { path: relay/src/lib/kv.ts, owns: "KV namespace read/write helpers (blob:/ledger: key prefixes)", serves_component: null, in_degree: null }
+  - { path: relay/src/lib/ratelimit.ts, owns: "per-IP rate-limit window logic (KV-backed, D-084)", serves_component: null, in_degree: null }
+  - { path: relay/.dev.vars.example, owns: "local wrangler dev secrets template", serves_component: null, in_degree: null }
+  - { path: relay/.gitignore, owns: "relay-local gitignore rules", serves_component: null, in_degree: null }
+  - { path: relay/package.json, owns: "relay package manifest", serves_component: null, in_degree: null }
+  - { path: relay/tsconfig.json, owns: "relay TypeScript config", serves_component: null, in_degree: null }
+  - { path: relay/vitest.config.ts, owns: "relay vitest + cloudflare:test config", serves_component: null, in_degree: null }
+  - { path: relay/wrangler.toml, owns: "Worker deploy config: KV binding, size/rate/TTL vars, compatibility_date", serves_component: null, in_degree: null }
+  - { path: scripts/build-form.ps1, owns: "form build orchestrator (relay blueprint step 6)", serves_component: null, in_degree: null }
+  - { path: scripts/build-form.sh, owns: "bash delegate to build-form.ps1", serves_component: null, in_degree: null }
+  - { path: scripts/e2e-remote-intake.ps1, owns: "opt-in automated form-to-graph rehearsal (not in check-all)", serves_component: null, in_degree: null }
+  - { path: scripts/e2e-remote-intake.sh, owns: "bash delegate to the e2e rehearsal script", serves_component: null, in_degree: null }
+  - { path: scripts/e2e/prepare-pull-config.mjs, owns: "prepares cn intake pull config for the e2e rehearsal", serves_component: null, in_degree: null }
+  - { path: scripts/e2e/seal-submission.mjs, owns: "seals a synthetic submission via real form crypto for the e2e rehearsal", serves_component: null, in_degree: null }
+  - { path: scripts/package.json, owns: "scripts/ package manifest (libsodium-wrappers dependency for e2e scripts)", serves_component: null, in_degree: null }
+  - { path: scripts/pii-allowlist.txt, owns: "operator-identity email allowlist for the PII scan", serves_component: null, in_degree: null }
+  - { path: schemas/README.md, owns: "schema inventory doc", serves_component: null, in_degree: null }
+  - { path: schemas/group-template.schema.json, owns: "group-template schema; no direct test import confirmed this session (npm run validate:templates lives outside the declared census roots)", serves_component: null, in_degree: null }
+  - { path: schemas/theme-tokens.schema.json, owns: "theme-token schema; no direct test import confirmed this session", serves_component: null, in_degree: null }
+  - { path: fixtures/README.md, owns: "fixtures inventory doc", serves_component: null, in_degree: null }
+  - { path: fixtures/intake/fisheries-committee.submissions.json, owns: "synthetic intake submissions fixture, fisheries-committee group", serves_component: null, in_degree: null }
+  - { path: fixtures/intake/research-network.submissions.json, owns: "synthetic intake submissions fixture, research-network group", serves_component: null, in_degree: null }
+  - { path: fixtures/templates/fisheries-committee.template.json, owns: "fisheries-committee synthetic group template; not named in any P-id's Touches line (research-network is the one explicitly cited, at P3.5)", serves_component: null, in_degree: null }
+
+orphan_tests:
+  - path: core/crates/cn-api/tests/intake_facade.rs
+    asserts: true
+    reaches: []
+  - path: core/crates/cn-api/tests/measure.rs
+    asserts: true
+    reaches: []
+  - path: core/crates/cn-ingest/tests/crypto_vectors.rs
+    asserts: true
+    reaches: [fixtures/crypto/sealed-box-vectors.json]
+  - path: core/crates/cn-schema/tests/blueprint.rs
+    asserts: true
+    reaches: [core/crates/cn-schema/src/lib.rs, core/crates/cn-schema/src/types.rs, core/crates/cn-schema/src/validate.rs]
+  - path: core/crates/cn-store/tests/intake_seam.rs
+    asserts: true
+    reaches: [core/crates/cn-store/src/seam.rs]
+  - path: core/cli/tests/intake_apply.rs
+    asserts: true
+    reaches: [core/cli/src/intake/apply.rs]
+  - path: core/cli/tests/intake_bundle.rs
+    asserts: true
+    reaches: [core/cli/src/intake/bundle.rs]
+  - path: core/cli/tests/intake_keygen.rs
+    asserts: true
+    reaches: [core/cli/src/intake/keygen.rs]
+  - path: core/cli/tests/intake_pull.rs
+    asserts: true
+    reaches: [core/cli/src/intake/pull.rs]
+  - path: core/cli/tests/intake_pull_cli.rs
+    asserts: true
+    reaches: [core/cli/src/intake/pull.rs]
+  - path: app/src/state/intake.test.ts
+    asserts: true
+    reaches: [app/src/state/intake.ts, app/src/state/actions.ts, app/src/state/state.ts, app/src/state/reducer.ts]
+  - path: app/src/state/intake-idb.test.ts
+    asserts: true
+    reaches: [app/src/state/intake.ts]
+  - path: app/src/state/intake-roundtrip.test.ts
+    asserts: true
+    reaches: [app/src/state/intake.ts]
+  - path: app/src/state/search.test.ts
+    asserts: true
+    reaches: [app/src/state/search.ts]
+  - path: app/src/theme/theme.test.ts
+    asserts: true
+    reaches: [app/src/theme/color.ts, app/src/theme/contrast.ts, app/src/theme/derive.ts, app/src/theme/tokens.ts]
+  - path: app/src/ui/format.test.ts
+    asserts: true
+    reaches: [app/src/ui/format.ts]
+  - path: app/src/wasm/client.test.ts
+    asserts: true
+    reaches: [app/src/wasm/client.ts, app/src/wasm/protocol.ts]
+  - path: form/scripts/manifest.test.ts
+    asserts: true
+    reaches: [form/scripts/manifest.ts]
+  - path: form/src/consent.test.ts
+    asserts: true
+    reaches: [form/src/consent.ts]
+  - path: form/src/crypto.test.ts
+    asserts: true
+    reaches: [form/src/crypto.ts]
+  - path: form/src/envelope.test.ts
+    asserts: true
+    reaches: [form/src/crypto.ts, form/src/envelope.ts]
+  - path: form/src/submit.test.ts
+    asserts: true
+    reaches: [form/src/crypto.ts, form/src/envelope.ts, form/src/submit.ts]
+  - path: relay/test/blob.test.ts
+    asserts: true
+    reaches: [relay/src/routes/blob.ts]
+  - path: relay/test/receipts.test.ts
+    asserts: true
+    reaches: [relay/src/routes/receipts.ts]
+  - path: relay/test/routing.test.ts
+    asserts: true
+    reaches: [relay/src/index.ts, relay/src/lib/cors.ts, relay/src/lib/http.ts]
+  - path: relay/test/submit.test.ts
+    asserts: true
+    reaches: [relay/src/index.ts, relay/src/routes/submit.ts]
+  - path: relay/test/env.d.ts
+    asserts: false
+    reaches: []
+  - path: relay/test/helpers.ts
+    asserts: false
+    reaches: [relay/src/index.ts, relay/src/env.ts]
+  - path: relay/test/setup.ts
+    asserts: false
+    reaches: []
+
+census_closes:
+  files_scouted: 203
+  attached_to_a_task: 56
+  orphans_with_test_coverage: 70
+  orphans_without_test_coverage: 77
+  # 56 + 70 + 77 = 203. Test files (47 total: 13 core/crates + 6 core/cli + 15
+  # app/src + 6 form + 7 relay) are tracked separately above under orphan_tests
+  # (29 uncited by any task) and under tasks[].tests (18 cited by at least one
+  # task) - not part of this source-file arithmetic, per method.files_partition.

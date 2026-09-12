@@ -1,0 +1,600 @@
+roster_version: 1
+project: community-connector (Community Navigator)
+planning_authority: PLAN_1.0.md (v1.1, Phase 5 reconciliation 2026-07-24) for the P-ids; this
+  roster's own sessions (R0-R7) are director-fixed additions for the 2026-09-12 pickup,
+  not PLAN_1.0.md ids - see TRACE.yaml's tasks.R0-R7 notes
+updated: 2026-09-12
+plan_tier: unverified   # see state.unverified item 1 - no seat/plan was named this session
+
+evidence:
+  repo_head: 375e8b2
+  trace: TRACE.yaml
+  trace_commit: 375e8b2
+  reconciliation: docs/planning/RECONCILIATION-2026-09-12.md
+  reconciliation_commit: 375e8b2
+  tiered_from: verdicts (bootstrap)
+  # "verdicts (bootstrap)" per the director's brief: RECONCILIATION-2026-09-12.md's own
+  # verdicts (verified_done/partial/not_started/claimed_not_verified) are BOOTSTRAP-MODE
+  # verdicts - no imports.json, no per-cluster scout dispatch - built from the same four
+  # 2026-09-12 pickup scout reports TRACE.yaml uses, not from a resolved module graph.
+  # R0-R7's own tiers are director-fixed (stated in the brief as non-negotiable), not
+  # derived by this roster's Pass 2; only their reads/budgets/gates are this session's
+  # own judgement.
+
+state:
+  version: "v0.1.0 in progress (D-052 committed near-term deliverable; not tagged)"
+  branch: main
+  repo_head: 375e8b2 (2026-08-11T17:04:41-07:00) - confirmed this session via `git log -1
+    --format="%H %cI"`
+  ahead_of_origin: 31 commits, unpushed (confirmed this session via `git rev-list --count
+    origin/main..main`; matches director ledger and RECONCILIATION-2026-09-12.md's
+    Arithmetic note)
+  tree_status: NOT clean at this exact moment - `git status --porcelain` (read-only, this
+    session) shows " M HANDOFF.md" (modified, not by this session - this session made no
+    edits to HANDOFF.md) and four untracked paths from this pickup arc's own prior work
+    (TRACE.yaml, docs/planning/, docs/research/discovery-2026-09-12.md) plus this session's
+    own new SESSION_ROSTER.yaml and .claude/agents/*.md. The director ledger's "tree clean"
+    describes commit 375e8b2 itself, which is still HEAD; nothing has been committed since.
+    Director note at close (2026-09-12): the HANDOFF.md modification was the director's own
+    Pickup block and corrections; all of the above landed as four docs-only commits on main
+    (reconciliation; backbone + agents; discovery memo; HANDOFF + NEXT_SESSION), unpushed -
+    see `git log --oneline -4` and the HANDOFF.md Pickup block.
+  verified_working:
+    - "check-all 11 of 12 PASS at HEAD 375e8b2 (director ledger, reconfirmed by
+       RECONCILIATION-2026-09-12.md); the sole failure is a toolchain-drift rust-clippy lint,
+       not a regression (see broken_or_unknown)"
+    - "GroupRole::Facilitator, is_facilitator_or_governance, and a 13-Facilitator-occurrence
+       authority-matrix test suite are real and tested (core/crates/cn-model/src/group.rs:62,
+       core/crates/cn-perm/src/viewer.rs:46, core/crates/cn-perm/tests/authority_matrix.rs -
+       all confirmed this session via TRACE.yaml's P3.1-P3.4 attachments), even though
+       PLAN_1.0.md's own checkboxes for P3.1-P3.4 read unchecked"
+    - "the facilitator wizard (app/src/ui/intake/panel.ts, mountIntakeWizard) and the
+       template-driven entry forms + pending-review queue (app/src/ui/forms/*,
+       app/src/ui/intake/model.ts) are real, tested code (TRACE.yaml P3.5/P3.6)"
+    - "cn-api query_paths/entity_detail/search and cn-graph shortest_path/neighborhood/
+       degrees/search are real and tested (TRACE.yaml P1.4/P1.5/P5.1); no candidate-
+       resolution/need-term routing layer or graph centrality measures (betweenness/
+       Jaccard/community detection) sit on top of them yet (discovery-2026-09-12.md Track B,
+       confirmed structurally by this session's own grep of cn-graph/src)"
+    - "schemas/ now holds 5 versioned schemas incl. op-log and story-path with
+       accepted_schema_version defs (schemas/op-log.schema.json:19,
+       schemas/story-path.schema.json:17) - PLAN_1.0.md:98 still claims only 2 exist,
+       a stale, self-disclaimed line (PLAN_1.0.md:121-123)"
+  broken_or_unknown:
+    - "rust-clippy FAILS at core/cli/src/intake/keymat.rs:258:39
+       (useless_borrows_in_formatting) under rustc/cargo 1.98.1; no rust-toolchain.toml
+       exists anywhere in the repo (director ledger; this is R0's target)"
+    - "relay/ and form/ vitest suites (47/47 each per D-089, 2026-08-11) were not re-run by
+       any scout or this session's own commands - RECONCILIATION-2026-09-12.md Finding 2:
+       'could not have looked,' not 'looked and found nothing'"
+    - "no real-browser Playwright smoke of the built form exists anywhere in the census
+       (form/, scripts/, or app/) - confirmed independently by scout-intake AND this
+       session's TRACE.yaml build (P2.4 has zero files/tests)"
+    - ".github/ does not exist at repo root - no GitHub Pages deploy workflow (confirmed
+       this session by `find`, matching scout-intake and RECONCILIATION-2026-09-12.md)"
+    - "core/cli/src/lib.rs's `ingest` and `snapshot` subcommands are explicit parked stubs
+       (stub_ingest/stub_snapshot) whose error text still says 'A human must answer G-RAT
+       before any ingest behavior ships' even though G-RAT was RESOLVED 2026-07-24 (D-052)
+       - a stale stub message this session's own grep found while building TRACE.yaml
+       (core/cli/src/lib.rs:105-120), not previously flagged in RECONCILIATION-2026-09-12.md"
+    - "relay/ (the entire Cloudflare Worker, 19 non-test source files) is named nowhere in
+       PLAN_1.0.md's Touches lines for any P-id - TRACE.yaml's single largest orphan
+       cluster, corroborating RECONCILIATION-2026-09-12.md Finding 1's identical gap in
+       HANDOFF.md's own path table"
+    - "the D-023 human sign-off on the intake consent text has not happened
+       (docs/design/intake-consent-text-draft-2026-07-24.md still carries its DRAFT banner);
+       the keygen ceremony has not been executed for real (by design, off-repo)"
+  context_hazards:
+    - { file: DECISIONS.md, lines: 2293, est_tokens: 22000, owns: "durable decision record D-001..D-089; read by section/range, never whole" }
+    - { file: PLAN_1.0.md, lines: 1259, est_tokens: 12000, owns: "the P-id route map this trace and roster key off of" }
+    - { file: HANDOFF.md, lines: 406, est_tokens: 4000, owns: "live-state narrative; currently has one uncommitted local modification (see tree_status)" }
+    - { file: core/crates/cn-ingest, lines: "12 src modules, ~76 tests", est_tokens: 9000, owns: "intake domain logic - the crate R3's build session works inside" }
+    - { file: app/src/viz, lines: "18 files, ~2680 lines (scout-app section 1)", est_tokens: 9500, owns: "the instanced-Three rendering layer R4b's presenter mode extends" }
+  claude_md:
+    root: true
+    path: CLAUDE.md
+    nested: []
+    stale_lines_found_not_applied:
+      - { line: "CLAUDE.md:66", text: "\"Rendering stays in TypeScript (3d-force-graph + Three.js to start)\"", problem: "contradicted by the binding ADR-004 (docs/adr/ADR-004-renderer.md:35-37: no 3d-force-graph in product code); confirmed by RECONCILIATION-2026-09-12.md cross-cutting contradiction 1 and independently by scout-app (no production 3d-force-graph import found)", proposed_edit: "NOT APPLIED - out of scope for this roster; propose in a future CLAUDE.md-maintenance session, per CLAUDE.md's own rule that architecture stances change only via ADR + one adversarial Codex round, which ADR-004 already satisfied - the prose line just needs to catch up" }
+      - { line: "CLAUDE.md:88", text: "crate list: \"cn-model cn-schema cn-perm cn-graph cn-store cn-sync cn-ingest cn-wasm\" (8 named)", problem: "omits cn-api; core/Cargo.toml has 9 crates + cli = 10 workspace members (confirmed this session and by RECONCILIATION-2026-09-12.md drift row 11)", proposed_edit: "NOT APPLIED - out of scope for this roster; a one-line fix for a future session" }
+  settings_and_hooks:
+    settings_json: ABSENT (.claude/settings.json not found this session)
+    settings_local_json: ABSENT (.claude/settings.local.json not found this session)
+    claude_agents_dir: ABSENT before this session (.claude/agents/ did not exist; this
+      session's own scout.md and coordinator.md are the first files in it)
+    claude_dir_contents_before_this_session: "scheduled_tasks.lock, worktrees/ (empty) - confirmed this session via `ls -la .claude`, matching the director ledger exactly"
+    dot_agents_dir: "empty (confirmed this session via `ls -la .agents`)"
+    git_pre_commit_hook:
+      status: present
+      path: scripts/hooks/pre-commit
+      installed_by: scripts/install-hooks.ps1 (sets core.hooksPath -> scripts/hooks)
+      behavior: "staged PII scan always runs; when staged paths touch code
+        (core/, app/, schemas/, fixtures/, scripts/), the scoped battery runs:
+        scripts/check-all.ps1 -Staged -Quiet (per D-043 and scripts/hooks/pre-commit:2-9,
+        confirmed this session)"
+      is_the_gate_candidate_of_highest_weight: true
+      # per session-roster's own Pass-1 rule: a Stop-hook-equivalent that runs the gate
+      # outranks a gate this roster would otherwise choose. No session in this roster
+      # proposes disabling or working around it.
+  unverified:
+    - "plan_tier: no Claude Code seat/plan (Pro/Max/Team/Enterprise/API) was named by the
+       human this session, so model/effort billing-tier implications (e.g. Fable's
+       usage-credit consent prompt on Pro vs included-in-limits on Max) could not be
+       resolved. All model/effort assignments below are chosen on task shape, not tier;
+       revisit if a tier is named."
+    - "relay/form vitest suite results (47/47 each, D-089) - not re-run this session or any
+       2026-09-12 pickup scout; R1's gate re-establishes this before deploy."
+    - "in-degree / import-graph ranking of any file - no module graph was built this run
+       (see TRACE.yaml method.orphans); every context_hazard token estimate above is a
+       line-count-based approximation (~4 chars/token per the roster skill's own
+       guidance), not a measured tokenization."
+    - "whether the git worktree(s) under .claude/worktrees/ (present, empty per this
+       session's own `ls`) hold any unmerged work - session-handoff's branch audit (the
+       maintenance-chain entry below) is the mechanism that would answer this; not
+       answered here."
+    - "DECISIONS.md's full text beyond the entries RECONCILIATION-2026-09-12.md sampled
+       (D-023, D-080..D-089) - not reread by this roster; lessons below quote only what
+       RECONCILIATION-2026-09-12.md and the director's brief already surfaced."
+
+defaults:
+  execution_model: claude-sonnet-5
+  execution_effort: high
+  planning_model: claude-opus-5
+  scout_model: claude-haiku-4-5
+  subagent_default: claude-haiku-4-5
+  verification_ladder: ["pwsh scripts/check-all.ps1"]
+  completion_rule: "no completion claim without pasting scripts/check-all.ps1's actual
+    output, plus every session-specific gate command's output, per this repo's own
+    verification-loop rule (CLAUDE.md 'Autonomy protocol')"
+  compaction_rule: "/clear after two failed corrections on the same defect; write a
+    one-paragraph handover into HANDOFF.md's 'next actions' section first"
+  guarded_paths: [".github/workflows/**"]
+  hooks:
+    PreCommit: "scripts/hooks/pre-commit (present; staged PII scan always, scoped
+      check-all -Staged on code paths) - see state.settings_and_hooks"
+    PreToolUse: "deny Edit|Write under .github/workflows/** without explicit approval -
+      applies to R1, the only session that touches this path"
+  standing_rulings_no_session_may_fix: [D-032, D-037, D-051, D-056.4, ADR-004]
+  # D-032: TSDF tier codes stay primary in the UI. D-037: in-app story authoring is the
+  # v0.1 choice (deliberate, against a generic recommendation) - R6 builds it, never
+  # second-guesses it. D-051: ATNI authors the capability vocabulary AFTER the system is
+  # stable; standard developer language stands until then - R2's 15-committee vocabulary
+  # is verbatim from the director, not a language-authority act. D-056.4: the intake-path
+  # dedup design (client UUIDs + facilitator near-dup surfacing) stands; R3 must reconcile
+  # its own alias/term work with it, not replace it. ADR-004: the renderer stays instanced
+  # Three.js; R4b extends it, never revisits the 3d-force-graph-vs-instanced decision.
+  models_note: "R-session models/efforts below are director-fixed per the brief, not
+    derived by this roster's own Pass 3; see references/roster.md for the model cards
+    that justify each choice where this roster had discretion (R4a/R4b split, R5's
+    default, subagent assignments)."
+
+sessions:
+  # Execution order is the director's ruling from the 2026-09-12 DATE CHECK: the
+  # convention is 2026-09-14 (two days out) and "the visuals are more important than
+  # anything" for the sprint. So the reveal chain (R0 -> R2 -> R4a -> R4b -> R7) runs
+  # first, entirely on synthetic data, with NOTHING going live for the convention
+  # (D-090c). Deploy-bar clearance (R1) and the remaining engineering debt (R3, R5, R6)
+  # run AFTER 2026-09-14, in that order. The maintenance chain is appended as a final
+  # entry per the brief, but its own stop_when notes that it is scheduled to START as
+  # soon as R1 lands - not to wait for R3/R5/R6 - since a branch/plan/roster true-up is
+  # most valuable right after the highest-risk session (R1, deploy-bar) closes.
+
+  - id: S-R0
+    task_ids: [R0]
+    title: "Toolchain pin + clippy fix + troika-three-text dependency fix (director pre-step)"
+    tier: T1
+    model: claude-sonnet-5
+    effort: medium
+    mode: direct
+    run_as: main
+    role: "fixer: three small, unrelated mechanical fixes; land each as its own atomic
+      commit per CLAUDE.md's 'never batch a day's work' rule"
+    skills: []
+    mcp: []
+    subagents: []
+    standing_rulings_no_fix: [D-032, D-037, D-051, D-056.4, ADR-004]
+    reads:
+      - { path: "core/cli/src/intake/keymat.rs", lines: "245-262", est_tokens: 400, why: "the useless_borrows_in_formatting lint site (line 258:39, confirmed this session; the fix is almost certainly removing a `&` before a format! argument)" }
+      - { path: "app/package.json", lines: "1-37", est_tokens: 500, why: "whole file (37 lines) - troika-three-text sits in devDependencies at line 28, imported in production at app/src/viz/labels.ts:2; move it above the devDependencies split at line 18" }
+      - { path: "core/Cargo.toml", lines: "1-19", est_tokens: 250, why: "whole file (19 lines) - confirms cargo/rustc 1.98.1 is the version to pin rust-toolchain.toml to (director ledger); no existing rust-toolchain.toml anywhere in the repo" }
+      - { path: "scripts/check-all.ps1", lines: "1-20", est_tokens: 350, why: "confirms rust-clippy is member 2 of 12 and the exact clippy invocation to verify the fix against" }
+    budget_tokens: 12000
+    gate: "pwsh scripts/check-all.ps1"
+    stop_when: "check-all prints 12/12 PASS (all three fixes verified) and each fix is its
+      own committed conventional commit; this MUST land before any reveal-chain commit
+      (R2/R4a/R4b) is made, since a red check-all would gate every later commit's own
+      verification loop"
+    status: planned
+    outcome: null
+
+  - id: S-R2
+    task_ids: [R2]
+    title: "ATNI convention group template + alias-table placeholder + 15-committee vocabulary (synthetic)"
+    tier: T3
+    model: claude-sonnet-5
+    effort: high
+    mode: plan-then-code
+    run_as: main
+    role: "template author: a committee kind with 15 fixed instances, a member_of edge
+      kind, person attributes per discovery-2026-09-12.md D-094c, an alias-table
+      PLACEHOLDER block (not the R3 matching logic - just the schema shape), all
+      SYNTHETIC fixture data"
+    skills: []
+    mcp: []
+    subagents: []
+    standing_rulings_no_fix: [D-032, D-037, D-051, D-056.4, ADR-004]
+    committees_verbatim: [Energy, Taxation, "Education (K-12)", ICWA, "Law & Justice",
+      Philanthropy, "Telecomms & Tech", "Food Sovereignty", "Economic Development",
+      "Native Vote", TERO, Gaming, "Drug Abuse & Prevention", Housing,
+      "Climate Resilience"]
+    reads:
+      - { path: "schemas/group-template.schema.json", lines: "1-60", est_tokens: 700, why: "additive-field policy (additionalProperties:false means a new committee kind + alias-table block is a version bump, per discovery-2026-09-12.md Track B)" }
+      - { path: "fixtures/templates/research-network.template.json", lines: "1-40", est_tokens: 500, why: "the shape of an existing synthetic template to follow" }
+      - { path: "core/crates/cn-model/src/group.rs", lines: "1-70", est_tokens: 900, why: "GroupRole/entity-kind model the new committee kind must fit" }
+      - { path: "docs/research/discovery-2026-09-12.md", lines: "184-215", est_tokens: 500, why: "D-094c's exact attribute list (display_name, tribe, role, affiliations, areas_of_interest, specialties, events_of_interest, contact_email, contact_preference) and the consent-as-structural-checkbox-gate requirement (D-030)" }
+    budget_tokens: 60000
+    gate: "pwsh scripts/check-all.ps1 (must show npm run validate:templates green as one of the 12 members) AND a manual pii-scan pass confirming every new fixture value is under the @example.test namespace"
+    stop_when: "check-all is 12/12 green, validate:templates passes the new template, and
+      every synthetic person/committee value in the new fixture uses @example.test - never
+      a real name, real committee roster, or real contact"
+    status: planned
+    outcome: null
+
+  - id: S-R4a
+    task_ids: [R4]
+    title: "R4a: cn-graph event measures + cn-api JSON call (Rust half of presentation mode)"
+    tier: T3
+    model: claude-sonnet-5
+    effort: high
+    mode: plan-then-code
+    run_as: main
+    role: "graph engineer: add degree (exists)/single-tie/shared-committee Jaccard/
+      betweenness (if budget allows) to cn-graph, deterministic over the BTreeMap
+      adjacency already in place; expose them through a new cn-api JSON call in the
+      style of query_paths; every measure ships a plain-language explanation string
+      the detail panel can render"
+    skills: []
+    mcp: []
+    subagents:
+      - { name: claim-verifier, model: claude-sonnet-5, effort: medium, purpose: "re-run
+          every new measure's test against the synthetic ATNI fixture and confirm the
+          plain-language explanation string matches the actual computed value before any
+          completion claim" }
+    standing_rulings_no_fix: [D-032, D-037, D-051, D-056.4, ADR-004]
+    reads:
+      - { path: "core/crates/cn-graph/src/query.rs", lines: "1-170", est_tokens: 2200, why: "whole file - the existing GraphIndex/shortest_path/neighborhood/degrees/search surface this session's new measures extend, never replace" }
+      - { path: "core/crates/cn-api/src/lib.rs", lines: "90-135", est_tokens: 700, why: "the query_paths/query_neighborhood/search JSON-facade pattern the new measures call must follow" }
+      - { path: "docs/research/discovery-2026-09-12.md", lines: "82-137", est_tokens: 900, why: "Track B's exact measure table, cost-at-300-nodes column, and the three community-detection options ranked (deterministic Louvain first, no new dependency)" }
+    budget_tokens: 80000
+    gate: "cargo test --workspace (from core/) green, plus pwsh scripts/check-all.ps1 12/12"
+    stop_when: "cn-api exposes the new measures as one JSON call, cargo test is green, and
+      the claim-verifier subagent has independently reproduced at least one measure's
+      value on the R2 fixture"
+    status: planned
+    outcome: null
+
+  - id: S-R4b
+    task_ids: [R4]
+    title: "R4b: app presenter mode (mainstage reveal, TypeScript half of presentation mode)"
+    tier: T3
+    model: claude-sonnet-5
+    effort: high
+    mode: plan-then-code
+    run_as: main
+    role: "frontend engineer: new `present` view mode through the state machine (I4),
+      hidden chrome, label scale ~1.8x with visible cap lowered to 30, auto-orbit reusing
+      the existing drift policy, zoomToFit story-beat camera presets, connector +
+      edge-of-network highlight fed by R4a's new cn-api call, prefers-reduced-motion
+      variant for every new animation"
+    skills: [frontend-design]
+    mcp: [playwright-cli]
+    subagents:
+      - { name: claim-verifier, model: claude-sonnet-5, effort: medium, purpose: "confirm
+          30 FPS on the Iris Xe reference at the R2 synthetic fixture scale and confirm the
+          prefers-reduced-motion variant actually suppresses the new auto-orbit/zoomToFit
+          animations, via a real Playwright-driven screenshot/perf pass, not a code read" }
+    standing_rulings_no_fix: [D-032, D-037, D-051, D-056.4, ADR-004]
+    reads:
+      - { path: "app/src/viz/camera.ts", lines: "1-120", est_tokens: 1600, why: "existing driftActive()/flyTo()/idle-drift policy at 0.2 speed reuse target (discovery-2026-09-12.md Track C)" }
+      - { path: "app/src/state/state.ts", lines: "1-233", est_tokens: 3000, why: "whole file - the view-mode union type (present is currently absent, per scout-app section 6) this session extends" }
+      - { path: "docs/design/DESIGN_BRIEF.md", lines: "1-40", est_tokens: 600, why: "sections 3.2 (story-beat camera preset rules), 4.2/4.4 (presenter-mode projector legibility), 6 (Iris Xe budget/quality tiers) - read the specific sections, not the whole brief" }
+      - { path: "docs/research/discovery-2026-09-12.md", lines: "139-183", est_tokens: 1400, why: "Track C's full needs table (presenter mode/auto-orbit/story-beat presets/connectors/edge-pulse stretch/committee-affinity color/projector legibility) and the fits-under-budget verdict for each" }
+    budget_tokens: 90000
+    gate: "npm run typecheck && npm run build && npm run test (from app/), plus pwsh scripts/check-all.ps1 12/12, plus a director screenshot review (HUMAN-ONLY per AGENTS.md - this session cannot self-certify it)"
+    stop_when: "check-all is green, the claim-verifier subagent's own Playwright run
+      confirms 30 FPS and the reduced-motion variant, and the director has been handed a
+      screenshot/live build to review - completion is NOT claimed on the code landing
+      alone, since the gate's visual half is human-only"
+    status: planned
+    outcome: null
+
+  - id: S-R7
+    task_ids: [R7]
+    title: "Convention rehearsal checklist (human-only artifact)"
+    tier: T1
+    model: claude-sonnet-5
+    effort: medium
+    mode: direct
+    run_as: main
+    role: "checklist author: produce docs/runbooks/convention-rehearsal-checklist.md - a
+      dated, human-executable checklist for the full facilitator arc (ingest, reveal,
+      route, story, re-ingest) on synthetic fixtures; this session writes the checklist,
+      it does NOT run the rehearsal (that is the human's act, P5.9's own acceptance)"
+    skills: []
+    mcp: []
+    subagents: []
+    standing_rulings_no_fix: [D-032, D-037, D-051, D-056.4, ADR-004]
+    reads:
+      - { path: "PLAN_1.0.md", lines: "883-889", est_tokens: 200, why: "P5.9's exact acceptance sentence this checklist must satisfy" }
+      - { path: "docs/runbooks/e2e-remote-intake.md", lines: "1-40", est_tokens: 600, why: "the existing manual-runbook style/structure to match (headings only needed, per scout-intake section 5)" }
+      - { path: "docs/design/DESIGN_BRIEF.md", lines: "1-20", est_tokens: 300, why: "any presenter-mode/projector items from R4b that the rehearsal checklist should verify live (e.g. the 1080p projector rehearsal named at discovery-2026-09-12.md Track C row 'Projector legibility')" }
+    budget_tokens: 15000
+    gate: "the checklist file exists at docs/runbooks/convention-rehearsal-checklist.md,
+      is dated, and covers ingest/reveal/route/story/re-ingest end to end; no code gate
+      applies (P5.9/AGENTS.md name this human-only - a machine cannot close it)"
+    stop_when: "the checklist is written and committed; this session does not attempt the
+      rehearsal itself"
+    status: planned
+    outcome: null
+
+  - id: S-R1
+    task_ids: [R1]
+    title: "Deploy-bar clearance: Playwright smoke, Pages workflow, D8 hash step, keygen rehearsal"
+    tier: T4
+    model: claude-sonnet-5
+    effort: high
+    mode: plan-then-code
+    run_as: main
+    role: "deploy engineer: (1) real-browser Playwright smoke of the built form under its
+      real CSP against `wrangler dev` (seal a synthetic submission, POST, assert a
+      receipt); (2) .github/workflows/ GitHub Pages deploy workflow with a post-deploy
+      D8 fetch-and-hash step, guarded by PreToolUse approval; (3) the R4-5 localhost
+      build guard (fail the build if CN_FORM_RELAY_ORIGIN is the localhost default);
+      (4) a keygen ceremony REHEARSAL on synthetic keys via `cn intake selftest --dry`
+      plus the ceremony checklist (docs/design/facilitator-keygen-ceremony.md section 5) -
+      NOT the real ceremony, which is human-only"
+    human_steps:
+      - "D-023 sign-off on the intake consent text (docs/design/intake-consent-text-draft-2026-07-24.md) - this session cannot perform a human review"
+      - "the REAL keygen ceremony on the pilot PC (this session only rehearses it on synthetic keys)"
+      - "setting the repository's Pages source to \"GitHub Actions\" in GitHub Settings (a UI click, not a commit)"
+      - "the Workers Paid tier decision (D-092c, USD 5/month minimum) - a spend decision reserved to the human per CLAUDE.md's human-gates list"
+    skills: []
+    mcp: [playwright-cli, github]
+    subagents:
+      - { name: claim-verifier, model: claude-sonnet-5, effort: high, purpose: "independently re-run the Playwright smoke and the relay/form vitest suites from a clean checkout before any '47/47 green' or 'smoke passes' claim is made - RECONCILIATION-2026-09-12.md Finding 2 exists precisely because nobody did this last time" }
+    standing_rulings_no_fix: [D-032, D-037, D-051, D-056.4, ADR-004]
+    reads:
+      - { path: "docs/runbooks/intake-relay-deploy.md", lines: "1-60", est_tokens: 900, why: "the DRAFT deploy runbook (NOT to be executed until D-059.8 clears) whose steps this session's workflow automates" }
+      - { path: "relay/wrangler.toml", lines: "1-64", est_tokens: 900, why: "whole file - KV binding, size/rate/TTL vars, the REPLACE_WITH_* placeholders a real deploy must resolve" }
+      - { path: "form/vite.config.ts", lines: "1-80", est_tokens: 1100, why: "whole file - base path (/community-connector/), DEFAULT_RELAY_ORIGIN, CN_FORM_RELAY_ORIGIN - the exact localhost value the R4-5 build guard must catch" }
+      - { path: "docs/design/facilitator-keygen-ceremony.md", lines: "1-30", est_tokens: 500, why: "section 5 (offline backup/restore drill) and section 9 (ceremony checklist) - the rehearsal this session performs on synthetic keys only" }
+      - { path: "core/cli/src/intake/selftest.rs", lines: "1-60", est_tokens: 800, why: "the --dry rehearsal mechanism (ephemeral in-memory key, touches no filesystem) this session's rehearsal step calls" }
+      - { path: "docs/adr/ADR-005-remote-intake.md", lines: "1-40", est_tokens: 600, why: "D8's full-bundle-pin browser trust model the post-deploy hash step must satisfy" }
+    budget_tokens: 150000
+    gate: "pwsh scripts/check-all.ps1 12/12 AND the new Playwright smoke test passes
+      against a local `wrangler dev` AND `npm test` in relay/ AND `npm test` in form/ both
+      report their full suite green (47/47 each last recorded, D-089) - re-run fresh this
+      session, not assumed"
+    stop_when: "all four gate legs pass with pasted output, the four human_steps are
+      handed to the human as an explicit checklist (not attempted by this session), and
+      the deploy bar's engineering-owned items (P3.5/P3.6 pipeline, real-browser smoke,
+      Pages workflow, R4-5 guard) are the only ones marked closed - D-023, the real
+      ceremony, the Pages Settings click, and the Workers tier decision stay open,
+      human-owned"
+    status: planned
+    outcome: null
+
+  - id: S-R3
+    task_ids: [R3]
+    title: "Term normalization in cn-ingest with facilitator confirmation + mandatory adversarial round"
+    tier: T4
+    model: claude-opus-5
+    effort: high
+    mode: plan-then-code
+    run_as: main
+    role: "build: alias table as an additive optional block in the group-template schema;
+      matching in cn-ingest at plan-approval time only (NFC/case-fold/trim/whitespace
+      collapse reusing near_dup.rs's one_line/normalize_name, exact alias lookup, a small
+      suffix-stem list, then strsim 0.11.1 Jaro-Winkler at a fixed 0.92 threshold,
+      SUGGEST-only); facilitator confirmation surfaced in the existing review view
+      (app/src/ui/intake/panel.ts): accept or keep-as-written per suggestion; the durable
+      owner (approval.rs) writes the canonical tag and preserves the as-written term in
+      the intake provenance block (I6); every unconfirmed suggestion surfaces as a
+      warning in the run report (I12), never applied silently. ALSO folds in D-089's
+      deferred R2-2 (durable conflict-twin link: the wizard can currently double-admit
+      unlinked conflict twins) as a second, related deliverable in the same session -
+      this session's own call, made because both touch the same approval.rs/decision.rs
+      surface and R2-2 is too small (a link field + one guard) to justify fragmenting
+      into its own permission-adjacent adversarial round"
+    skills: []
+    mcp: []
+    subagents:
+      - { name: reviewer-schema-alias, model: claude-sonnet-5, effort: medium, purpose: "review the schema + alias-table slice only: additive-field policy compliance, version bump correctness, no PII in any alias/term example" }
+      - { name: reviewer-ingest-matching, model: claude-sonnet-5, effort: medium, purpose: "review cn-ingest matching + the plan-approval report only: NFC/case-fold correctness, the 0.92 Jaro-Winkler threshold is suggest-only and never auto-applies, I12 warning visibility" }
+      - { name: reviewer-review-durable, model: claude-sonnet-5, effort: medium, purpose: "review the review-view + decision-file + durable-owner (approval.rs) slice only: as-written term is preserved per I6, R2-2's conflict-twin link is durable and cannot be silently double-admitted" }
+    refute_mandate: true
+    findings_verified_on_disk_before_disposition: true
+    standing_rulings_no_fix: [D-032, D-037, D-051, D-056.4, ADR-004]
+    reads:
+      - { path: "core/crates/cn-ingest/src/near_dup.rs", lines: "1-90", est_tokens: 1100, why: "existing normalize_name()/one_line()/name_match() this session's matching layer reuses rather than reimplements" }
+      - { path: "core/crates/cn-ingest/src/approval.rs", lines: "1-60", est_tokens: 900, why: "the durable owner this session's canonical-tag write and R2-2 conflict-twin link both land in" }
+      - { path: "core/crates/cn-ingest/src/dedup.rs", lines: "1-40", est_tokens: 600, why: "classify_dedup()'s existing transport/semantic verdict shape, which R2-2's conflict-twin link extends rather than replaces" }
+      - { path: "schemas/group-template.schema.json", lines: "1-60", est_tokens: 700, why: "additionalProperties:false - confirms the alias-table block needs a version bump, per the project's additive-field policy" }
+      - { path: "app/src/ui/intake/panel.ts", lines: "1-80", est_tokens: 1100, why: "the existing review view this session adds accept/keep-as-written controls to" }
+      - { path: "docs/research/discovery-2026-09-12.md", lines: "113-133", est_tokens: 700, why: "Track B's full term-normalization design paragraph this session implements verbatim" }
+      - { path: "DECISIONS.md", lines: "2255-2261", est_tokens: 300, why: "D-089's R2-2 finding text (conflict twins staged but not durably linked, possible wizard double-admit) this session's second deliverable closes" }
+    budget_tokens: 220000
+    gate: "pwsh scripts/check-all.ps1 12/12 AND the adversarial round's verdict (PASS,
+      PASS-WITH-NOTES, or FAIL-and-amend) is recorded in DECISIONS.md BY THE HUMAN, not by
+      this session - this is permission-adjacent work per CLAUDE.md's mandatory-round
+      rule, so a session-written verdict does not count as closure"
+    stop_when: "check-all is green, all three reviewer subagents have filed findings
+      verified against the actual working tree (not against the build session's own
+      report), and the human has recorded the round's disposition in DECISIONS.md"
+    status: planned
+    outcome: null
+
+  - id: S-R5
+    task_ids: [R5]
+    title: "Snapshot pipeline self-containment for the convention build (D-048 / P2.3-P2.5)"
+    tier: T3
+    model: claude-sonnet-5
+    effort: high
+    mode: plan-then-code
+    run_as: main
+    role: "build engineer: inline the WASM worker into the single-file snapshot build
+      (main-thread WasmTransport per D-046, replacing the external ~2.1MB worker
+      confirmed at app/src/main.ts:55/app/dist/worker-CtUIZEL0.js) so `npm run
+      build:snapshot` produces one self-contained dist/index.html under the 5MB budget
+      that boots fully offline with no separate worker file"
+    skills: []
+    mcp: []
+    subagents: []
+    standing_rulings_no_fix: [D-032, D-037, D-051, D-056.4, ADR-004]
+    reads:
+      - { path: "app/src/main.ts", lines: "40-90", est_tokens: 700, why: "the Worker(new URL(...)) construction at line 55 this session replaces with a main-thread transport under CN_EMBED_SNAPSHOT" }
+      - { path: "app/src/wasm/worker.ts", lines: "1-106", est_tokens: 1500, why: "whole file - the worker entry/wasm-init/dispatch logic this session moves onto the main thread for the snapshot build only" }
+      - { path: "app/src/wasm/client.ts", lines: "1-173", est_tokens: 2300, why: "whole file - WasmClient's transport abstraction; this session adds a main-thread transport variant alongside the existing worker transport, per D-046" }
+      - { path: "app/vite.config.ts", lines: "1-40", est_tokens: 600, why: "CN_EMBED_SNAPSHOT gate at lines 32-33 and the __CN_SNAPSHOT_MODE__ define this session's inlining hooks into" }
+      - { path: "scripts/check-size.mjs", lines: "1-20", est_tokens: 300, why: "whole file - the 5MB BUDGET_BYTES gate the self-contained artifact must still pass" }
+    budget_tokens: 90000
+    gate: "npm run build:snapshot (from app/) produces a single dist/index.html, and
+      scripts/check-size.mjs on that file exits 0; plus pwsh scripts/check-all.ps1 12/12;
+      plus a manual offline load (file:// or a server with no network) confirming both
+      synthetic fixtures render with no separate worker request in the network panel"
+    stop_when: "build:snapshot's single output file is under 5MB, boots with zero external
+      requests, and both fixtures render"
+    status: planned
+    outcome: null
+
+  - id: S-R6
+    task_ids: [R6]
+    title: "Minimal P4.1 story authoring (in-app, facilitator-authorized)"
+    tier: T3
+    model: claude-sonnet-5
+    effort: high
+    mode: plan-then-code
+    run_as: main
+    role: "feature engineer: add an authoring surface to app/src/ui/ - create/edit/order
+      story steps referencing entities by stable id, gated to facilitator authority
+      (cn-perm's is_facilitator_or_governance, already real per TRACE.yaml P3.1) - on top
+      of the EXISTING playback machinery (storyEntered/storyStepped/storyExited,
+      app/src/state/actions.ts:72-82) and the EXISTING story-path schema
+      (schemas/story-path.schema.json), neither of which this session need rebuild"
+    skills: []
+    mcp: []
+    subagents: []
+    standing_rulings_no_fix: [D-032, D-037, D-051, D-056.4, ADR-004]
+    reads:
+      - { path: "core/crates/cn-model/src/story.rs", lines: "1-90", est_tokens: 1100, why: "whole file - the existing Story/StoryStep model (playback shape only, confirmed this session via TRACE.yaml P4.1) this session's authoring surface writes into, unchanged" }
+      - { path: "app/src/state/actions.ts", lines: "60-100", est_tokens: 500, why: "storyEntered/storyStepped/storyExited - the playback action variants; this session ADDS authoring-specific variants alongside them, per the plan's own P4.1 acceptance ('save/reload/play round-trips a story')" }
+      - { path: "schemas/story-path.schema.json", lines: "1-40", est_tokens: 500, why: "the schema authored stories must validate against at load (I7)" }
+      - { path: "core/crates/cn-perm/src/viewer.rs", lines: "40-55", est_tokens: 400, why: "is_facilitator_or_governance - the exact predicate the authoring surface's permission gate calls" }
+      - { path: "PLAN_1.0.md", lines: "756-763", est_tokens: 300, why: "P4.1's own acceptance sentence this session's gate is measured against" }
+    budget_tokens: 90000
+    gate: "cargo test --workspace green (if the story model gains any Rust-side
+      authoring validation) AND npm run test (app/) green AND pwsh
+      scripts/check-all.ps1 12/12 AND a manual save -> reload -> play round-trip on the
+      R2 synthetic fixture, screen-recorded or screenshotted for the completion claim"
+    stop_when: "a story authored in-app round-trips through save/reload validation (I7)
+      and authoring is denied to a non-facilitator viewer by an actual test, not by
+      inspection"
+    status: planned
+    outcome: null
+
+  - id: S-maintenance-chain
+    task_ids: []
+    title: "Post-R1 true-up: branch audit -> full planning-reconcile -> roster refresh -> handoff"
+    tier: T2
+    model: claude-sonnet-5
+    effort: high
+    mode: plan-then-code
+    run_as: main
+    role: "four-phase maintenance chain, run in this exact sub-order: (1) session-handoff's
+      branch audit (every local branch's tip/ahead-behind/merged/gate result, incl. the
+      empty worktree seen at .claude/worktrees/ this session); (2) planning-reconcile in
+      FULL mode (not bootstrap) - by this point TRACE.yaml exists and R0-R7/R1-landed work
+      gives it real evidence to reconcile against, closing the 'not applicable in
+      bootstrap mode' gaps this run's TRACE.yaml and RECONCILIATION-2026-09-12.md both
+      named (orphan in-degree ranking, dependency ordering); (3) session-roster refresh -
+      re-read THIS file, mark R0/R2/R4a/R4b/R7/R1 done or abandoned with outcomes, re-tier
+      whatever remains; (4) session-handoff's own HANDOFF.md rewrite, closing the loop"
+    ordering_note: "listed last in this file per the director's brief ('add the
+      maintenance chain as a final entry'), but this session's own stop_when schedules it
+      to START as soon as R1 (deploy-bar clearance) lands - not after R3/R5/R6. R1 is the
+      highest-risk, most state-changing session in this roster (new .github/ workflow,
+      new deploy surface, human_steps pending); a branch audit and reconciliation are most
+      valuable immediately after it, while R3/R5/R6 can proceed in parallel or afterward
+      without blocking on this chain."
+    skills: [session-handoff, planning-reconcile, session-roster]
+    mcp: []
+    subagents: []
+    standing_rulings_no_fix: [D-032, D-037, D-051, D-056.4, ADR-004]
+    reads:
+      - { path: "TRACE.yaml", lines: "all", est_tokens: 9000, why: "this session's own trace - the evidence layer the full-mode planning-reconcile phase upgrades from bootstrap to resolved-graph verdicts" }
+      - { path: "docs/planning/RECONCILIATION-2026-09-12.md", lines: "all", est_tokens: 4500, why: "this pickup arc's prior bootstrap-mode reconciliation - the full-mode pass supersedes its 'not applicable' sections 7-8, not its verdicts" }
+      - { path: "SESSION_ROSTER.yaml", lines: "all", est_tokens: 6000, why: "this file - the roster-refresh phase reads it first and updates in place, per the session-roster skill's own rule" }
+    budget_tokens: 120000
+    gate: "session-handoff produces BRANCH_REPORT.md and an updated HANDOFF.md;
+      planning-reconcile (full mode) produces an updated RECONCILIATION doc and
+      PLANNING_AUTHORITY.md; session-roster produces this file updated in place with
+      real outcomes; each of the three skills' own completion criteria stand as this
+      entry's gate - no single shell command covers all four phases"
+    stop_when: "all four phases have run and their four output artifacts exist and are
+      internally consistent with each other (same repo_head cited throughout)"
+    status: planned
+    outcome: null
+
+lessons:
+  - date: 2026-08-11
+    decision_id: D-089
+    model: unverified
+    effort: unverified
+    task: "remote-intake relay adversarial round"
+    observed: "two deploy-blocking form defects escaped every node-only test suite
+      because no one ran the built form in a real browser"
+    root_cause: "the verification ladder had no browser-driven step; vitest/cargo test
+      cannot see a CSP violation or a real DOM interaction failure"
+    change: "browser smoke is now a gate - R1 above makes a real-browser Playwright
+      smoke of the built form a hard gate leg, not an optional extra, and assigns a
+      claim-verifier subagent specifically to re-run it independently"
+  - date: 2026-08-11
+    decision_id: D-088
+    model: unverified
+    effort: unverified
+    task: "step-9 form-to-graph e2e rehearsal"
+    observed: "two intake paths (in-app vs remote-form) emitted different timestamp
+      types (integer vs ISO string) and only the end-to-end rehearsal caught it"
+    root_cause: "unit tests on each path individually never exercised the seam where
+      the two paths' outputs meet in the durable owner"
+    change: "integration e2e before acceptance - no session in this roster claims a
+      pipeline-spanning feature (R1, R3, R6) done from unit tests alone; each carries an
+      end-to-end or round-trip step in its own gate"
+  - date: 2026-08-11
+    decision_id: D-084
+    model: unverified
+    effort: unverified
+    task: "relay Worker test toolchain setup"
+    observed: "a brief named an API that the installed package version had already
+      removed"
+    root_cause: "the brief was written from memory/documentation rather than against the
+      actually-installed package version"
+    change: "resolve tool calls against installed versions, not memory - every session
+      above that touches a pinned dependency (three.js in R4b, strsim/petgraph in R4a/R3,
+      wrangler/libsodium in R1) reads the actual installed version from package.json/
+      Cargo.toml/package-lock.json before writing code against its API, per
+      discovery-2026-09-12.md's own registry-checked version table"
+  - date: 2026-09-12
+    decision_id: D-096c
+    model: unverified
+    effort: unverified
+    task: "this pickup session's own discovery pass"
+    observed: "a calendar-day toolchain move (cargo/rustc advancing past 2026-08-11's
+      pinned state) turned a green tree red: one new clippy lint
+      (useless_borrows_in_formatting) failed check-all with zero code changes"
+    root_cause: "no rust-toolchain.toml existed anywhere in the repo, so `cargo`/`rustc`
+      floated to whatever version the machine had installed rather than the version
+      check-all was last green on"
+    change: "pin the toolchain - R0 above is entirely this fix: a rust-toolchain.toml
+      pinned to the exact version check-all is green on, landed as the FIRST session in
+      this roster so no later session's check-all run is exposed to the same drift"
