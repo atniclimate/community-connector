@@ -93,6 +93,25 @@ describe("layout", () => {
     expect(layoutSnapshot(computeLayout(entities))).toEqual(forward);
     expect(reversed).toEqual(forward);
   });
+
+  it("keeps same-kind entities closer together than entities of different kinds", () => {
+    const kinds = ["person", "organization", "place", "skill", "need", "project"];
+    const entities = kinds.flatMap((kind) =>
+      Array.from({ length: 20 }, (_, index) => ({ id: `${kind}-${index}`, kind, attributes: {} })),
+    );
+    const positions = computeLayout(entities).positions;
+    const same: number[] = [];
+    const cross: number[] = [];
+    for (const [leftIndex, left] of entities.entries()) {
+      for (const right of entities.slice(leftIndex + 1)) {
+        const distance = positions.get(left.id)?.distanceTo(positions.get(right.id) ?? new Vector3()) ?? 0;
+        (left.kind === right.kind ? same : cross).push(distance);
+      }
+    }
+    const median = (values: number[]): number => [...values].sort((a, b) => a - b)[Math.floor(values.length / 2)] ?? 0;
+
+    expect(median(same)).toBeLessThan(median(cross) * 0.6);
+  });
 });
 
 describe("demo generator", () => {

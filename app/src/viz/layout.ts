@@ -41,7 +41,7 @@ function clusterCenter(kind: string): Vector3 {
   const radius = Math.sqrt(Math.max(0, UNIT - y * y));
   const theta = index * RENDER_TOKENS.layout.goldenAngle;
   return new Vector3(Math.cos(theta) * radius, y, Math.sin(theta) * radius)
-    .multiplyScalar(RENDER_TOKENS.layout.clusterRadius);
+    .multiplyScalar(RENDER_TOKENS.layout.radius);
 }
 
 function spikeOffset(entity: ProjectionEntityDto): Vector3 {
@@ -53,7 +53,7 @@ function spikeOffset(entity: ProjectionEntityDto): Vector3 {
   const radius = Math.sqrt(Math.max(0, UNIT - y * y));
   const theta = hashString(`${entity.id}${HASH_THETA_SUFFIX}`) * RENDER_TOKENS.layout.goldenAngle;
   return new Vector3(Math.cos(theta) * radius, y, Math.sin(theta) * radius)
-    .multiplyScalar(RENDER_TOKENS.layout.radius * jitter);
+    .multiplyScalar(RENDER_TOKENS.layout.clusterRadius * jitter);
 }
 
 export function positionForEntity(entity: ProjectionEntityDto): Vector3 {

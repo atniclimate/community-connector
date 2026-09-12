@@ -6,7 +6,7 @@ export const RENDER_TOKENS = {
     tierD: 1,
   },
   layout: {
-    radius: 500,
+    radius: 340,
     clusterRadius: 180,
     minJitter: 0.35,
     maxJitter: 1,
