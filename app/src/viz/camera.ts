@@ -29,11 +29,48 @@ export type ZoomToFitOptions = {
   readonly bearing?: "centroid" | "current";
 };
 
-/** Distance at which a sphere of `radius` fits the narrower of the two FOV axes. */
-export function fitDistance(radius: number, verticalFovDegrees: number, aspect: number): number {
-  const verticalHalf = verticalFovDegrees * Math.PI / 360;
-  const horizontalHalf = Math.atan(Math.tan(verticalHalf) * aspect);
-  return radius / Math.sin(Math.min(verticalHalf, horizontalHalf));
+export type FitFrame = {
+  readonly target: Vector3;
+  readonly distance: number;
+};
+
+/**
+ * Frames `positions` for a camera looking in along `-direction` (unit vector
+ * from target toward camera) with world-up `up`: the target is the center of
+ * the points' screen-plane extent, and the distance is the smallest one that
+ * keeps every point (padded by `pad`) inside both FOV axes. A bounding sphere
+ * would overstate graphs that are deep but narrow from this bearing.
+ */
+export function fitFrame(
+  positions: readonly Vector3[],
+  direction: Vector3,
+  up: Vector3,
+  verticalFovDegrees: number,
+  aspect: number,
+  pad: number,
+): FitFrame {
+  const right = new Vector3().crossVectors(up, direction);
+  if (right.lengthSq() < MIN_TARGET_LENGTH) {
+    right.set(1, 0, 0);
+  }
+  right.normalize();
+  const screenUp = new Vector3().crossVectors(direction, right).normalize();
+  const centroid = positions.reduce((sum, position) => sum.add(position), new Vector3()).divideScalar(positions.length);
+  const coords = positions.map((position) => {
+    const offset = position.clone().sub(centroid);
+    return { x: offset.dot(right), y: offset.dot(screenUp), depth: offset.dot(direction) };
+  });
+  const midX = (Math.min(...coords.map((c) => c.x)) + Math.max(...coords.map((c) => c.x))) / 2;
+  const midY = (Math.min(...coords.map((c) => c.y)) + Math.max(...coords.map((c) => c.y))) / 2;
+  const tanVertical = Math.tan(verticalFovDegrees * Math.PI / 360);
+  const tanHorizontal = tanVertical * aspect;
+  const distance = coords.reduce((best, c) => Math.max(
+    best,
+    c.depth + pad + (Math.abs(c.y - midY) + pad) / tanVertical,
+    c.depth + pad + (Math.abs(c.x - midX) + pad) / tanHorizontal,
+  ), MOTION_OFF);
+  const target = centroid.add(right.multiplyScalar(midX)).add(screenUp.multiplyScalar(midY));
+  return { target, distance };
 }
 
 const MOTION_ON = 1;
@@ -230,18 +267,21 @@ function beginZoomToFit(
   opts: ZoomToFitOptions,
 ): Flight | null {
   const centroid = positions.reduce((sum, position) => sum.add(position), new Vector3()).divideScalar(positions.length);
-  const boundingRadius = positions.reduce(
-    (radius, position) => Math.max(radius, position.distanceTo(centroid)),
-    MOTION_OFF,
-  ) + opts.paddingWorldUnits + RENDER_TOKENS.node.maxRadius;
   const direction = fitDirection(camera, controls, centroid, opts.bearing ?? "centroid");
-  const distance = fitDistance(boundingRadius, camera.fov, camera.aspect);
-  const toPosition = centroid.clone().add(direction.multiplyScalar(distance));
+  const frame = fitFrame(
+    positions,
+    direction,
+    camera.up,
+    camera.fov,
+    camera.aspect,
+    opts.paddingWorldUnits + RENDER_TOKENS.node.maxRadius,
+  );
+  const toPosition = frame.target.clone().add(direction.multiplyScalar(frame.distance));
   return beginFlightTo(
     camera,
     controls,
     toPosition,
-    centroid,
+    frame.target,
     RENDER_TOKENS.camera.beatDurationMs,
     opts.reducedMotion,
     RENDER_TOKENS.camera.beatDurationMs,

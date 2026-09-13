@@ -17,7 +17,7 @@ import {
 } from "three";
 import type { ProjectionDto } from "../state/state";
 import type { Theme } from "../theme/tokens";
-import { fitDistance, motionSettings } from "./camera";
+import { fitFrame, motionSettings } from "./camera";
 import { RENDER_TOKENS } from "./config";
 import { buildEdgeBuffers, buildEdgeLayer, expectedEdgeVertexCount, weightToAlpha } from "./edges";
 import { buildHaloLayer, selectHaloCandidates } from "./halos";
@@ -452,15 +452,39 @@ describe("picking", () => {
 });
 
 describe("camera fit", () => {
-  it("fits the narrower FOV axis so portrait canvases do not clip sideways", () => {
-    const landscape = fitDistance(500, RENDER_TOKENS.camera.fov, 16 / 9);
-    const square = fitDistance(500, RENDER_TOKENS.camera.fov, 1);
-    const portrait = fitDistance(500, RENDER_TOKENS.camera.fov, 9 / 16);
+  const fov = RENDER_TOKENS.camera.fov;
+  const towardCamera = new Vector3(0, 0, 1);
+  const up = new Vector3(0, 1, 0);
 
-    expect(landscape).toBeCloseTo(500 / Math.sin(RENDER_TOKENS.camera.fov * Math.PI / 360));
-    expect(square).toBeCloseTo(landscape);
-    expect(portrait).toBeGreaterThan(landscape * 1.5);
-    expect(portrait).toBeLessThan(RENDER_TOKENS.camera.maxDistance);
+  function projectedInside(points: readonly Vector3[], frame: ReturnType<typeof fitFrame>, aspect: number): boolean {
+    const tanV = Math.tan(fov * Math.PI / 360);
+    return points.every((point) => {
+      const offset = point.clone().sub(frame.target);
+      const depthFromCamera = frame.distance - offset.z;
+      return depthFromCamera > 0
+        && Math.abs(offset.y) / depthFromCamera <= tanV + 1e-9
+        && Math.abs(offset.x) / depthFromCamera <= tanV * aspect + 1e-9;
+    });
+  }
+
+  it("keeps every point inside both FOV axes, including portrait canvases", () => {
+    const points = [new Vector3(-400, 0, 0), new Vector3(400, 0, 0), new Vector3(0, 250, 0), new Vector3(0, -250, 200)];
+    const landscape = fitFrame(points, towardCamera, up, fov, 16 / 9, 0);
+    const portrait = fitFrame(points, towardCamera, up, fov, 9 / 16, 0);
+
+    expect(projectedInside(points, landscape, 16 / 9)).toBe(true);
+    expect(projectedInside(points, portrait, 9 / 16)).toBe(true);
+    expect(portrait.distance).toBeGreaterThan(landscape.distance * 1.5);
+  });
+
+  it("frames the screen-plane extent, not a bounding sphere, and centers on it", () => {
+    const deepNarrow = [new Vector3(0, 0, -600), new Vector3(0, 0, 600), new Vector3(100, 40, 0), new Vector3(300, -40, 0)];
+    const frame = fitFrame(deepNarrow, towardCamera, up, fov, 16 / 9, 0);
+    const sphereDistance = 600 / Math.sin(fov * Math.PI / 360);
+
+    expect(projectedInside(deepNarrow, frame, 16 / 9)).toBe(true);
+    expect(frame.distance).toBeLessThan(sphereDistance);
+    expect(frame.target.x).toBeCloseTo(150);
   });
 });
 
