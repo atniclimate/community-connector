@@ -1,4 +1,5 @@
 roster_version: 1
+updated: 2026-09-12
 project: community-connector (Community Navigator)
 planning_authority: PLAN_1.0.md (v1.1, Phase 5 reconciliation 2026-07-24) for the P-ids; this
   roster's own sessions (R0-R7) are director-fixed additions for the 2026-09-12 pickup,
@@ -35,7 +36,7 @@ state:
     (TRACE.yaml, docs/planning/, docs/research/discovery-2026-09-12.md) plus this session's
     own new SESSION_ROSTER.yaml and .claude/agents/*.md. The director ledger's "tree clean"
     describes commit 375e8b2 itself, which is still HEAD; nothing has been committed since.
-    Director note at close (2026-09-12): the HANDOFF.md modification was the director's own
+    Director note at close (2026-09-12) - the HANDOFF.md modification was the director's own
     Pickup block and corrections; all of the above landed as four docs-only commits on main
     (reconciliation; backbone + agents; discovery memo; HANDOFF + NEXT_SESSION), unpushed -
     see `git log --oneline -4` and the HANDOFF.md Pickup block.
@@ -204,8 +205,12 @@ sessions:
       own committed conventional commit; this MUST land before any reveal-chain commit
       (R2/R4a/R4b) is made, since a red check-all would gate every later commit's own
       verification loop"
-    status: planned
-    outcome: null
+    status: partial
+    outcome: "2026-09-12 (evening true-up, verified on disk) - 1 of 3 fixes landed. The
+      clippy fix is 7be2b5b (landed by S-R4a because it blocked every commit); check-all
+      has been 12/12 since. NOT done - no rust-toolchain.toml exists at the repo root or
+      in core/, and troika-three-text is still under devDependencies in app/package.json
+      although app/src/viz/labels.ts imports it. Both remain small mechanical fixes."
 
   - id: S-R2
     task_ids: [R2]
@@ -390,6 +395,11 @@ sessions:
       entry's UNIT-1 status text, were also swept into one of its commits (18d4a09) by
       its own broad `git add` - content intact, just attributed to the other session's
       commit rather than a commit of this session's own).
+      2026-09-12 (later): viz quick wins and convention reveal work landed
+      81af3f2..10dbc78 (D-097, D-098); screenshots verified in headless
+      Chromium with SwiftShader WebGL (which does capture the canvas); the
+      reveal opens with `pwsh scripts/reveal.ps1` on `?group=atni-convention`;
+      the human visual gate on the real GPU is still open.
       Manual dev-app check attempted on the atni-convention fixture (temporary,
       reverted app/src/main.ts edit, matching S-R2's precedent - no diff remains): the
       Present control and beat-advance keys were confirmed working MECHANICALLY via
@@ -686,6 +696,199 @@ sessions:
       entry's gate - no single shell command covers all four phases"
     stop_when: "all four phases have run and their four output artifacts exist and are
       internally consistent with each other (same repo_head cited throughout)"
+    status: planned
+    outcome: null
+
+  # --- Next phase (planned 2026-09-12, docs/planning/NEXT-PHASE-convention-e2e.md) ---
+  # Human ask: QR scan -> ATNI-branded dark-mode form -> collected submissions
+  # get proper edges/nodes/clusters -> presenter c/o/t/s keys + on-screen rail
+  # -> prepare for tests of the system. Execution order E1 -> E2 -> E3 -> E4;
+  # E5 runs whenever the human moves on the deploy bar, blocking nothing else.
+  # All five build and test on SYNTHETIC data only; none crosses D-059.8.
+
+  - id: S-E1
+    task_ids: [E1]
+    title: "ATNI-template form build switch + dark-mode theme-token slot"
+    tier: T2
+    model: claude-sonnet-5
+    effort: medium
+    mode: plan-then-code
+    run_as: main
+    role: "build engineer: an explicit, documented switch to build form/
+      against atni-convention.template.json (today only reachable via the
+      undocumented CN_FORM_TEMPLATE_PATH env var, form/vite.config.ts:60);
+      a theme-token slot for an ATNI palette/fonts that plugs INTO the
+      existing app/src/theme/ pipeline, never bypasses it; placeholder
+      colors/fonts until the human supplies real ATNI assets - nothing
+      invented or scraped"
+    skills: []
+    mcp: []
+    subagents: []
+    standing_rulings_no_fix: [D-032, D-037, D-051, D-056.4, ADR-004]
+    reads:
+      - { path: "form/vite.config.ts", lines: "1-107", est_tokens: 1500, why: "whole file - the CN_FORM_TEMPLATE_PATH/CN_FORM_* mechanism this session exposes as a documented build-script flag" }
+      - { path: "scripts/build-form.ps1", lines: "1-60", est_tokens: 800, why: "whether the human-facing build script exposes a template switch today (not verified as of this plan)" }
+      - { path: "app/src/theme", lines: "all", est_tokens: 2000, why: "the existing OKLCH/CVD token pipeline the ATNI palette slot extends, never bypasses" }
+      - { path: "fixtures/templates/atni-convention.template.json", lines: "53-61", est_tokens: 200, why: "the template's own theme block (default-dark, 3 role colors) this session's slot must accept overrides for" }
+    budget_tokens: 40000
+    gate: "pwsh scripts/check-all.ps1 12/12 AND npm run build (form/) against the ATNI template AND a manual visual check that dark mode renders"
+    stop_when: "the ATNI template builds via a documented flag (not only an env var), the theme-token slot exists and is exercised by a placeholder palette, and no approval.rs or durable-owner code was touched"
+    status: planned
+    outcome: null
+
+  - id: S-E2
+    task_ids: [E2]
+    title: "Intake-to-edges: committee/org membership becomes graph edges"
+    tier: T4
+    model: claude-opus-5
+    effort: high
+    mode: plan-then-code
+    run_as: main
+    role: "build: an additive tags-typed committee_memberships (and
+      optionally organization_affiliations) attribute on the ATNI person
+      kind (schema PATCH bump per the D-090 precedent); plan_approval
+      extended to resolve named committees/orgs against the group's FIXED
+      template instances (lookup by display name, no fuzzy matching - that
+      is D-093c's separate, unbuilt work) and emit member_of/
+      affiliated_with EdgeCreate ops inside the SAME approval batch as the
+      existing EntityCreate, preserving the batch-digest/pre-link
+      discipline exactly"
+    skills: []
+    mcp: []
+    subagents:
+      - { name: reviewer-schema-field, model: claude-sonnet-5, effort: medium, purpose: "review the new template attribute + schema version bump only: additive-field policy compliance, no PII in any example value" }
+      - { name: reviewer-edge-resolution, model: claude-sonnet-5, effort: medium, purpose: "review plan_approval's edge-resolution logic only: exact lookup correctness against fixed committee/org instances, no silent drop of an unresolvable name (I3/I12), batch atomicity preserved" }
+      - { name: reviewer-review-durable, model: claude-sonnet-5, effort: medium, purpose: "review the review-view rendering of the new field and the durable-owner write path only: as-written value preserved, edges land in the SAME approval transaction as the entity, no partial-admit path" }
+    refute_mandate: true
+    findings_verified_on_disk_before_disposition: true
+    standing_rulings_no_fix: [D-032, D-037, D-051, D-056.4, ADR-004]
+    reads:
+      - { path: "core/crates/cn-ingest/src/approval.rs", lines: "1-663", est_tokens: 6500, why: "whole file - plan_approval currently emits exactly ONE EntityCreate (confirmed by this session's own reading, lines 602-624) and this session's edge-emission code must preserve the pre-link batch-digest/per-op-digest discipline exactly" }
+      - { path: "fixtures/templates/atni-convention.template.json", lines: "1-61", est_tokens: 700, why: "whole file - the committee/org fixed-instance shape the resolution logic looks up against, and the person kind this session adds an attribute to" }
+      - { path: "docs/blueprints/intake-pipeline.md", lines: "156-176", est_tokens: 500, why: "the plan_approval bullet's explicit 'EdgeCreates deferred to merge-by-hand' line this session closes" }
+      - { path: "schemas/group-template.schema.json", lines: "1-60", est_tokens: 700, why: "additive-field policy this session's new attribute and version bump must follow" }
+      - { path: "app/src/ui/intake/panel.ts", lines: "1-80", est_tokens: 1100, why: "the existing review view this session's new field renders read-only inside, no redesign" }
+      - { path: "DECISIONS.md", lines: "2294-2328", est_tokens: 700, why: "D-090's PATCH-not-MINOR precedent this session's own schema bump follows" }
+    budget_tokens: 200000
+    gate: "pwsh scripts/check-all.ps1 12/12 AND the adversarial round's verdict (PASS,
+      PASS-WITH-NOTES, or FAIL-and-amend) is recorded in DECISIONS.md BY THE HUMAN, not by
+      this session - permission-adjacent per CLAUDE.md's mandatory-round rule"
+    stop_when: "check-all is green, all three reviewer subagents have filed findings
+      verified against the actual working tree, an approved synthetic submission with a
+      committee_memberships field produces the entity AND its member_of edges in the
+      same batch, and the human has recorded the round's disposition in DECISIONS.md"
+    status: planned
+    outcome: null
+
+  - id: S-E3
+    task_ids: [E3]
+    title: "Presenter controls: c/o/t/s keys + on-screen control rail"
+    tier: T3
+    model: claude-sonnet-5
+    effort: high
+    mode: plan-then-code
+    run_as: main
+    role: "frontend engineer: add cases to the existing
+      handlePresenterKeydown (app/src/viz/index.ts:431-462) for c
+      (committees beat), o (organizations beat), t (a new tribe-clustering
+      beat, exact-match on the tribe attribute per research question (d)
+      Option 1), and s (per whatever D-099c resolves to, default:
+      single_tie); a small fixed on-screen button rail mirroring the keys,
+      shown only in present mode, no new visual language beyond the
+      existing toolbar style; ARIA-labeled, keyboard-reachable, 375px,
+      prefers-reduced-motion respected via the existing camera-token
+      handling"
+    skills: []
+    mcp: [playwright-cli]
+    subagents: []
+    standing_rulings_no_fix: [D-032, D-037, D-051, D-056.4, ADR-004]
+    reads:
+      - { path: "app/src/viz/index.ts", lines: "420-465", est_tokens: 700, why: "handlePresenterKeydown - the exact function this session adds cases to, never replaces" }
+      - { path: "CONTROLS.md", lines: "1-51", est_tokens: 700, why: "whole file - the current key table this session extends and must keep in sync" }
+      - { path: "app/public/beats.atni.json", lines: "1-27", est_tokens: 300, why: "the beat shape (id/label/filter.kinds/measure/topN) this session's new beats follow" }
+      - { path: "docs/research/discovery-2026-09-12.md", lines: "84-139", est_tokens: 900, why: "Track B's measure table - single_tie/betweenness_top_n already wired, relevant if D-099c resolves s to single_tie" }
+      - { path: "docs/planning/NEXT-PHASE-convention-e2e.md", lines: "1-999", est_tokens: 3500, why: "section 2(d)'s full options analysis for t and s this session implements the chosen default from, and the D-099c decision record once it exists" }
+    budget_tokens: 90000
+    gate: "npm run typecheck && npm run build && npm run test (app/) plus pwsh
+      scripts/check-all.ps1 12/12 plus a director screenshot review (HUMAN-ONLY per
+      AGENTS.md) plus a keyboard-only walkthrough and a 375px layout check (both
+      HUMAN-ONLY per AGENTS.md's accessibility-testing line)"
+    stop_when: "c/o/t/s and the on-screen rail all work on the atni-convention
+      fixture, CONTROLS.md is updated to match, and the human-only visual/
+      accessibility gates have been handed off - this session does not self-certify them"
+    status: planned
+    outcome: null
+
+  - id: S-E4
+    task_ids: [E4]
+    title: "End-to-end system test: scripted rehearsal on synthetic data"
+    tier: T4
+    model: claude-sonnet-5
+    effort: high
+    mode: plan-then-code
+    run_as: main
+    role: "test engineer: extend scripts/e2e-remote-intake.ps1 with a
+      Playwright-driven real-browser leg: build the ATNI-templated form,
+      open it in a real browser, fill fields including E2's committee-
+      membership field, seal and POST to a local wrangler dev relay, cn
+      intake pull, drive the ACTUAL facilitator wizard review UI (not the
+      emit-approve-decision shortcut) to approve, cn intake apply into a
+      gitignored scratch queue, reload the app on ?group=atni-convention,
+      and assert via the app's own projection that the new entity, its
+      edges, and at least one E3 presenter beat all reflect it"
+    skills: [playwright-cli]
+    mcp: [playwright-cli]
+    subagents: []
+    standing_rulings_no_fix: [D-032, D-037, D-051, D-056.4, ADR-004]
+    depends_on: [S-E2, S-E3]
+    reads:
+      - { path: "scripts/e2e-remote-intake.ps1", lines: "all", est_tokens: 3000, why: "whole file - the existing automated rehearsal (Degraded D8 path) this session extends rather than replaces" }
+      - { path: "docs/runbooks/e2e-remote-intake.md", lines: "1-206", est_tokens: 2200, why: "whole file - the manual procedure this session automates the same arc of, with Playwright standing in for the human's browser actions" }
+      - { path: "scripts/e2e", lines: "all", est_tokens: 2000, why: "existing helper scripts this session's new Playwright steps slot alongside" }
+      - { path: "app/src/ui/intake/panel.ts", lines: "1-200", est_tokens: 2500, why: "the review view Playwright must drive - selectors and button labels for the real approve flow" }
+    budget_tokens: 150000
+    gate: "the script runs green end to end at least twice in a row (flake check) plus
+      pwsh scripts/check-all.ps1 12/12; the completion claim pastes the full script
+      output per the roster's own completion_rule"
+    stop_when: "the full rehearsal (form fill through presenter-beat assertion) passes
+      twice consecutively on synthetic data, closing the D-089-owed real-browser form
+      smoke as a side effect (on the ATNI template specifically)"
+    status: planned
+    outcome: null
+
+  - id: S-E5
+    task_ids: [E5]
+    title: "Deploy-bar clearance for the ATNI form (extends S-R1, non-executing until human gates clear)"
+    tier: T3
+    model: claude-sonnet-5
+    effort: medium
+    mode: plan-then-code
+    run_as: main
+    role: "deploy engineer: retarget S-R1's Playwright smoke and build steps
+      at the ATNI-templated form (once E1's build switch lands) instead of
+      only the research-network default, and add an ATNI-specific
+      manifest/D8 check confirming the deployed bundle pins the
+      ATNI-built form/dist. Does NOT duplicate S-R1's relay/Pages/keygen
+      work - see S-R1 in this file for that. Produces no live deploy;
+      every S-R1 human_steps item stays open and human-owned"
+    skills: []
+    mcp: []
+    subagents: []
+    standing_rulings_no_fix: [D-032, D-037, D-051, D-056.4, ADR-004]
+    depends_on: [S-E1]
+    human_steps:
+      - "D-023 sign-off on the intake consent text (unchanged from S-R1)"
+      - "the REAL keygen ceremony (unchanged from S-R1)"
+      - "GitHub Settings Pages source = GitHub Actions (unchanged from S-R1)"
+      - "the Workers Paid tier decision D-092c (unchanged from S-R1)"
+    reads:
+      - { path: "SESSION_ROSTER.yaml", lines: "484-529", est_tokens: 1200, why: "S-R1's own entry - to avoid re-scoping work S-R1 already covers" }
+      - { path: "form/vite.config.ts", lines: "1-107", est_tokens: 1500, why: "E1's build-switch addition, once it exists, that this session retargets S-R1's build step at" }
+    budget_tokens: 60000
+    gate: "identical to S-R1's gate (pwsh scripts/check-all.ps1 12/12 AND the Playwright
+      smoke AND relay/form npm test), run again against the ATNI-built artifact specifically"
+    stop_when: "S-R1's gate passes against the ATNI-templated build; every human_steps
+      item stays open and unattempted by this session"
     status: planned
     outcome: null
 
