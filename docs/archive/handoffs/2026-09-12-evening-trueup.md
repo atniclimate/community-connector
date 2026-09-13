@@ -3,8 +3,8 @@
 > The /pickup target; outranks session memory. Reading order for a fresh session:
 > `CLAUDE.md`, this file, `docs/NEXT_SESSION.md` (launch cards), then
 > `docs/planning/NEXT-PHASE-convention-e2e.md` and `SESSION_ROSTER.yaml` for the phase
-> being worked. Written at the 2026-09-13 true-up. Previous handoff:
-> `docs/archive/handoffs/2026-09-12-evening-trueup.md`.
+> being worked. Written at the 2026-09-12 evening true-up. Previous handoff:
+> `docs/archive/handoffs/2026-09-12-pickup-director.md`.
 >
 > **The repo is PUBLIC** (origin `https://github.com/atniclimate/community-connector`).
 > Local `main` was pushed to origin on 2026-09-12 at the human's instruction (D-100);
@@ -75,13 +75,6 @@ laptop, running on synthetic data unless the human clears the go-live gates.
   deferrals recorded in D-098.
 - Evening true-up: next-phase plan + S-E1..S-E5 (D-099); archive moves; CLAUDE.md's
   stale renderer and crate-list lines fixed.
-- Human rulings since: `s` = state of residence (D-100); typography League Spartan /
-  Lexend / Arial with Arimo fallback, self-hosted (D-101, D-102). `main` pushed to origin
-  (0 ahead at `0d0678a`; the working push command is in the header).
-- ATNI design system (revised 2026-09-12, off-repo at `I:\ATNI_design-system\`)
-  digested at `docs/design/atni-design-system-digest.md` (values and rules only; no
-  assets copied). The corrected `atni-climate-lockup.png` is recorded there; its section
-  7 conflicts are in the human's queue.
 
 **NOT done - ordered next actions:**
 1. **S-R0 remainder** (tiny): add `rust-toolchain.toml` (none exists) and move
@@ -94,9 +87,8 @@ laptop, running on synthetic data unless the human clears the go-live gates.
    Human visual gate afterward.
 3. **Codex review of `0cb27f0..d0e15a0`** (after the reviewed range; still
    `[unreviewed-by-codex]`), then of S-E3.
-4. **S-E1** ATNI form build switch + theme tokens from the design system digest (the
-   build switch can start now; styling waits on the human's answers to the digest's
-   section 7).
+4. **S-E1** ATNI form build switch + theme-token slot (placeholder palette until the
+   human supplies ATNI assets).
 5. **S-E2** intake-to-edges (an approval emits one `EntityCreate` and no edges today,
    `core/crates/cn-ingest/src/approval.rs:602-624`); permission-adjacent, mandatory
    adversarial round, verdict recorded by the human.
@@ -137,9 +129,7 @@ laptop, running on synthetic data unless the human clears the go-live gates.
 ## Non-negotiables a fresh session must not violate
 
 - **Public repo, privacy first (I1):** no real-person PII in any file, commit, fixture,
-  or Codex prompt; never commit `_private/`. Never copy ATNI logos, font files, or the
-  design-system source into the repo; fonts ship via pinned open-licensed packages
-  (D-101). On the projector, show counts, not
+  or Codex prompt; never commit `_private/`. On the projector, show counts, not
   individual names, until an on-stage consent line exists (D-099).
 - **Deploy bar D-059.8 is UNMET:** nothing goes live on Pages or Workers. No real
   ingestion before the recorded committee checkpoint. Cloudflare spend only for the

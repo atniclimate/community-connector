@@ -22,4 +22,8 @@ history is also in git.
   reconciliation, roster R0-R7 planned, candidate decisions D-090c..D-096c), superseded
   by the same day's evening true-up after the reveal chain (R0, R2, R4a, R4b, R7), the
   viz quick wins and convention reveal work (D-097, D-098), and the next-phase plan
-  landed. The live root `HANDOFF.md` continues from here.
+  landed. Superseded by the evening true-up below.
+- `2026-09-12-evening-trueup.md` - the handoff as incrementally updated through the
+  2026-09-12 evening (next-phase plan, D-099..D-102, push, design-system digest),
+  superseded by the 2026-09-13 true-up, which folded those updates into state of play.
+  The live root `HANDOFF.md` continues from here.

@@ -1,4 +1,4 @@
-# NEXT_SESSION.md - Launch cards (refreshed 2026-09-12, evening true-up)
+# NEXT_SESSION.md - Launch cards (refreshed 2026-09-13 true-up)
 
 > Reading order: CLAUDE.md -> HANDOFF.md -> this file. Session plan of record:
 > `SESSION_ROSTER.yaml`; next-phase plan: `docs/planning/NEXT-PHASE-convention-e2e.md`.
