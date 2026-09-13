@@ -8,7 +8,11 @@
 >
 > **The repo is PUBLIC** (origin `https://github.com/atniclimate/community-connector`).
 > Local `main` was pushed to origin on 2026-09-12 at the human's instruction (D-100);
-> check `git rev-list --count origin/main..main` for anything committed since.
+> check `git rev-list --count origin/main..main` for anything committed since. Plain
+> `git push` fails from a non-interactive session here: `gh` has two accounts and the
+> active one is not `atniclimate`, so the repo's `gh auth git-credential` helper returns
+> nothing. Working one-shot form (changes no config, prints no token):
+> `git -c credential.helper= -c 'credential.helper=!f() { echo username=atniclimate; echo "password=$(gh auth token --user atniclimate)"; }; f' push origin main`.
 
 ## What this project is
 
