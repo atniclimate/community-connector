@@ -60,6 +60,11 @@
   grid-column: 1;
   grid-row: 1;
   position: relative;
+  /* A definite height: otherwise the canvas's height:100% falls back to its
+     intrinsic buffer aspect and the region grows past the viewport. */
+  height: 100vh;
+  height: 100dvh;
+  min-height: 0;
 }
 
 .cn-present-beat {
