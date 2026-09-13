@@ -2402,3 +2402,34 @@ and display with `pwsh scripts/reveal.ps1`. Commits since 81af3f2 that predate
 this review carry `[unreviewed-by-codex]`; 290820d is the reviewed-and-fixed
 point, and 0cb27f0..d0e15a0 postdate the reviewed range, so they remain
 unreviewed.
+
+## D-099 (2026-09-12) - Next-phase direction: convention end-to-end, planned on synthetic data
+
+Trigger: the human's direction at the evening true-up. Paraphrased: a QR code takes
+participants to a simple dark-mode ATNI-branded page (GitHub Pages if still the plan),
+their entries are collected and assigned proper nodes, edges, and clusters, and they
+enter the visual graph; the presenter gets simple keys (`c` committees, `o` orgs, `t`
+Tribes, `s` state) and a few on-screen buttons; prepare the next phase for tests of the
+system; add creative "wow" tasks.
+
+Decision (planning only, nothing built): the next phase is
+`docs/planning/NEXT-PHASE-convention-e2e.md`, sessions S-E1..S-E5 in
+`SESSION_ROSTER.yaml`, plus the W1-W5 wow slice in the same doc. Every session builds and
+rehearses on SYNTHETIC data. The direction does NOT resolve D-090c ("nothing goes live
+for the convention"), does not clear any D-059.8 deploy-bar item, and does not open the
+real-data gate; the plan carries both a synthetic-demo path and a go-live checklist, and
+going live stays a human decision.
+
+Findings the plan rests on (verified on disk by the director): an approved intake record
+produces exactly one `EntityCreate` and no edges
+(`core/crates/cn-ingest/src/approval.rs:602-624`, per the intake blueprint's "EdgeCreates
+deferred"), and the ATNI template has no attribute through which a participant could name
+a committee or organization - so "proper edges" is new, permission-adjacent work (S-E2,
+mandatory adversarial round). `tribe` is free text and no `state` data exists, so `t`
+and `s` need a human call: **D-099c (candidate) - what `s` means** (state of residence,
+repurpose to the `single_tie` beat, or inert until decided). Brand colors and fonts come
+from the human; nothing is invented or scraped.
+
+Also recorded: the creative pass's privacy rule for the projector - a `nameOnStage` beat
+flag, default off, so measure and constellation beats show counts rather than individual
+names until an on-stage consent line exists (community-facing text, D-023 gate).
