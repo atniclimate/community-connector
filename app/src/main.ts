@@ -62,8 +62,28 @@ const reducedMotionMedia = matchMedia("(prefers-reduced-motion: reduce)");
 const store = createStore(createInitialState());
 const worker = new Worker(new URL("./wasm/worker.ts", import.meta.url), { type: "module" });
 const client = new WasmClient(worker);
-const DEMO_GROUP_ID = "00000000-0000-0000-0000-000000000010";
-const DEMO_VIEWER_PERSON = "00000000-0000-0000-0000-0000000003e9";
+type DevGroup = {
+  readonly fixture: string;
+  readonly groupId: string;
+  /** A synthetic person holding the governance role in that fixture. */
+  readonly viewerPerson: string;
+};
+
+// Synthetic fixtures only (I1). Selected with ?group=<key>; research-network
+// stays the default so existing dev and test flows are unchanged.
+const DEV_GROUPS: Readonly<Record<string, DevGroup>> = {
+  "research-network": {
+    fixture: "research-network",
+    groupId: "00000000-0000-0000-0000-000000000010",
+    viewerPerson: "00000000-0000-0000-0000-0000000003e9",
+  },
+  "atni-convention": {
+    fixture: "atni-convention",
+    groupId: "00000000-0000-0000-0000-0000000dbba0",
+    viewerPerson: "00000000-0000-0000-0000-0000000de2bd",
+  },
+};
+const DEFAULT_DEV_GROUP = "research-network";
 
 function render(): void {
   const state = store.getState();
@@ -127,19 +147,29 @@ async function mountIntakeIfFacilitator(
   });
 }
 
+function selectedDevGroup(): DevGroup {
+  const key = new URLSearchParams(window.location.search).get("group") ?? DEFAULT_DEV_GROUP;
+  const group = DEV_GROUPS[key];
+  if (group === undefined) {
+    throw new Error(`Unknown dev group "${key}"; expected one of: ${Object.keys(DEV_GROUPS).join(", ")}`);
+  }
+  return group;
+}
+
 async function loadDevDemo(): Promise<void> {
+  const group = selectedDevGroup();
   const [templateResponse, opsResponse] = await Promise.all([
-    fetch("/fixtures/templates/research-network.template.json"),
-    fetch("/fixtures/groups/research-network.ops.jsonl"),
+    fetch(`/fixtures/templates/${group.fixture}.template.json`),
+    fetch(`/fixtures/groups/${group.fixture}.ops.jsonl`),
   ]);
   if (!templateResponse.ok || !opsResponse.ok) {
-    throw new Error("Failed to fetch dev demo fixtures");
+    throw new Error(`Failed to fetch dev fixtures for ${group.fixture}`);
   }
   const templateText = await templateResponse.text();
-  const viewer = { kind: "person", person: DEMO_VIEWER_PERSON };
-  await loadGroup(store, client, DEMO_GROUP_ID, viewer, templateText, await opsResponse.text());
+  const viewer = { kind: "person", person: group.viewerPerson };
+  await loadGroup(store, client, group.groupId, viewer, templateText, await opsResponse.text());
   loadedTemplate = JSON.parse(templateText) as JsonObject;
-  await mountIntakeIfFacilitator(DEMO_GROUP_ID, viewer);
+  await mountIntakeIfFacilitator(group.groupId, viewer);
 }
 
 const onReducedMotion = (event: MediaQueryListEvent): void => {

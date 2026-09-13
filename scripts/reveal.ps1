@@ -7,23 +7,24 @@
 .DESCRIPTION
   Rebuilds the cn-wasm package if core/crates/cn-wasm/pkg is missing, starts
   the app (dev server, or a built preview with -Built), waits until the port
-  answers, then opens the default browser at the app URL.
+  answers, then opens the default browser at the app URL for -Group
+  (default atni-convention, the synthetic convention fixture).
 
-  Note on query parameters: app/src/main.ts (checked 2026-09-12) reads no URL
-  query parameters at all - there is no `mode` or `group` parameter to enter
-  presenter mode or pick a group. Presenter mode is entered in-app via the
-  "Present" toolbar button once beats have loaded. The dev server always
-  loads the research-network demo fixture (main.ts's hardcoded DEMO_GROUP_ID);
-  switching that to atni-convention is an app-code change and out of scope
-  for this script (see SESSION_ROSTER.yaml S-R7). So this launcher opens the
-  plain app URL with no query string.
+  The app reads one query parameter, `group` (app/src/main.ts DEV_GROUPS):
+  research-network or atni-convention. Presenter mode has no parameter; it is
+  entered with the in-app "Present" button.
+
+  -Built serves the production build, which has no fixture loader: the graph
+  is empty. Use the default dev server for the reveal.
 
 .EXAMPLE
   pwsh scripts/reveal.ps1
-  pwsh scripts/reveal.ps1 -Built
+  pwsh scripts/reveal.ps1 -Group research-network
 #>
 [CmdletBinding()]
 param(
+    [ValidateSet('atni-convention', 'research-network')]
+    [string]$Group = 'atni-convention',
     [switch]$Built,
     [int]$Port,
     [int]$TimeoutSeconds = 60
@@ -54,7 +55,7 @@ if (-not (Test-Path $wasmPkgDir)) {
 }
 
 if ($Port -eq 0) { $Port = if ($Built) { 4173 } else { 5173 } }
-$url = "http://localhost:$Port/"
+$url = "http://localhost:$Port/?group=$Group"
 
 $npxCmd = (Get-Command npx.cmd, npx -ErrorAction SilentlyContinue | Select-Object -First 1).Source
 if (-not $npxCmd) {
@@ -63,6 +64,7 @@ if (-not $npxCmd) {
 }
 
 if ($Built) {
+    Write-Host 'reveal: -Built has no fixture loader, so the graph will be empty. Omit -Built for the reveal.' -ForegroundColor Yellow
     Write-Host '==> npm run build (app/) ...'
     & npm --prefix $appDir run build
     if ($LASTEXITCODE -ne 0) { throw 'npm run build failed' }

@@ -1,11 +1,13 @@
 # Controls
 
-Launch with `pwsh scripts/reveal.ps1` (or `-Built` for a built preview).
+Launch with `pwsh scripts/reveal.ps1`. It opens `?group=atni-convention` (the
+synthetic convention fixture); `-Group research-network` opens the research
+demo. Don't use `-Built` for the reveal: the production build loads no data.
 
 ## Presenter mode
 
-Click the **Present** toolbar button once beats have loaded (the app does not
-read a URL query parameter for this - see `scripts/reveal.ps1`'s header note).
+Click the **Present** toolbar button once beats have loaded. Hover a node for
+its full name; click it to focus.
 
 | Key | Action |
 | --- | --- |
