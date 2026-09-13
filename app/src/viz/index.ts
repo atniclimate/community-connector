@@ -333,6 +333,9 @@ function applyFocusRendering(
   writeHover(renderState, state, renderState.hoveredEntityId, true);
   writeFocusTargetColors(renderState.edges, state.theme.resolved, focus?.adjacentEdgeIds ?? null);
   renderState.halos?.setSelected(focusedId);
+  renderState.labels?.setEmphasis(
+    focus === null ? null : new Set([...(focus.focusedId === null ? [] : [focus.focusedId]), ...focus.neighborIds]),
+  );
   renderState.focusBlend.setTarget(focus === null ? BLEND_OFF : BLEND_ON);
   return focus;
 }

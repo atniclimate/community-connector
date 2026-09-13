@@ -363,6 +363,14 @@ describe("labels", () => {
     expect(labelScaleForDistance(-1)).toBe(0);
   });
 
+  it("labels an emphasized set regardless of the zoom distance, still under the cap", () => {
+    const far = Array.from({ length: 60 }, (_, index) =>
+      candidate(`far-${index}`, RENDER_TOKENS.label.visibleDistance * 3, 0));
+
+    expect(selectVisibleLabels(far, origin, "A")).toEqual([]);
+    expect(selectVisibleLabels(far, origin, "A", "overview", true).length).toBe(visibleLabelCap("A"));
+  });
+
   it("orders deterministically by adjusted distance with id tie-break", () => {
     const tied = [candidate("b-tied", 100, 0), candidate("a-tied", 100, 0), candidate("closer", 50, 0)];
     const visible = selectVisibleLabels(tied, origin, "A");

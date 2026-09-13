@@ -23,6 +23,11 @@ export type LabelCandidate = {
 export type LabelLayer = {
   readonly group: Group;
   readonly update: (camera: Camera, elapsedMs: number) => boolean;
+  /**
+   * While a focus or highlight set is active, only its entities are labeled;
+   * dimmed context stays unlabeled. null restores the normal policy.
+   */
+  readonly setEmphasis: (ids: ReadonlySet<string> | null) => void;
   readonly dispose: () => void;
 };
 
@@ -108,6 +113,7 @@ export function selectVisibleLabels(
   cameraPosition: Vector3,
   tier: QualityTier,
   viewMode: ViewMode = "overview",
+  ignoreDistance = false,
 ): readonly LabelCandidate[] {
   const cap = visibleLabelCap(tier, viewMode);
   if (cap <= ZERO) {
@@ -117,7 +123,7 @@ export function selectVisibleLabels(
     const adjusted =
       candidate.position.distanceTo(cameraPosition) /
       (UNIT + RENDER_TOKENS.label.hubBoost * hubShare(candidate.degree));
-    if (adjusted > RENDER_TOKENS.label.visibleDistance) {
+    if (!ignoreDistance && adjusted > RENDER_TOKENS.label.visibleDistance) {
       return [];
     }
     return [{ candidate, adjusted }];
@@ -233,6 +239,7 @@ export function buildLabelLayer(args: BuildLabelLayerArgs): LabelLayer {
   const lastCamera = new Vector3(Number.NaN, Number.NaN, Number.NaN);
   const orientation = new Quaternion();
   let sinceRecomputeMs = Number.POSITIVE_INFINITY;
+  let eligible: readonly LabelCandidate[] = candidates;
   const update = (camera: Camera, elapsedMs: number): boolean => {
     sinceRecomputeMs += elapsedMs;
     let changed = false;
@@ -243,7 +250,7 @@ export function buildLabelLayer(args: BuildLabelLayerArgs): LabelLayer {
     if (shouldRecompute) {
       changed = applyVisible(
         slots,
-        selectVisibleLabels(candidates, camera.position, args.tier, args.viewMode),
+        selectVisibleLabels(eligible, camera.position, args.tier, args.viewMode, eligible !== candidates),
         args.onNeedsRender,
       );
       lastCamera.copy(camera.position);
@@ -261,6 +268,11 @@ export function buildLabelLayer(args: BuildLabelLayerArgs): LabelLayer {
   return {
     group,
     update,
+    setEmphasis: (ids) => {
+      eligible = ids === null ? candidates : candidates.filter((candidate) => ids.has(candidate.id));
+      // Force the next update to recompute regardless of camera movement.
+      lastCamera.set(Number.NaN, Number.NaN, Number.NaN);
+    },
     dispose: () => {
       for (const slot of slots) {
         slot.mesh.dispose();
