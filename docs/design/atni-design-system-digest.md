@@ -7,7 +7,14 @@ repository; only color values, type names, and usage rules are recorded here (I1
 ## 1. Source receipt
 
 - Folder: `I:\ATNI_design-system\ATNI design system\` (127 files).
-- Zip: `I:\ATNI_design-system\ATNI design system.zip` (33,181,599 bytes).
+- Zip: `I:\ATNI_design-system\ATNI design system.zip` (33,174,396 bytes after the
+  2026-09-13 asset fix; was 33,181,599).
+- Asset fix 2026-09-13: the human replaced a bad image. The only file changed was
+  `assets/logos/atni-climate-lockup.png` (1,086,970 bytes, modified 2026-09-12 23:59
+  local). The corrected file has a transparent background: a white seal with black and
+  red linework, "ATNI" in white with a black outline, "CLIMATE" in red. The
+  design-system HTML did not change, so the usage rules in section 5 stand. Folder and
+  zip re-verified identical (127 files each, same sizes).
 - Zip-versus-folder: **match.** The zip's single top-level entry (`ATNI design system/`)
   contains the same 127 files as the folder, and every shared path has an identical byte
   size. No file exists in only one of the two, and no size differs.
