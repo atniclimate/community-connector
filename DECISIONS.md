@@ -2359,3 +2359,46 @@ Open: no Codex review pass ran on these diffs (commits marked
 `[unreviewed-by-codex]`); the S-R4b human visual gate is unchanged and now covers
 these changes too. Strongest surviving objection: the tunings are judged on the
 120-node research fixture only, not atni-convention or the 5,000-node scale.
+
+## D-098 (2026-09-12) - Convention reveal on atni-convention; Codex diff review disposition
+
+Trigger: the human asked (on the convention laptop) to make the reveal open the
+atni-convention fixture via a `?group=` URL parameter, and to run the Codex review
+of the D-097 commits. Commits 0cb27f0..290820d.
+
+Reveal: `?group=` selects a synthetic dev fixture (research-network stays the
+default); `scripts/reveal.ps1 -Group` defaults to atni-convention. The S-R4b "1
+entity" finding was a viewer with no grant, not missing fixture data: the atni
+fixture already grants governance to three synthetic people, and one of them sees
+all 87 entities. No fixture change was needed. Running the real convention data
+exposed four presenter problems, all fixed and screenshot-checked: the load fit
+used a bounding sphere (graph at ~40% of the view; now a frustum fit of the
+screen-plane extent); the beat caption covered the graph (fits now keep a 16%
+bottom inset); kind beats only moved the camera (their kinds now take the existing
+highlight role and the rest dims); committee rings seen edge-on read as pills
+(torus nodes now face the camera, with sphere picking).
+
+Codex review (`C:/dev/_reviews/community-connector/2026-09-12_viz-quickwins-diff-review.md`,
+changes requested): both High findings verified and fixed with tests or browser
+measurements (stale hover cache; drift wait rendering every frame), as were
+Medium stale tooltip on rebuild, maxDistance clamping tall fits, halo refresh
+upload cost, pointercancel, and the Low initial-fit snap (now a gentle fly;
+snaps under reduced motion). Deferred, with reasons:
+
+1. **Keyboard/Escape tooltip (Medium, brief deviation).** The tooltip stays a
+   pointer-only, aria-hidden visual echo. The flat view and search already expose
+   every name to keyboard and screen-reader users; a focusable graph-keyboard
+   grammar is larger work than the convention window allows.
+2. **index.ts over the I5 ~500-line guide (584 lines).** Hover moved out to
+   `viz/hover.ts`; extracting the presenter controller and frame scheduler is a
+   pure refactor with regression risk two days before the reveal. Revisit post-
+   convention.
+3. **Scheduler tests and a 5,000-node halo benchmark on Iris Xe.** Loop idling is
+   measured in a real browser, not unit-tested; halo refresh cost is reduced but
+   unmeasured at scale.
+
+Human-only still: the S-R4b visual gate, now on the convention laptop's real GPU
+and display with `pwsh scripts/reveal.ps1`. Commits since 81af3f2 that predate
+this review carry `[unreviewed-by-codex]`; 290820d is the reviewed-and-fixed
+point, and 0cb27f0..d0e15a0 postdate the reviewed range, so they remain
+unreviewed.
