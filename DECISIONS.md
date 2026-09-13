@@ -2433,3 +2433,27 @@ from the human; nothing is invented or scraped.
 Also recorded: the creative pass's privacy rule for the projector - a `nameOnStage` beat
 flag, default off, so measure and constellation beats show counts rather than individual
 names until an on-stage consent line exists (community-facing text, D-023 gate).
+
+## D-100 (2026-09-12) - Presenter key `s` = state of residence (resolves D-099c); push authorized
+
+Human ruling: `s` on the presenter keyboard means **state of residence**. The human
+also authorized pushing local `main` to origin.
+
+No state data exists today, so S-E3 adds it. Engineering defaults, reversible (schema
+drafts at 0.x are ours to decide per CLAUDE.md):
+
+1. An optional `state_of_residence` attribute on the atni-convention person kind:
+   `enum` of US states plus DC, with "Outside the United States" and "Prefer not to
+   say". Additive, with a schema PATCH bump per the D-090 precedent. The form and the
+   wizard render it with existing widgets. It is a standard geographic list, not the
+   community capability vocabulary that D-051 reserves to ATNI.
+2. Default visibility `group`, never `public`; tier T1 like every pilot field (D-034).
+3. On the projector the `s` beat is aggregate only: members grouped or counted by state,
+   no names (the D-099 name gate), and states with fewer than 3 members shown as
+   "fewer than 3" to avoid small-count re-identification. The threshold is a starting
+   value for the human's visual review.
+4. The synthetic fixture generator assigns synthetic states, weighted toward the ATNI
+   region, so the beat has something to show. It stays synthetic data.
+
+The state option list and the on-stage wording are community-facing text and go through
+the D-023 review before any real use.

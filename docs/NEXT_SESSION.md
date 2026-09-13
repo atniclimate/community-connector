@@ -9,7 +9,7 @@
 The reveal works. `pwsh scripts/reveal.ps1` opens the dev app on the synthetic ATNI
 convention group (60 people, 15 committee rings, 12 orgs). There, presenter mode steps
 through beats that fit the camera, dim everything off-beat, and label only what matters.
-check-all has been 12/12 since the viz work; 70 commits are local and unpushed. The
+check-all has been 12/12 since the viz work; `main` is pushed to origin. The
 human's next ask is the full loop: QR -> ATNI-branded dark-mode form -> approved entries
 land with real edges -> presenter keys `c`/`o`/`t`/`s` plus a button rail -> a scripted
 end-to-end test. Two findings shape it. An approval creates a node but no edges
@@ -46,8 +46,12 @@ claude --model claude-sonnet-5 --effort high --permission-mode plan
 
 > Role: frontend engineer (plan first). Outcome: in presenter mode, `c` committees, `o`
 > organizations, `m` members jump to kind beats; `t` shows an exact-match tribe beat;
-> `s` does what D-099c says (if undecided, bind nothing and show the key as unassigned on
-> the rail); a small on-screen rail mirrors the keys (keyboard-reachable, ARIA-labeled,
+> `s` shows members by state of residence (D-100: add an optional `state_of_residence`
+> enum to the atni-convention person kind - US states plus DC, "Outside the United
+> States", "Prefer not to say", group visibility, schema PATCH bump - give the fixture
+> generator synthetic states, and make the beat aggregate-only with states under 3
+> shown as "fewer than 3"; widen the scope fence to `fixtures/`, `schemas/` if the
+> bump needs it, and `app/scripts/generate-atni-ops.mjs`); a small on-screen rail mirrors the keys (keyboard-reachable, ARIA-labeled,
 > holds at 375 px, no new animation, reduced-motion safe). Captions carry projection
 > counts ("15 standing committees"). Add the `nameOnStage` beat flag (default false):
 > when false, measure beats show "N highlighted" and no person labels.
@@ -82,7 +86,7 @@ claude --model claude-sonnet-5 --effort high --permission-mode plan
 
 ## Questions for the human (one-line answers unblock the roster)
 
-1. What should `s` mean on the presenter keyboard (D-099c)?
-2. Can you share the ATNI palette and font files (with licenses) for the dark-mode form?
-3. Convention day: synthetic demo only, or pursue the go-live checklist (D-090c)?
-4. OK to push the 70 local commits?
+1. Can you share the ATNI palette and font files (with licenses) for the dark-mode form?
+2. Convention day: synthetic demo only, or pursue the go-live checklist (D-090c)?
+
+Answered 2026-09-12: `s` = state of residence (D-100); push authorized and done.

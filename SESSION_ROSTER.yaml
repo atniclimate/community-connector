@@ -792,8 +792,10 @@ sessions:
       handlePresenterKeydown (app/src/viz/index.ts:431-462) for c
       (committees beat), o (organizations beat), t (a new tribe-clustering
       beat, exact-match on the tribe attribute per research question (d)
-      Option 1), and s (per whatever D-099c resolves to, default:
-      single_tie); a small fixed on-screen button rail mirroring the keys,
+      Option 1), and s = state of residence (D-100, resolves D-099c: add an
+      optional state_of_residence enum to the atni-convention person kind with
+      a schema PATCH bump, synthetic states in the fixture generator, and an
+      aggregate-only beat with small-count suppression and no names); a small fixed on-screen button rail mirroring the keys,
       shown only in present mode, no new visual language beyond the
       existing toolbar style; ARIA-labeled, keyboard-reachable, 375px,
       prefers-reduced-motion respected via the existing camera-token

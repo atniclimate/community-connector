@@ -7,9 +7,8 @@
 > `docs/archive/handoffs/2026-09-12-pickup-director.md`.
 >
 > **The repo is PUBLIC** (origin `https://github.com/atniclimate/community-connector`).
-> Local `main` is **70 commits ahead of origin and UNPUSHED** (`git rev-list --count
-> origin/main..main` = 70 before this handoff's own commit). Pushing is permitted by
-> CLAUDE.md's gate notes but has not been run this arc; ask the human first.
+> Local `main` was pushed to origin on 2026-09-12 at the human's instruction (D-100);
+> check `git rev-list --count origin/main..main` for anything committed since.
 
 ## What this project is
 
@@ -28,7 +27,7 @@ laptop, running on synthetic data unless the human clears the go-live gates.
 |---|---|
 | Durable contract (mission, R1-R10, gates, autonomy) | `CLAUDE.md` |
 | Invariants I1-I12 (review standard) | `AGENTS.md` |
-| Decision register (D-001..D-099) | `DECISIONS.md` |
+| Decision register (D-001..D-100) | `DECISIONS.md` |
 | Session plan of record (R-sessions, next-phase S-E1..S-E5) | `SESSION_ROSTER.yaml` |
 | Next-phase plan: go-live checklist, research receipts, sessions, wow slice W1-W5 | `docs/planning/NEXT-PHASE-convention-e2e.md` |
 | Route map to 1.0 (P-ids) and task trace | `PLAN_1.0.md`, `TRACE.yaml` |
@@ -77,8 +76,10 @@ laptop, running on synthetic data unless the human clears the go-live gates.
    `troika-three-text` from devDependencies to dependencies in `app/package.json`.
 2. **S-E3 presenter controls first** (director ordering for the 2026-09-14 date; the plan
    lists E1 first): `c`/`o` (and `m`) kind keys plus an on-screen rail, `t` exact-match
-   tribe beat, `s` per D-099c, with W1 and the W3 `nameOnStage` name gate folded in.
-   Needs no schema or durable-owner change. Human visual gate afterward.
+   tribe beat, `s` state of residence (D-100: optional `state_of_residence` enum on the
+   person kind with a schema PATCH bump, synthetic states in the generator, aggregate-only
+   beat), with W1 and the W3 `nameOnStage` name gate folded in. No durable-owner change.
+   Human visual gate afterward.
 3. **Codex review of `0cb27f0..d0e15a0`** (after the reviewed range; still
    `[unreviewed-by-codex]`), then of S-E3.
 4. **S-E1** ATNI form build switch + theme-token slot (placeholder palette until the
@@ -101,8 +102,8 @@ laptop, running on synthetic data unless the human clears the go-live gates.
    click Present, step the beats. All viz evidence so far is SwiftShader screenshots.
 2. **ATNI brand assets** for the dark-mode form and app: palette values, font files, and
    their licenses (S-E1 uses placeholders until then).
-3. **D-099c**: what `s` means on the presenter keyboard; later, whether `tribe` stays
-   free text or becomes a fixed vocabulary.
+3. Later, not blocking: whether `tribe` stays free text or becomes a fixed vocabulary
+   (`s` was decided as state of residence, D-100).
 4. **Go live at the convention or not** (D-090c, candidate). Live requires every row of
    the go-live checklist (`docs/planning/NEXT-PHASE-convention-e2e.md` section 1): D-023
    sign-off on the consent/form text; the real keygen ceremony; Pages source set to
@@ -111,8 +112,7 @@ laptop, running on synthetic data unless the human clears the go-live gates.
 5. **Record, amend, or reject D-090c..D-096c** (discovery memo, last section). D-094c
    (template shape) is already realized in the synthetic fixture; D-096c (toolchain pin)
    is half done.
-6. **Push**: 70 commits are local only. Say when.
-7. Standing: G-BACKUP accepted not solved; pilot-window close needs the recorded
+6. Standing: G-BACKUP accepted not solved; pilot-window close needs the recorded
    rejected-record purge sweep (D-059.11).
 
 ## Non-negotiables a fresh session must not violate

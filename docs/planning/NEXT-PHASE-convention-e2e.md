@@ -209,6 +209,13 @@ Option (i) or (iii) before E3 starts, in which case E3's blueprint is
 amended before coding begins. Candidate decision to record: **D-099c -
 presenter key `s` scope**, options as above, decision needed before E3.
 
+**Resolved 2026-09-12 by the human: `s` = state of residence (D-100).** Option (i). S-E3
+adds an optional `state_of_residence` enum to the person kind (US states plus DC,
+"Outside the United States", "Prefer not to say"; group visibility; schema PATCH
+bump), synthetic values in the fixture generator, and an aggregate-only `s` beat (no
+names; states under 3 members shown as "fewer than 3"). The fallback paragraph above is
+superseded.
+
 ## 3. Phase sessions
 
 Execution order: E1 -> E2 -> E3 -> E4, with E5 running whenever the human
@@ -376,7 +383,7 @@ ATNI-built artifact specifically.
 - ATNI brand palette (hex or OKLCH values) and font files (with their
   licenses) for the dark-mode theme - E1 ships a placeholder token slot
   without them; nothing invented or scraped in their place.
-- D-099c: what `s` should mean on the presenter keyboard (see research
+- RESOLVED (D-100: state of residence). D-099c: what `s` should mean on the presenter keyboard (see research
   question (d)) - state of residence, something else, or repurposed to
   `single_tie` - before S-E3 starts, or S-E3 ships the `single_tie`
   fallback by default.
