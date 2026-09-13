@@ -477,6 +477,17 @@ describe("camera fit", () => {
     expect(portrait.distance).toBeGreaterThan(landscape.distance * 1.5);
   });
 
+  it("keeps a bottom inset clear by fitting into the window above it", () => {
+    const points = [new Vector3(-300, -200, 0), new Vector3(300, 200, 0)];
+    const inset = 0.2;
+    const frame = fitFrame(points, towardCamera, up, fov, 16 / 9, 0, inset);
+    const tanV = Math.tan(fov * Math.PI / 360);
+    const ratios = points.map((point) => (point.y - frame.target.y) / frame.distance);
+
+    expect(Math.min(...ratios)).toBeGreaterThanOrEqual(-tanV + 2 * tanV * inset - 1e-9);
+    expect(Math.max(...ratios)).toBeLessThanOrEqual(tanV + 1e-9);
+  });
+
   it("frames the screen-plane extent, not a bounding sphere, and centers on it", () => {
     const deepNarrow = [new Vector3(0, 0, -600), new Vector3(0, 0, 600), new Vector3(100, 40, 0), new Vector3(300, -40, 0)];
     const frame = fitFrame(deepNarrow, towardCamera, up, fov, 16 / 9, 0);

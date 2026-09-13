@@ -13,7 +13,7 @@ import { entityLabel, projectedEntities } from "./projection";
 import { createVizScene, type SceneSetup } from "./scene";
 import { createCameraRig, zoomToFit, type CameraRig } from "./camera";
 import { applyFocusToNodeLayer, computeFocusSet, FocusBlend, writeNodeHover, type FocusSet } from "./focus";
-import { measureHighlights, presenterBeatText } from "./presenter";
+import { kindBeatHighlights, measureHighlights, presenterBeatText } from "./presenter";
 import { effectivePixelRatio, QualityManager, type QualityProfile } from "./quality";
 
 export type MountedViz = () => void;
@@ -259,6 +259,12 @@ function syncMotion(
   renderState.sceneSetup.setPresentMode(present);
   const beat = present ? state.presentation.beats[state.presentation.beatIndex] : undefined;
   syncPresenterMeasure(renderState, state, beat, store, client);
+  const kindHighlights = kindBeatHighlights(state.data.projection?.entities ?? [], present ? beat : undefined);
+  if (kindHighlights !== null) {
+    // Measure beats own highlightedIds (set asynchronously); every other beat,
+    // and leaving presenter mode, derives it from the beat's kind filter.
+    renderState.highlightedIds = kindHighlights;
+  }
   updatePresenterLabel(renderState, present, beat);
   fitNewLoad(renderState, state, rebuilt);
   const focusedId = state.view.mode === "focus" || present ? state.view.focusedEntityId : null;
@@ -284,6 +290,7 @@ function syncMotion(
     zoomToFit(renderState.cameraRig, positionsForBeat(projection, renderState.layout, beat), {
       paddingWorldUnits: RENDER_TOKENS.camera.fitAllPaddingWorldUnits,
       reducedMotion: reduced,
+      bottomInset: RENDER_TOKENS.camera.presentCaptionInset,
     });
   }
 }
@@ -489,6 +496,7 @@ function handlePresenterKeydown(event: KeyboardEvent, renderState: RenderState, 
       zoomToFit(renderState.cameraRig, positionsForBeat(projection, renderState.layout, undefined), {
         paddingWorldUnits: RENDER_TOKENS.camera.fitAllPaddingWorldUnits,
         reducedMotion: state.ui.reducedMotion,
+        bottomInset: RENDER_TOKENS.camera.presentCaptionInset,
       });
     }
   } else if (event.key === "Escape") {

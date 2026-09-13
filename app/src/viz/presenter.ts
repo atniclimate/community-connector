@@ -56,6 +56,25 @@ export function measureHighlights(response: JsonObject, beat: PresentBeat): Meas
   };
 }
 
+/**
+ * A kind-filter beat foregrounds its kinds: they take the highlight role and
+ * everything else dims, while staying in place. Beats with a measure get
+ * their highlight set from the measure call instead (null here).
+ */
+export function kindBeatHighlights(
+  entities: readonly { readonly id: string; readonly kind?: string | null }[],
+  beat: PresentBeat | undefined,
+): ReadonlySet<string> | null {
+  if (beat?.measure !== undefined) {
+    return null;
+  }
+  const kinds = beat?.filter?.kinds;
+  if (kinds === undefined || kinds.length === 0) {
+    return new Set<string>();
+  }
+  return new Set(entities.filter((entity) => kinds.includes(entity.kind ?? "")).map((entity) => entity.id));
+}
+
 export function presenterBeatText(
   beat: PresentBeat | undefined,
   explanations: readonly string[],

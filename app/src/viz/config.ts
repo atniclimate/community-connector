@@ -101,6 +101,7 @@ export const RENDER_TOKENS = {
     maxDurationMs: 900,
     aimLockFraction: 3,
     fitAllPaddingWorldUnits: 20,
+    presentCaptionInset: 0.16,
   },
   scene: {
     fogDensity: 0.00065,

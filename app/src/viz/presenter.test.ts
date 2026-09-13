@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { JsonObject, PresentBeat } from "../state/state";
-import { measureHighlights, presenterBeatText } from "./presenter";
+import { kindBeatHighlights, measureHighlights, presenterBeatText } from "./presenter";
 
 const response: JsonObject = {
   betweenness: {
@@ -44,6 +44,20 @@ describe("presenter measure highlights", () => {
       "connected to 1 other person",
       "has one connection",
     ]);
+  });
+
+  it("foregrounds a kind beat's kinds and leaves measure beats to the measure call", () => {
+    const entities = [
+      { id: "p1", kind: "person" },
+      { id: "c1", kind: "committee" },
+      { id: "c2", kind: "committee" },
+    ];
+
+    expect([...(kindBeatHighlights(entities, { id: "c", label: "Committees", filter: { kinds: ["committee"] } }) ?? [])])
+      .toEqual(["c1", "c2"]);
+    expect(kindBeatHighlights(entities, { id: "all", label: "Overview" })?.size).toBe(0);
+    expect(kindBeatHighlights(entities, undefined)?.size).toBe(0);
+    expect(kindBeatHighlights(entities, { id: "b", label: "Bridges", measure: "betweenness_top_n", topN: 3 })).toBeNull();
   });
 
   it("rejects malformed measure responses so callers can surface the failure", () => {

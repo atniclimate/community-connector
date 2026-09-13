@@ -27,6 +27,8 @@ export type ZoomToFitOptions = {
    * origin-to-centroid direction. "current": keep the present viewing bearing.
    */
   readonly bearing?: "centroid" | "current";
+  /** Fraction of the viewport height at the bottom to keep clear (0..1). */
+  readonly bottomInset?: number;
 };
 
 export type FitFrame = {
@@ -48,6 +50,7 @@ export function fitFrame(
   verticalFovDegrees: number,
   aspect: number,
   pad: number,
+  bottomInset = 0,
 ): FitFrame {
   const right = new Vector3().crossVectors(up, direction);
   if (right.lengthSq() < MIN_TARGET_LENGTH) {
@@ -62,14 +65,19 @@ export function fitFrame(
   });
   const midX = (Math.min(...coords.map((c) => c.x)) + Math.max(...coords.map((c) => c.x))) / 2;
   const midY = (Math.min(...coords.map((c) => c.y)) + Math.max(...coords.map((c) => c.y))) / 2;
-  const tanVertical = Math.tan(verticalFovDegrees * Math.PI / 360);
-  const tanHorizontal = tanVertical * aspect;
+  const tanFull = Math.tan(verticalFovDegrees * Math.PI / 360);
+  // A bottom inset (e.g. a caption) shrinks the usable vertical window and
+  // moves its center up by tanFull * bottomInset.
+  const tanVertical = tanFull * (1 - bottomInset);
+  const tanHorizontal = tanFull * aspect;
   const distance = coords.reduce((best, c) => Math.max(
     best,
     c.depth + pad + (Math.abs(c.y - midY) + pad) / tanVertical,
     c.depth + pad + (Math.abs(c.x - midX) + pad) / tanHorizontal,
   ), MOTION_OFF);
-  const target = centroid.add(right.multiplyScalar(midX)).add(screenUp.multiplyScalar(midY));
+  const target = centroid
+    .add(right.multiplyScalar(midX))
+    .add(screenUp.multiplyScalar(midY - tanFull * bottomInset * distance));
   return { target, distance };
 }
 
@@ -275,6 +283,7 @@ function beginZoomToFit(
     camera.fov,
     camera.aspect,
     opts.paddingWorldUnits + RENDER_TOKENS.node.maxRadius,
+    opts.bottomInset ?? 0,
   );
   const toPosition = frame.target.clone().add(direction.multiplyScalar(frame.distance));
   return beginFlightTo(
