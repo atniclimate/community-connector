@@ -2326,3 +2326,36 @@ versions are 0.x). Strongest surviving objection: a literal reading of "minor ve
 bump" was not honored to the letter. Reversible if a future session teaches
 `accepts_schema` a wider acceptance window and wants the true semver-minor instead.
 Nothing ships on the un-browser-tested path while the bar stands.
+
+## D-097 (2026-09-12) - Viz quick wins from the Codex rendering critique: tuning calls
+
+Trigger: the human asked for the six "quick wins" in the gpt-5.6-sol review
+`C:\dev\_reviews\community-connector\2026-09-12_threejs-viz-critique.md` (off-repo).
+Landed as eight commits, 81af3f2..86f46fa. Each was screenshot-checked in headless
+Chromium (SwiftShader WebGL renders correctly there, unlike the automated capture
+S-R4b tried). Four calls went beyond the review's text:
+
+1. **Layout radius 500 -> 340.** Swapping the inverted center/offset radii (the
+   review's fix) put kind centers at 500, which pushed far clusters almost fully
+   into fog and off the default frame. 340 keeps roughly the old overall extent.
+   Every node moves; the median same-kind vs cross-kind distance test pins the
+   intent. Known v0 limit: two kinds with nearby hashed centers still overlap.
+2. **Fog density 0.0009 -> 0.00065.** Fit-on-load moves the camera from a fixed
+   z=1100 to the true framing distance (~1300 on the research fixture), and the old
+   density dimmed the whole framed graph. Far clusters still recede.
+3. **Selected halo is a rim ring, not the resting glow at higher alpha.** The
+   resting falloff is brightest behind the node; at `selectedAlpha` 0.8 it read as
+   a solid disk merging with the node. The ring (detail-3 shell, 1.6x base halo
+   scale) keeps the node legible inside it.
+4. **Near-camera label size cap, depth-tested labels.** Not in the six. Clustering
+   made focus flights land among close same-kind nodes whose world-sized labels
+   filled the view, a regression the clustering itself caused, so it was fixed in
+   the same pass. Screen-space collision (review C3) stays open.
+
+Also found and fixed: presenter mode's graph region grew past the viewport (canvas
+intrinsic-aspect fallback), a pre-existing S-R4b layout bug.
+
+Open: no Codex review pass ran on these diffs (commits marked
+`[unreviewed-by-codex]`); the S-R4b human visual gate is unchanged and now covers
+these changes too. Strongest surviving objection: the tunings are judged on the
+120-node research fixture only, not atni-convention or the 5,000-node scale.
