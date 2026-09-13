@@ -52,6 +52,7 @@ export const RENDER_TOKENS = {
     offsetPad: 2,
     maxChars: 28,
     visibleDistance: 950,
+    fullSizeDistance: 260,
     hubBoost: 1.5,
     capTierA: 48,
     capTierB: 32,

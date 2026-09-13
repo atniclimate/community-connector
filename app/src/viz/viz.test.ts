@@ -23,6 +23,7 @@ import { buildEdgeBuffers, buildEdgeLayer, expectedEdgeVertexCount, weightToAlph
 import { buildHaloLayer, selectHaloCandidates } from "./halos";
 import {
   labelCandidates,
+  labelScaleForDistance,
   selectVisibleLabels,
   truncateLabel,
   visibleLabelCap,
@@ -352,6 +353,14 @@ describe("labels", () => {
     expect(visible.map((entry) => entry.id)).toContain("near-leaf");
     expect(visible.map((entry) => entry.id)).toContain("far-hub");
     expect(visible.map((entry) => entry.id)).not.toContain("far-leaf");
+  });
+
+  it("holds on-screen label size once the camera is inside the full-size distance", () => {
+    const full = RENDER_TOKENS.label.fullSizeDistance;
+    expect(labelScaleForDistance(full * 3)).toBe(1);
+    expect(labelScaleForDistance(full)).toBe(1);
+    expect(labelScaleForDistance(full / 2)).toBeCloseTo(0.5);
+    expect(labelScaleForDistance(-1)).toBe(0);
   });
 
   it("orders deterministically by adjusted distance with id tie-break", () => {

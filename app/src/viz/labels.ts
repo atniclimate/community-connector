@@ -128,6 +128,15 @@ export function selectVisibleLabels(
   return scored.slice(ZERO, cap).map((entry) => entry.candidate);
 }
 
+/**
+ * World-sized text grows without bound as the camera closes in; inside
+ * fullSizeDistance the label shrinks with distance, so its on-screen size
+ * holds at roughly its full-size-distance height instead of swamping the view.
+ */
+export function labelScaleForDistance(distance: number): number {
+  return Math.min(UNIT, Math.max(ZERO, distance) / RENDER_TOKENS.label.fullSizeDistance);
+}
+
 function themeHex(theme: Theme | null, key: string, fallback: string): string {
   return theme?.tokens[key]?.hex ?? fallback;
 }
@@ -147,7 +156,9 @@ function makeLabel(theme: Theme | null, viewMode: ViewMode): Text {
   label.outlineWidth = fontSize * RENDER_TOKENS.label.outlineWidthRatio;
   label.anchorX = "center";
   label.anchorY = "bottom";
-  label.material.depthTest = false;
+  // Depth-tested so nearer nodes hide labels behind them; no depth write, so
+  // labels never occlude each other or the edges.
+  label.material.depthTest = true;
   label.material.depthWrite = false;
   label.renderOrder = RENDER_TOKENS.label.renderOrder;
   label.visible = false;
@@ -242,6 +253,7 @@ export function buildLabelLayer(args: BuildLabelLayerArgs): LabelLayer {
     for (const slot of slots) {
       if (slot.mesh.visible) {
         slot.mesh.quaternion.copy(orientation);
+        slot.mesh.scale.setScalar(labelScaleForDistance(slot.mesh.position.distanceTo(camera.position)));
       }
     }
     return changed;
