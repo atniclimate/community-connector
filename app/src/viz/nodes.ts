@@ -6,10 +6,12 @@ import {
   Group,
   IcosahedronGeometry,
   InstancedMesh,
+  Matrix3,
   Matrix4,
   Object3D,
   OctahedronGeometry,
   ShaderMaterial,
+  Sphere,
   SphereGeometry,
   TetrahedronGeometry,
   TorusGeometry,
@@ -17,6 +19,8 @@ import {
   UniformsUtils,
   Vector3,
   type BufferGeometry,
+  type Intersection,
+  type Raycaster,
 } from "three";
 import type { KindMeta, ProjectionDto, ProjectionEntityDto, ShapeName } from "../state/state";
 import type { Theme } from "../theme/tokens";
@@ -41,8 +45,11 @@ export type NodeLayer = {
 const UNIT = 1;
 const RADIAL_SEGMENTS = 6;
 const TORUS_TUBE_RADIUS = 0.35;
-const TORUS_RADIAL_SEGMENTS = 6;
-const TORUS_TUBULAR_SEGMENTS = 12;
+const TORUS_RADIAL_SEGMENTS = 10;
+const TORUS_TUBULAR_SEGMENTS = 32;
+/** Outer radius of the unit torus (ring radius + tube radius). */
+export const TORUS_OUTER_RADIUS = UNIT + TORUS_TUBE_RADIUS;
+const FACE_TILT_RADIANS = -0.45;
 const CONE_RADIUS = 1;
 const CONE_HEIGHT = 2;
 const FULL_COLOR_SHARE = 1;
@@ -84,9 +91,12 @@ export function degreeToScale(degree: number): number {
   return RENDER_TOKENS.node.minRadius + t * (RENDER_TOKENS.node.maxRadius - RENDER_TOKENS.node.minRadius);
 }
 
-function material(): ShaderMaterial {
+function material(faceCamera: boolean): ShaderMaterial {
   return new ShaderMaterial({
     fog: true,
+    // A ring seen edge-on reads as a pill, and orbiting guarantees some rings
+    // are edge-on; FACE_CAMERA keeps the ring turned toward the viewer.
+    defines: faceCamera ? { FACE_CAMERA: "" } : {},
     uniforms: UniformsUtils.merge([
       UniformsLib.fog,
       {
@@ -99,6 +109,11 @@ function material(): ShaderMaterial {
         uKeyIntensity: { value: RENDER_TOKENS.scene.keyIntensity },
         uFillIntensity: { value: RENDER_TOKENS.scene.fillIntensity },
         uAmbientIntensity: { value: RENDER_TOKENS.scene.ambientIntensity },
+        uFaceTilt: { value: new Matrix3().set(
+          1, 0, 0,
+          0, Math.cos(FACE_TILT_RADIANS), -Math.sin(FACE_TILT_RADIANS),
+          0, Math.sin(FACE_TILT_RADIANS), Math.cos(FACE_TILT_RADIANS),
+        ) },
       },
     ]),
     vertexShader: `
@@ -106,10 +121,20 @@ function material(): ShaderMaterial {
       #include <fog_pars_vertex>
       varying vec3 vNodeColor;
       varying vec3 vNodeNormal;
+      uniform mat3 uFaceTilt;
       void main() {
         vNodeColor = instanceColor;
-        vNodeNormal = normalize(normalMatrix * mat3(instanceMatrix) * normal);
-        vec4 mvPosition = modelViewMatrix * instanceMatrix * vec4(position, 1.0);
+        #ifdef FACE_CAMERA
+          // Geometry is placed in view space around the instance center, so
+          // the ring always faces the camera, tilted for a readable 3D form.
+          vec4 center = modelViewMatrix * instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0);
+          float nodeScale = length(instanceMatrix[0].xyz);
+          vNodeNormal = normalize(uFaceTilt * normal);
+          vec4 mvPosition = vec4(center.xyz + uFaceTilt * position * nodeScale, 1.0);
+        #else
+          vNodeNormal = normalize(normalMatrix * mat3(instanceMatrix) * normal);
+          vec4 mvPosition = modelViewMatrix * instanceMatrix * vec4(position, 1.0);
+        #endif
         gl_Position = projectionMatrix * mvPosition;
         #include <fog_vertex>
       }
@@ -144,10 +169,44 @@ function material(): ShaderMaterial {
 }
 
 function meshForShape(shape: ShapeName, count: number): InstancedMesh {
-  const mesh = new InstancedMesh(shapeGeometry(shape), material(), count);
+  const faceCamera = shape === "torus";
+  const mesh = new InstancedMesh(shapeGeometry(shape), material(faceCamera), count);
   mesh.instanceMatrix.setUsage(DynamicDrawUsage);
   mesh.instanceColor?.setUsage(DynamicDrawUsage);
+  if (faceCamera) {
+    // The world-space geometry no longer matches what is drawn; pick against
+    // the ring's bounding sphere, which covers every drawn orientation.
+    mesh.raycast = instanceSphereRaycast(mesh, TORUS_OUTER_RADIUS);
+  }
   return mesh;
+}
+
+const RAY_MATRIX = new Matrix4();
+const RAY_SPHERE = new Sphere();
+const RAY_POINT = new Vector3();
+const RAY_SCALE = new Vector3();
+
+export function instanceSphereRaycast(
+  mesh: InstancedMesh,
+  radiusFactor: number,
+): (raycaster: Raycaster, intersects: Intersection[]) => void {
+  return (raycaster, intersects) => {
+    for (let instanceId = 0; instanceId < mesh.count; instanceId += UNIT) {
+      mesh.getMatrixAt(instanceId, RAY_MATRIX);
+      RAY_MATRIX.premultiply(mesh.matrixWorld);
+      RAY_SCALE.setFromMatrixScale(RAY_MATRIX);
+      RAY_SPHERE.center.setFromMatrixPosition(RAY_MATRIX);
+      RAY_SPHERE.radius = RAY_SCALE.x * radiusFactor;
+      if (raycaster.ray.intersectSphere(RAY_SPHERE, RAY_POINT) === null) {
+        continue;
+      }
+      const distance = raycaster.ray.origin.distanceTo(RAY_POINT);
+      if (distance < raycaster.near || distance > raycaster.far) {
+        continue;
+      }
+      intersects.push({ distance, point: RAY_POINT.clone(), object: mesh, instanceId });
+    }
+  };
 }
 
 function groupByShape(

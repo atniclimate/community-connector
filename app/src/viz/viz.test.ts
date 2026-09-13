@@ -170,6 +170,37 @@ describe("nodes", () => {
     layer.dispose();
   });
 
+  it("turns rings toward the camera and picks them by their bounding sphere", () => {
+    const data = projection();
+    const layer = buildNodeLayer({
+      projection: data,
+      layout: computeLayout(data.entities ?? []),
+      kindMeta: { person: { shape: "torus" as const, label: "Person", colorRole: "kind-1" }, place: kindMeta().place },
+      theme: theme(),
+      degrees: degreesForProjection(data),
+    });
+    const ring = layer.records.find((record) => record.shape === "torus");
+    const cube = layer.records.find((record) => record.shape === "cube");
+    const target = layer.entityToMesh.get(entityA);
+    if (ring === undefined || cube === undefined || target === undefined) {
+      throw new Error("missing ring test meshes");
+    }
+    expect((ring.mesh.material as ShaderMaterial).defines).toHaveProperty("FACE_CAMERA");
+    expect((cube.mesh.material as ShaderMaterial).defines).not.toHaveProperty("FACE_CAMERA");
+
+    // A ray straight through the ring's hole misses the world-space torus, but
+    // the drawn ring is camera-facing and tilted, so picking uses its sphere.
+    const matrix = new Matrix4();
+    const center = new Vector3();
+    target.mesh.getMatrixAt(target.instanceId, matrix);
+    center.setFromMatrixPosition(matrix);
+    const raycaster = new Raycaster(center.clone().add(new Vector3(0, 0, 1000)), new Vector3(0, 0, -1));
+    const hits = raycaster.intersectObject(ring.mesh, false);
+
+    expect(hits.some((hit) => hit.instanceId === target.instanceId)).toBe(true);
+    layer.dispose();
+  });
+
   it("maps degree to bounded scale", () => {
     expect(degreeToScale(-1)).toBe(3);
     expect(degreeToScale(99)).toBe(10);
