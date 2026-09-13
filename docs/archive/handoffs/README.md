@@ -17,4 +17,9 @@ history is also in git.
   end-of-day true-up after steps 9-11 + the adversarial round landed.
 - `2026-08-11-relay-complete.md` - end-of-2026-08-11 snapshot: the remote-intake
   relay (steps 1-11) COMPLETE and ACCEPTED (D-089, adversarial round), all fixes
+  landed. Superseded by the 2026-09-12 pickup.
+- `2026-09-12-pickup-director.md` - the 2026-09-12 pickup-session handoff (discovery,
+  reconciliation, roster R0-R7 planned, candidate decisions D-090c..D-096c), superseded
+  by the same day's evening true-up after the reveal chain (R0, R2, R4a, R4b, R7), the
+  viz quick wins and convention reveal work (D-097, D-098), and the next-phase plan
   landed. The live root `HANDOFF.md` continues from here.

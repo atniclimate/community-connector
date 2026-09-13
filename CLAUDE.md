@@ -63,8 +63,9 @@ and computationally connected to a solution.
   of truth for data, schema validation, permissions, and graph queries. Same crates
   power the native `cn` CLI and ingestor. The frontend never re-implements permission
   logic; it renders projections the core hands it.
-- **Rendering stays in TypeScript** (3d-force-graph + Three.js to start). The core
-  does no layout or rendering; replacing the renderer must not touch the core.
+- **Rendering stays in TypeScript** (owned instanced Three.js per ADR-004; no
+  3d-force-graph in product code). The core does no layout or rendering; replacing
+  the renderer must not touch the core.
 - **Permission-filtered projection is the only read path.** Every graph the app
   receives is computed by `cn-perm` for a viewer context (anonymous, group member,
   trusted peer, self, admin). There is no unfiltered client API.
@@ -85,7 +86,7 @@ docs/            CODEX_GUIDE.md, LAUNCH_PROMPT.md, ENVIRONMENT.md, adr/, design/
 schemas/         JSON Schemas: group templates, ingest formats, Codex output
                  contracts, story paths
 core/            Rust workspace
-  crates/        cn-model cn-schema cn-perm cn-graph cn-store cn-sync cn-ingest cn-wasm
+  crates/        cn-model cn-schema cn-perm cn-graph cn-store cn-sync cn-ingest cn-api cn-wasm
   cli/           cn CLI: ingest, validate, export, snapshot build
 app/             TypeScript strict + Vite; src/viz src/state src/ui src/wasm
 fixtures/        SYNTHETIC data only; two contrasting demo groups minimum
