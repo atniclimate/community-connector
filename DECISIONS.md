@@ -2457,3 +2457,40 @@ drafts at 0.x are ours to decide per CLAUDE.md):
 
 The state option list and the on-stage wording are community-facing text and go through
 the D-023 review before any real use.
+
+## D-101 (2026-09-12) - ATNI typography for Community Navigator surfaces
+
+Human ruling (brand choice, Google Fonts):
+
+| Role | Face |
+|---|---|
+| Titles | League Spartan SemiBold |
+| Bold body text | League Spartan Bold |
+| Subtitles | Lexend Medium |
+| Body text, presentation style (large text: presenter mode, projector captions, rail) | League Spartan |
+| Traditional body text (form fields, panels, reading text) | Calibri |
+
+Engineering constraints and defaults, reversible:
+
+1. **Self-host, never load from Google at runtime.** League Spartan and Lexend are SIL OFL
+   1.1 and ship as bundled files (e.g. `@fontsource/league-spartan`,
+   `@fontsource/lexend`, pinned exactly like the existing
+   `@fontsource/atkinson-hyperlegible`). Three reasons: the intake form's CSP is
+   `default-src 'self'` with no `font-src` exception (`form/index.html:23`); the offline
+   snapshot must boot with zero requests (R8); and a request to a third-party font CDN
+   would expose each participant's IP address to that CDN when they open the form.
+   Adding the packages is a recorded dependency change (exact pins,
+   `NOTICE-third-party` entries).
+2. **Calibri cannot be bundled.** It is a Microsoft font, not on Google Fonts and not
+   redistributable, so it can only be used when the viewer's machine has it installed.
+   Stack: `Calibri, Carlito, <system sans>`. Carlito is OFL, metric-compatible with
+   Calibri, on Google Fonts, and self-hosted like the others, so layout holds on phones
+   without Calibri (most participants scanning the QR code).
+3. **Subset for names:** Latin plus Latin Extended, as DESIGN_BRIEF item 22 already
+   requires for the current face, so Indigenous and community names with diacritics
+   render.
+4. **The 3D graph labels are not silently switched.** They use Atkinson Hyperlegible
+   (troika SDF) for legibility at distance. S-E1/S-E3 may propose League Spartan for
+   presenter-mode labels, backed by a legibility screenshot at projector scale; the
+   human decides.
+5. The palette is still owed by the human; S-E1 keeps placeholder colors until then.

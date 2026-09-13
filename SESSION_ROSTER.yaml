@@ -719,8 +719,11 @@ sessions:
       undocumented CN_FORM_TEMPLATE_PATH env var, form/vite.config.ts:60);
       a theme-token slot for an ATNI palette/fonts that plugs INTO the
       existing app/src/theme/ pipeline, never bypasses it; placeholder
-      colors/fonts until the human supplies real ATNI assets - nothing
-      invented or scraped"
+      colors until the human supplies the ATNI palette - nothing invented or
+      scraped; fonts per D-101 (League Spartan SemiBold titles / Bold body,
+      Lexend Medium subtitles, League Spartan presentation body, Calibri with
+      Carlito fallback for traditional body), self-hosted OFL files with exact
+      pins and NOTICE entries, no runtime Google Fonts requests"
     skills: []
     mcp: []
     subagents: []

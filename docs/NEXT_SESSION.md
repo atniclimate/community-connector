@@ -86,7 +86,8 @@ claude --model claude-sonnet-5 --effort high --permission-mode plan
 
 ## Questions for the human (one-line answers unblock the roster)
 
-1. Can you share the ATNI palette and font files (with licenses) for the dark-mode form?
+1. Can you share the ATNI palette (hex values) for the dark-mode form? Fonts are
+   decided (D-101).
 2. Convention day: synthetic demo only, or pursue the go-live checklist (D-090c)?
 
 Answered 2026-09-12: `s` = state of residence (D-100); push authorized and done.

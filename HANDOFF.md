@@ -31,7 +31,7 @@ laptop, running on synthetic data unless the human clears the go-live gates.
 |---|---|
 | Durable contract (mission, R1-R10, gates, autonomy) | `CLAUDE.md` |
 | Invariants I1-I12 (review standard) | `AGENTS.md` |
-| Decision register (D-001..D-100) | `DECISIONS.md` |
+| Decision register (D-001..D-101) | `DECISIONS.md` |
 | Session plan of record (R-sessions, next-phase S-E1..S-E5) | `SESSION_ROSTER.yaml` |
 | Next-phase plan: go-live checklist, research receipts, sessions, wow slice W1-W5 | `docs/planning/NEXT-PHASE-convention-e2e.md` |
 | Route map to 1.0 (P-ids) and task trace | `PLAN_1.0.md`, `TRACE.yaml` |
@@ -104,8 +104,9 @@ laptop, running on synthetic data unless the human clears the go-live gates.
 
 1. **Visual sign-off on this laptop's real GPU** (S-R4b gate): `pwsh scripts/reveal.ps1`,
    click Present, step the beats. All viz evidence so far is SwiftShader screenshots.
-2. **ATNI brand assets** for the dark-mode form and app: palette values, font files, and
-   their licenses (S-E1 uses placeholders until then).
+2. **ATNI palette** for the dark-mode form and app (S-E1 uses placeholder colors until
+   then). Fonts are decided (D-101: League Spartan / Lexend / Calibri with Carlito
+   fallback, self-hosted).
 3. Later, not blocking: whether `tribe` stays free text or becomes a fixed vocabulary
    (`s` was decided as state of residence, D-100).
 4. **Go live at the convention or not** (D-090c, candidate). Live requires every row of
