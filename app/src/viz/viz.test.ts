@@ -11,9 +11,11 @@ import {
   Matrix4,
   Mesh,
   Object3D,
+  PerspectiveCamera,
   Raycaster,
   ShaderMaterial,
   Vector3,
+  type Intersection,
 } from "three";
 import type { ProjectionDto } from "../state/state";
 import type { Theme } from "../theme/tokens";
@@ -35,6 +37,7 @@ import {
   dispatchHoveredEntity,
   dispatchPickedEntity,
   entityIdFromIntersection,
+  PickingController,
   type PickDispatch,
 } from "./picking";
 import { effectivePixelRatio, profileForTier, QualityManager } from "./quality";
@@ -445,6 +448,76 @@ describe("quality", () => {
       manager.sample(1);
     }
     expect(manager.profile).toEqual(profileForTier("B"));
+  });
+});
+
+describe("picking hover", () => {
+  it("re-dispatches hover after the state machine clears it, and clears on pointercancel", () => {
+    const data = projection();
+    const layer = buildNodeLayer({
+      projection: data,
+      layout: computeLayout(data.entities ?? []),
+      kindMeta: kindMeta(),
+      theme: theme(),
+      degrees: degreesForProjection(data),
+    });
+    const target = layer.entityToMesh.get(entityA);
+    if (target === undefined) {
+      throw new Error("missing hover target");
+    }
+    const handlers = new Map<string, (event: unknown) => void>();
+    const element = {
+      style: { cursor: "" },
+      addEventListener: (type: string, handler: (event: unknown) => void) => handlers.set(type, handler),
+      removeEventListener: (type: string) => handlers.delete(type),
+      getBoundingClientRect: () => ({ left: 0, top: 0, width: 100, height: 100 }),
+    };
+    let hovered: string | null = null;
+    const actions: unknown[] = [];
+    const store = {
+      dispatch: (action: { kind: string; entityId?: string | null }) => {
+        actions.push(action);
+        hovered = action.entityId ?? null;
+      },
+      getState: () => ({ view: { hoveredEntityId: hovered } }),
+    };
+    const hit = { object: target.mesh, instanceId: target.instanceId, distance: 1 } as unknown as Intersection;
+    const originalRaf = globalThis.requestAnimationFrame;
+    const queued: FrameRequestCallback[] = [];
+    globalThis.requestAnimationFrame = ((callback: FrameRequestCallback) => {
+      queued.push(callback);
+      return queued.length;
+    }) as typeof requestAnimationFrame;
+    const moveAndFlush = (event: unknown): void => {
+      handlers.get("pointermove")?.(event);
+      queued.splice(0).forEach((callback) => callback(0));
+    };
+    try {
+      const picking = new PickingController(
+        element as unknown as HTMLElement,
+        new PerspectiveCamera(),
+        () => layer,
+        store as unknown as ConstructorParameters<typeof PickingController>[3],
+        () => [hit],
+      );
+      const move = { clientX: 50, clientY: 50 };
+      moveAndFlush(move);
+      moveAndFlush(move);
+      expect(actions).toHaveLength(1);
+
+      hovered = null; // e.g. entityFocused: the reducer clears hover
+      moveAndFlush(move);
+      expect(actions).toHaveLength(2);
+      expect(hovered).toBe(entityA);
+
+      handlers.get("pointercancel")?.({});
+      expect(hovered).toBeNull();
+      expect(element.style.cursor).toBe("");
+      picking.dispose();
+    } finally {
+      globalThis.requestAnimationFrame = originalRaf;
+      layer.dispose();
+    }
   });
 });
 

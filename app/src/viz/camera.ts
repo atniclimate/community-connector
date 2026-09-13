@@ -85,6 +85,8 @@ const MOTION_ON = 1;
 const MOTION_OFF = 0;
 const ASPECT_FALLBACK = 1;
 const MIN_TARGET_LENGTH = 0.0001;
+const DRIFT_WAKE_SLACK_MS = 20;
+const FIT_DISTANCE_HEADROOM = 1.15;
 const TARGET_ORIGIN = new Vector3(0, 0, 0);
 const CAMERA_START = new Vector3(0, 0, RENDER_TOKENS.camera.initialZ);
 
@@ -134,7 +136,10 @@ type RigState = {
   driftEnabled: boolean;
   reducedMotion: boolean;
   interacting: boolean;
-  msSinceInteraction: number;
+  /** performance.now() of the last interaction or scripted camera move. */
+  lastActivityAt: number;
+  /** Wakes the render loop when the idle delay ends, instead of polling per frame. */
+  driftWake: ReturnType<typeof setTimeout> | null;
 };
 
 export function createCameraRig(canvas: HTMLCanvasElement, onViewChange?: () => void): CameraRig {
@@ -158,17 +163,18 @@ export function createCameraRig(canvas: HTMLCanvasElement, onViewChange?: () => 
     driftEnabled: false,
     reducedMotion: false,
     interacting: false,
-    msSinceInteraction: MOTION_OFF,
+    lastActivityAt: performance.now(),
+    driftWake: null,
   };
   const onStart = (): void => {
     // Direct manipulation wins over a scripted flight instead of fighting it.
     rigState.flight = null;
     rigState.interacting = true;
-    rigState.msSinceInteraction = MOTION_OFF;
+    rigState.lastActivityAt = performance.now();
   };
   const onEnd = (): void => {
     rigState.interacting = false;
-    rigState.msSinceInteraction = MOTION_OFF;
+    rigState.lastActivityAt = performance.now();
   };
   const onChange = (): void => onViewChange?.();
   controls.addEventListener("start", onStart);
@@ -178,14 +184,14 @@ export function createCameraRig(canvas: HTMLCanvasElement, onViewChange?: () => 
     camera,
     controls,
     flyTo: (position, reducedMotion) => {
-      rigState.msSinceInteraction = MOTION_OFF;
+      rigState.lastActivityAt = performance.now();
       rigState.flight = beginFlight(camera, controls, position, reducedMotion);
     },
     zoomToFit: (positions, opts) => {
       if (positions.length === 0) {
         return;
       }
-      rigState.msSinceInteraction = MOTION_OFF;
+      rigState.lastActivityAt = performance.now();
       rigState.flight = beginZoomToFit(camera, controls, positions, opts);
     },
     setDrift: (enabled, autoRotateSpeed = RENDER_TOKENS.drift.autoRotateSpeed) => {
@@ -195,8 +201,11 @@ export function createCameraRig(canvas: HTMLCanvasElement, onViewChange?: () => 
     setReducedMotion: (reduced) => {
       applyReducedMotion(camera, controls, rigState, reduced);
     },
-    update: (deltaSeconds) => updateRig(camera, controls, rigState, deltaSeconds),
+    update: (deltaSeconds) => updateRig(camera, controls, rigState, deltaSeconds, onViewChange),
     dispose: () => {
+      if (rigState.driftWake !== null) {
+        clearTimeout(rigState.driftWake);
+      }
       controls.removeEventListener("start", onStart);
       controls.removeEventListener("end", onEnd);
       controls.removeEventListener("change", onChange);
@@ -285,6 +294,9 @@ function beginZoomToFit(
     opts.paddingWorldUnits + RENDER_TOKENS.node.maxRadius,
     opts.bottomInset ?? 0,
   );
+  // A fit that needs more room than the default bound (a tall narrow viewport)
+  // widens it; OrbitControls would otherwise clamp the flight short.
+  controls.maxDistance = Math.max(RENDER_TOKENS.camera.maxDistance, frame.distance * FIT_DISTANCE_HEADROOM);
   const toPosition = frame.target.clone().add(direction.multiplyScalar(frame.distance));
   return beginFlightTo(
     camera,
@@ -340,23 +352,29 @@ function updateRig(
   controls: OrbitControls,
   rigState: RigState,
   deltaSeconds: number,
+  onWake?: () => void,
 ): boolean {
   const deltaMs = deltaSeconds * RENDER_TOKENS.time.secondsToMs;
+  const now = performance.now();
   if (rigState.flight !== null) {
     advanceFlight(camera, controls, rigState, deltaMs);
     controls.update();
+    rigState.lastActivityAt = now;
     return true;
   }
-  rigState.msSinceInteraction += deltaMs;
-  controls.autoRotate = driftActive(
-    rigState.driftEnabled,
-    rigState.interacting,
-    rigState.msSinceInteraction,
-    rigState.reducedMotion,
-  );
+  const idleMs = now - rigState.lastActivityAt;
+  controls.autoRotate = driftActive(rigState.driftEnabled, rigState.interacting, idleMs, rigState.reducedMotion);
   // OrbitControls.update reports whether the camera moved, so settled damping
-  // stops the loop. Waiting out the idle delay keeps it alive until drift starts.
+  // stops the loop.
   const moved = controls.update(deltaSeconds);
-  const awaitingDrift = rigState.driftEnabled && !rigState.interacting && !rigState.reducedMotion;
-  return moved || controls.autoRotate || awaitingDrift;
+  const awaitingDrift = rigState.driftEnabled && !rigState.interacting && !rigState.reducedMotion && !controls.autoRotate;
+  if (awaitingDrift && rigState.driftWake === null && onWake !== undefined) {
+    // One timer for the rest of the idle delay; the woken frame re-evaluates
+    // (and re-arms if activity happened meanwhile).
+    rigState.driftWake = setTimeout(() => {
+      rigState.driftWake = null;
+      onWake();
+    }, Math.max(MOTION_OFF, RENDER_TOKENS.drift.idleDelayMs - idleMs) + DRIFT_WAKE_SLACK_MS);
+  }
+  return moved || controls.autoRotate;
 }

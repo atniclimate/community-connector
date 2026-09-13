@@ -3,6 +3,7 @@ import type { Store } from "../state/store";
 import type { NodeLayer } from "./nodes";
 
 export type PickDispatch = Pick<Store, "dispatch">;
+export type PickStore = Pick<Store, "dispatch" | "getState">;
 export type RaycastFn = (
   raycaster: Raycaster,
   layer: NodeLayer,
@@ -49,24 +50,26 @@ export class PickingController {
   private readonly raycast: RaycastFn;
   private pending: PointerEvent | null = null;
   private frame = NO_INSTANCE;
-  private hoveredEntityId: string | null = null;
 
   public constructor(
     private readonly element: HTMLElement,
     private readonly camera: Camera,
     private readonly layerProvider: () => NodeLayer | null,
-    private readonly store: PickDispatch,
+    private readonly store: PickStore,
     raycast: RaycastFn = defaultRaycast,
   ) {
     this.raycast = raycast;
     this.element.addEventListener("pointermove", this.onPointerMove);
     this.element.addEventListener("pointerleave", this.onPointerLeave);
+    // A touch drag that the browser takes over ends without pointerleave.
+    this.element.addEventListener("pointercancel", this.onPointerLeave);
     this.element.addEventListener("click", this.onClick);
   }
 
   public dispose(): void {
     this.element.removeEventListener("pointermove", this.onPointerMove);
     this.element.removeEventListener("pointerleave", this.onPointerLeave);
+    this.element.removeEventListener("pointercancel", this.onPointerLeave);
     this.element.removeEventListener("click", this.onClick);
     if (this.frame !== NO_INSTANCE) {
       cancelAnimationFrame(this.frame);
@@ -100,13 +103,16 @@ export class PickingController {
     this.applyHover(null);
   };
 
-  /** Dispatches only on change: re-hovering the same node is free. */
+  /**
+   * Dispatches only when the pick differs from the store's hover. The store is
+   * the single source: focus and presenter transitions clear hover in the
+   * reducer, and the next pointer move over the same node restores it.
+   */
   private applyHover(entityId: string | null): void {
-    if (entityId === this.hoveredEntityId) {
+    this.element.style.cursor = entityId === null ? "" : "pointer";
+    if (entityId === this.store.getState().view.hoveredEntityId) {
       return;
     }
-    this.hoveredEntityId = entityId;
-    this.element.style.cursor = entityId === null ? "" : "pointer";
     dispatchHoveredEntity(this.store, entityId);
   }
 

@@ -9,7 +9,8 @@ import { buildLabelLayer, type LabelLayer } from "./labels";
 import { computeLayout, type LayoutResult } from "./layout";
 import { buildNodeLayer, degreesForProjection, type NodeLayer } from "./nodes";
 import { PickingController } from "./picking";
-import { entityLabel, projectedEntities } from "./projection";
+import { HoverOverlay } from "./hover";
+import { projectedEntities } from "./projection";
 import { createVizScene, type SceneSetup } from "./scene";
 import { createCameraRig, zoomToFit, type CameraRig } from "./camera";
 import { applyFocusToNodeLayer, computeFocusSet, FocusBlend, writeNodeHover, type FocusSet } from "./focus";
@@ -25,8 +26,6 @@ const MIN_HEIGHT = 320;
 const BLEND_OFF = 0;
 const BLEND_ON = 1;
 const LOGICAL_SIZE = new Vector2();
-const TOOLTIP_OFFSET = 14;
-const TOOLTIP_MARGIN = 8;
 
 type RenderState = {
   sceneSetup: SceneSetup;
@@ -43,10 +42,8 @@ type RenderState = {
   degrees: ReadonlyMap<string, number> | null;
   focusedEntityId: string | null;
   focus: FocusSet | null;
-  hoveredEntityId: string | null;
+  hover: HoverOverlay;
   entities: ReadonlyMap<string, ProjectionEntityDto>;
-  tooltip: HTMLDivElement;
-  pointer: { x: number; y: number };
   focusBlend: FocusBlend;
   projectionRevision: number | null;
   fittedLoadKey: string | null;
@@ -72,16 +69,10 @@ export function mountViz(container: HTMLElement, store: Store, client: WasmClien
   live.className = "cn-viz-live";
   beatLabel.className = "cn-present-beat";
   beatLabel.hidden = true;
-  const tooltip = document.createElement("div");
-  tooltip.className = "cn-viz-tooltip";
-  // Visual echo of the hovered node; the flat view and search are the
-  // accessible paths to the same names (I9).
-  tooltip.setAttribute("aria-hidden", "true");
-  tooltip.hidden = true;
   canvas.setAttribute("role", "img");
   canvas.setAttribute("aria-label", CANVAS_LABEL_EMPTY);
   canvas.setAttribute("tabindex", "0");
-  container.append(canvas, live, beatLabel, tooltip);
+  container.append(canvas, live, beatLabel);
   const renderer = new WebGLRenderer({ canvas, antialias: true });
   renderer.outputColorSpace = SRGBColorSpace;
   renderer.toneMapping = NeutralToneMapping;
@@ -107,10 +98,8 @@ export function mountViz(container: HTMLElement, store: Store, client: WasmClien
     degrees: null,
     focusedEntityId: null,
     focus: null,
-    hoveredEntityId: null,
+    hover: new HoverOverlay(container, canvas),
     entities: new Map(),
-    tooltip,
-    pointer: { x: ZERO, y: ZERO },
     focusBlend: new FocusBlend(),
     projectionRevision: null,
     fittedLoadKey: null,
@@ -138,15 +127,6 @@ export function mountViz(container: HTMLElement, store: Store, client: WasmClien
     schedule(renderState, store);
   };
   const onKeydown = (event: KeyboardEvent): void => handlePresenterKeydown(event, renderState, store);
-  const onPointerMove = (event: PointerEvent): void => {
-    const rect = container.getBoundingClientRect();
-    renderState.pointer.x = event.clientX - rect.left;
-    renderState.pointer.y = event.clientY - rect.top;
-    if (!tooltip.hidden) {
-      positionTooltip(renderState, container);
-    }
-  };
-  canvas.addEventListener("pointermove", onPointerMove);
   const resizeObserver = new ResizeObserver(() => {
     resize(renderState, container);
     renderState.dirty = true;
@@ -158,7 +138,6 @@ export function mountViz(container: HTMLElement, store: Store, client: WasmClien
   handleState(renderState, container, store, client);
   return () => {
     resizeObserver.disconnect();
-    canvas.removeEventListener("pointermove", onPointerMove);
     unsubscribe();
     document.removeEventListener("visibilitychange", onVisibility);
     window.removeEventListener("keydown", onKeydown);
@@ -180,7 +159,8 @@ function handleState(
     schedule(renderState, store);
   });
   syncMotion(renderState, state, rebuilt, store, client);
-  syncHover(renderState, state, container);
+  renderState.hover.sync(state, renderState.entities, rebuilt, (entityId, hovered) =>
+    writeHover(renderState, state, entityId, hovered));
   updateAria(renderState, state);
   renderState.dirty = true;
   schedule(renderState, store);
@@ -296,9 +276,9 @@ function syncMotion(
 }
 
 /**
- * Frames each newly loaded group once. Theme, tier, and view rebuilds keep
- * the user's camera. It snaps rather than flies: there is no prior view of
- * this data to animate from.
+ * Frames each newly loaded group once (DESIGN_BRIEF first-ten-seconds gentle
+ * fit; snaps under reduced motion). Theme, tier, and view rebuilds keep the
+ * user's camera.
  */
 function fitNewLoad(renderState: RenderState, state: AppState, rebuilt: boolean): void {
   const projection = state.data.projection;
@@ -312,7 +292,7 @@ function fitNewLoad(renderState: RenderState, state: AppState, rebuilt: boolean)
   }
   zoomToFit(renderState.cameraRig, positionsForBeat(projection, renderState.layout, undefined), {
     paddingWorldUnits: RENDER_TOKENS.camera.fitAllPaddingWorldUnits,
-    reducedMotion: true,
+    reducedMotion: state.ui.reducedMotion,
     bearing: "current",
   });
 }
@@ -330,7 +310,7 @@ function applyFocusRendering(
   renderState.focus = focus;
   applyFocusToNodeLayer(renderState.nodes, projection, state.theme.resolved, renderState.degrees, focus);
   // The role pass rewrote every instance; put the hover emphasis back on top.
-  writeHover(renderState, state, renderState.hoveredEntityId, true);
+  writeHover(renderState, state, renderState.hover.hoveredEntityId, true);
   writeFocusTargetColors(renderState.edges, state.theme.resolved, focus?.adjacentEdgeIds ?? null);
   renderState.halos?.setSelected(focusedId);
   renderState.labels?.setEmphasis(
@@ -351,38 +331,6 @@ function writeHover(renderState: RenderState, state: AppState, entityId: string 
     focus: renderState.focus,
     theme: state.theme.resolved,
   }, hovered);
-}
-
-function syncHover(renderState: RenderState, state: AppState, container: HTMLElement): void {
-  const next = state.view.hoveredEntityId;
-  if (next === renderState.hoveredEntityId) {
-    return;
-  }
-  writeHover(renderState, state, renderState.hoveredEntityId, false);
-  renderState.hoveredEntityId = next;
-  writeHover(renderState, state, next, true);
-  const entity = next === null ? undefined : renderState.entities.get(next);
-  const tooltip = renderState.tooltip;
-  if (entity === undefined) {
-    tooltip.hidden = true;
-    return;
-  }
-  const name = document.createElement("strong");
-  name.textContent = entityLabel(entity, state.data.kindMeta);
-  const kind = document.createElement("span");
-  kind.textContent = state.data.kindMeta[entity.kind ?? ""]?.label ?? entity.kind ?? "";
-  tooltip.replaceChildren(name, kind);
-  tooltip.hidden = false;
-  positionTooltip(renderState, container);
-}
-
-function positionTooltip(renderState: RenderState, container: HTMLElement): void {
-  const tooltip = renderState.tooltip;
-  const maxX = Math.max(ZERO, container.clientWidth - tooltip.offsetWidth - TOOLTIP_MARGIN);
-  const maxY = Math.max(ZERO, container.clientHeight - tooltip.offsetHeight - TOOLTIP_MARGIN);
-  const x = Math.min(maxX, renderState.pointer.x + TOOLTIP_OFFSET);
-  const y = Math.min(maxY, renderState.pointer.y + TOOLTIP_OFFSET);
-  tooltip.style.transform = `translate(${Math.max(TOOLTIP_MARGIN, x)}px, ${Math.max(TOOLTIP_MARGIN, y)}px)`;
 }
 
 function activeMeasureKey(state: AppState, beat: PresentBeat | undefined): string | null {
@@ -628,6 +576,7 @@ function disposeRenderState(renderState: RenderState): void {
     cancelAnimationFrame(renderState.frame);
   }
   renderState.picking?.dispose();
+  renderState.hover.dispose();
   disposeGraphLayers(renderState);
   renderState.cameraRig.dispose();
   renderState.sceneSetup.dispose();

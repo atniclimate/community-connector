@@ -43,12 +43,13 @@ type HaloEntry = {
 
 export type HaloCandidate = {
   readonly entryIndex: number;
-  readonly distance: number;
+  readonly distanceSq: number;
 };
 
 const UNIT = 1;
 const ZERO_VISIBLE = 0;
 const SINGLE_INSTANCE = 1;
+const MATRIX_COMPONENTS = 16;
 const TORUS_HALO_RADIUS_FACTOR = 1.35;
 const DUMMY = new Object3D();
 
@@ -133,12 +134,15 @@ export function selectHaloCandidates(
   if (maxVisible === ZERO_VISIBLE) {
     return [];
   }
-  const maxDistance = tierDistance(tier);
-  return positions
-    .map((position, entryIndex) => ({ entryIndex, distance: position.distanceTo(cameraPosition) }))
-    .filter((candidate) => candidate.distance <= maxDistance)
-    .sort((left, right) => left.distance - right.distance)
-    .slice(ZERO_VISIBLE, maxVisible);
+  const maxDistanceSq = tierDistance(tier) ** 2;
+  const eligible: HaloCandidate[] = [];
+  for (const [entryIndex, position] of positions.entries()) {
+    const distanceSq = position.distanceToSquared(cameraPosition);
+    if (distanceSq <= maxDistanceSq) {
+      eligible.push({ entryIndex, distanceSq });
+    }
+  }
+  return eligible.sort((left, right) => left.distanceSq - right.distanceSq).slice(ZERO_VISIBLE, maxVisible);
 }
 
 function writeShell(mesh: InstancedMesh, instanceId: number, entry: HaloEntry, scaleFactor = UNIT): void {
@@ -217,7 +221,12 @@ export function buildHaloLayer(args: {
     for (const [kind, mesh] of kindMeshes.entries()) {
       mesh.count = used.get(kind) ?? ZERO_VISIBLE;
       mesh.visible = mesh.count > ZERO_VISIBLE;
-      mesh.instanceMatrix.needsUpdate = true;
+      if (mesh.visible) {
+        // Upload only the rewritten prefix, not the full-capacity buffer.
+        mesh.instanceMatrix.clearUpdateRanges();
+        mesh.instanceMatrix.addUpdateRange(ZERO_VISIBLE, mesh.count * MATRIX_COMPONENTS);
+        mesh.instanceMatrix.needsUpdate = true;
+      }
     }
   };
   refresh(args.cameraPosition);
