@@ -49,6 +49,7 @@ type RenderState = {
   pointer: { x: number; y: number };
   focusBlend: FocusBlend;
   projectionRevision: number | null;
+  fittedLoadKey: string | null;
   themeKey: string;
   viewMode: ViewMode;
   presentBeatIndex: number | null;
@@ -112,6 +113,7 @@ export function mountViz(container: HTMLElement, store: Store, client: WasmClien
     pointer: { x: ZERO, y: ZERO },
     focusBlend: new FocusBlend(),
     projectionRevision: null,
+    fittedLoadKey: null,
     themeKey: "",
     viewMode: "overview",
     presentBeatIndex: null,
@@ -258,6 +260,7 @@ function syncMotion(
   const beat = present ? state.presentation.beats[state.presentation.beatIndex] : undefined;
   syncPresenterMeasure(renderState, state, beat, store, client);
   updatePresenterLabel(renderState, present, beat);
+  fitNewLoad(renderState, state, rebuilt);
   const focusedId = state.view.mode === "focus" || present ? state.view.focusedEntityId : null;
   const focusChanged = focusedId !== renderState.focusedEntityId;
   const presentBeatIndex = present ? state.presentation.beatIndex : null;
@@ -283,6 +286,28 @@ function syncMotion(
       reducedMotion: reduced,
     });
   }
+}
+
+/**
+ * Frames each newly loaded group once. Theme, tier, and view rebuilds keep
+ * the user's camera. It snaps rather than flies: there is no prior view of
+ * this data to animate from.
+ */
+function fitNewLoad(renderState: RenderState, state: AppState, rebuilt: boolean): void {
+  const projection = state.data.projection;
+  const loadKey = `${state.session.groupId ?? ""}:${state.session.sessionId}`;
+  if (!rebuilt || projection === null || renderState.layout === null || renderState.fittedLoadKey === loadKey) {
+    return;
+  }
+  renderState.fittedLoadKey = loadKey;
+  if (state.view.mode !== "overview") {
+    return;
+  }
+  zoomToFit(renderState.cameraRig, positionsForBeat(projection, renderState.layout, undefined), {
+    paddingWorldUnits: RENDER_TOKENS.camera.fitAllPaddingWorldUnits,
+    reducedMotion: true,
+    bearing: "current",
+  });
 }
 
 function applyFocusRendering(

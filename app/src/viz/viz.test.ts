@@ -17,7 +17,7 @@ import {
 } from "three";
 import type { ProjectionDto } from "../state/state";
 import type { Theme } from "../theme/tokens";
-import { motionSettings } from "./camera";
+import { fitDistance, motionSettings } from "./camera";
 import { RENDER_TOKENS } from "./config";
 import { buildEdgeBuffers, buildEdgeLayer, expectedEdgeVertexCount, weightToAlpha } from "./edges";
 import { buildHaloLayer, selectHaloCandidates } from "./halos";
@@ -439,6 +439,19 @@ describe("picking", () => {
       { kind: "entityFocused", entityId: entityB },
     ]);
     layer.dispose();
+  });
+});
+
+describe("camera fit", () => {
+  it("fits the narrower FOV axis so portrait canvases do not clip sideways", () => {
+    const landscape = fitDistance(500, RENDER_TOKENS.camera.fov, 16 / 9);
+    const square = fitDistance(500, RENDER_TOKENS.camera.fov, 1);
+    const portrait = fitDistance(500, RENDER_TOKENS.camera.fov, 9 / 16);
+
+    expect(landscape).toBeCloseTo(500 / Math.sin(RENDER_TOKENS.camera.fov * Math.PI / 360));
+    expect(square).toBeCloseTo(landscape);
+    expect(portrait).toBeGreaterThan(landscape * 1.5);
+    expect(portrait).toBeLessThan(RENDER_TOKENS.camera.maxDistance);
   });
 });
 

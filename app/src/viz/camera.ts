@@ -22,7 +22,19 @@ export type CameraRig = {
 export type ZoomToFitOptions = {
   readonly paddingWorldUnits: number;
   readonly reducedMotion: boolean;
+  /**
+   * "centroid" (presenter beats, blueprint rule): look in along the
+   * origin-to-centroid direction. "current": keep the present viewing bearing.
+   */
+  readonly bearing?: "centroid" | "current";
 };
+
+/** Distance at which a sphere of `radius` fits the narrower of the two FOV axes. */
+export function fitDistance(radius: number, verticalFovDegrees: number, aspect: number): number {
+  const verticalHalf = verticalFovDegrees * Math.PI / 360;
+  const horizontalHalf = Math.atan(Math.tan(verticalHalf) * aspect);
+  return radius / Math.sin(Math.min(verticalHalf, horizontalHalf));
+}
 
 const MOTION_ON = 1;
 const MOTION_OFF = 0;
@@ -92,6 +104,9 @@ export function createCameraRig(canvas: HTMLCanvasElement, onViewChange?: () => 
   controls.enableDamping = true;
   controls.dampingFactor = RENDER_TOKENS.camera.dampingFactor;
   controls.autoRotateSpeed = RENDER_TOKENS.drift.autoRotateSpeed;
+  controls.minDistance = RENDER_TOKENS.camera.minDistance;
+  controls.maxDistance = RENDER_TOKENS.camera.maxDistance;
+  controls.maxTargetRadius = RENDER_TOKENS.camera.maxTargetRadius;
   controls.target.copy(TARGET_ORIGIN);
   const rigState: RigState = {
     flight: null,
@@ -101,6 +116,8 @@ export function createCameraRig(canvas: HTMLCanvasElement, onViewChange?: () => 
     msSinceInteraction: MOTION_OFF,
   };
   const onStart = (): void => {
+    // Direct manipulation wins over a scripted flight instead of fighting it.
+    rigState.flight = null;
     rigState.interacting = true;
     rigState.msSinceInteraction = MOTION_OFF;
   };
@@ -175,6 +192,7 @@ function beginFlight(
     target,
     flightDurationMs(camera.position.distanceTo(toPosition)),
     reducedMotion,
+    RENDER_TOKENS.camera.maxDurationMs,
   );
 }
 
@@ -185,6 +203,7 @@ function beginFlightTo(
   toTarget: Vector3,
   durationMs: number,
   reducedMotion: boolean,
+  maxDurationMs: number,
 ): Flight | null {
   const settings = motionSettings(reducedMotion);
   controls.enableDamping = settings.dampingEnabled;
@@ -199,7 +218,7 @@ function beginFlightTo(
     toPosition,
     fromTarget: controls.target.clone(),
     toTarget: toTarget.clone(),
-    durationMs: Math.min(durationMs, RENDER_TOKENS.camera.maxDurationMs),
+    durationMs: Math.min(durationMs, maxDurationMs),
     elapsedMs: MOTION_OFF,
   };
 }
@@ -214,12 +233,9 @@ function beginZoomToFit(
   const boundingRadius = positions.reduce(
     (radius, position) => Math.max(radius, position.distanceTo(centroid)),
     MOTION_OFF,
-  ) + opts.paddingWorldUnits;
-  const direction = centroid.length() > MIN_TARGET_LENGTH
-    ? centroid.clone().normalize()
-    : new Vector3(0, 0, 1);
-  const halfFovRadians = camera.fov * Math.PI / 360;
-  const distance = boundingRadius / Math.sin(halfFovRadians);
+  ) + opts.paddingWorldUnits + RENDER_TOKENS.node.maxRadius;
+  const direction = fitDirection(camera, controls, centroid, opts.bearing ?? "centroid");
+  const distance = fitDistance(boundingRadius, camera.fov, camera.aspect);
   const toPosition = centroid.clone().add(direction.multiplyScalar(distance));
   return beginFlightTo(
     camera,
@@ -228,7 +244,18 @@ function beginZoomToFit(
     centroid,
     RENDER_TOKENS.camera.beatDurationMs,
     opts.reducedMotion,
+    RENDER_TOKENS.camera.beatDurationMs,
   );
+}
+
+function fitDirection(
+  camera: PerspectiveCamera,
+  controls: OrbitControls,
+  centroid: Vector3,
+  bearing: "centroid" | "current",
+): Vector3 {
+  const source = bearing === "current" ? camera.position.clone().sub(controls.target) : centroid.clone();
+  return source.length() > MIN_TARGET_LENGTH ? source.normalize() : new Vector3(0, 0, 1);
 }
 
 export function zoomToFit(

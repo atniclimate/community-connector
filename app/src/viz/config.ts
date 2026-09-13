@@ -87,6 +87,9 @@ export const RENDER_TOKENS = {
     near: 0.1,
     far: 5000,
     initialZ: 1100,
+    minDistance: 40,
+    maxDistance: 3200,
+    maxTargetRadius: 900,
     targetDistance: 220,
     dampingFactor: 0.08,
     dampLambda: 5,
@@ -99,7 +102,7 @@ export const RENDER_TOKENS = {
     fitAllPaddingWorldUnits: 20,
   },
   scene: {
-    fogDensity: 0.0009,
+    fogDensity: 0.00065,
     stars: 360,
     starRadius: 1800,
     starMinBrightness: 0.35,
