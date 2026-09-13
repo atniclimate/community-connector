@@ -86,8 +86,9 @@ claude --model claude-sonnet-5 --effort high --permission-mode plan
 
 ## Questions for the human (one-line answers unblock the roster)
 
-1. Can you share the ATNI palette (hex values) for the dark-mode form? Fonts are
-   decided (D-101).
+1. Brand reconciliation: answer section 7 of `docs/design/atni-design-system-digest.md`
+   (authoritative system, Lexend vs Lexend Deca, weights, Arial vs Lexend Deca body, kind
+   colors) before S-E1 styles anything.
 2. Convention day: synthetic demo only, or pursue the go-live checklist (D-090c)?
 
 Answered 2026-09-12: `s` = state of residence (D-100); push authorized and done.

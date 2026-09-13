@@ -41,6 +41,7 @@ laptop, running on synthetic data unless the human clears the go-live gates.
 | Accepted ADRs (001-005) | `docs/adr/` |
 | Blueprints (intake pipeline, relay, presenter mode, facilitator role, ...) | `docs/blueprints/` |
 | Runbooks (live entry, remote-intake e2e, relay deploy DRAFT) | `docs/runbooks/` |
+| ATNI design system digest (tokens, type, logo rules, S-E1 mapping; source stays off-repo at `I:\ATNI_design-system\`) | `docs/design/atni-design-system-digest.md` |
 | Consent text DRAFT (pending D-023), keygen ceremony design | `docs/design/intake-consent-text-draft-2026-07-24.md`, `docs/design/facilitator-keygen-ceremony.md` |
 | Reveal launcher and presenter controls reference | `scripts/reveal.ps1`, `CONTROLS.md` |
 | Presenter beats (plain JSON array) | `app/public/beats.atni.json` |
@@ -104,9 +105,14 @@ laptop, running on synthetic data unless the human clears the go-live gates.
 
 1. **Visual sign-off on this laptop's real GPU** (S-R4b gate): `pwsh scripts/reveal.ps1`,
    click Present, step the beats. All viz evidence so far is SwiftShader screenshots.
-2. **ATNI palette** for the dark-mode form and app (S-E1 uses placeholder colors until
-   then). Fonts are decided (D-101, D-102: League Spartan / Lexend / Arial with Arimo
-   fallback, self-hosted).
+2. **Brand reconciliation** (palette now available: ATNI design system revised
+   2026-09-12, digested at `docs/design/atni-design-system-digest.md`). Answer its
+   section 7 before S-E1 styles anything: whether the top-level 09/12 system is the sole
+   authority (a 07/16 bundle with different fonts sits inside it); Lexend Medium
+   (D-101) vs the system's Lexend Deca Light for subtitles; League Spartan weights
+   (the system has no 700); Arial (D-102) vs the system's Lexend Deca for body text;
+   kind colors for person, committee, and organization (the system has one accent, ATNI
+   Red `#E13D33`, and no categorical palette).
 3. Later, not blocking: whether `tribe` stays free text or becomes a fixed vocabulary
    (`s` was decided as state of residence, D-100).
 4. **Go live at the convention or not** (D-090c, candidate). Live requires every row of

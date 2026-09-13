@@ -380,8 +380,11 @@ ATNI-built artifact specifically.
 
 ## 4. Human input needed
 
-- ATNI brand palette (hex or OKLCH values) for the dark-mode theme - E1 ships
-  placeholder colors until then; nothing invented or scraped. FONTS RESOLVED
+- PALETTE AVAILABLE 2026-09-12: the human's ATNI design system is digested at
+  `docs/design/atni-design-system-digest.md` (ATNI Red `#E13D33`, ground `#010B13`,
+  text `#E8ECF0`, surfaces `#141414`/`#1E242C`, radius 0). Its section 7 lists the
+  typography conflicts with D-101/D-102 and the missing kind palette for the human to
+  resolve before E1 styles anything. FONTS RESOLVED
   (D-101): League Spartan SemiBold titles and Bold for bold body text, Lexend Medium
   subtitles, League Spartan presentation body, Arial traditional body (D-102; falls back
   to self-hosted Arimo). Self-hosted open-licensed files only; no runtime Google Fonts requests
