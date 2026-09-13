@@ -721,8 +721,8 @@ sessions:
       existing app/src/theme/ pipeline, never bypasses it; placeholder
       colors until the human supplies the ATNI palette - nothing invented or
       scraped; fonts per D-101 (League Spartan SemiBold titles / Bold body,
-      Lexend Medium subtitles, League Spartan presentation body, Calibri with
-      Carlito fallback for traditional body), self-hosted OFL files with exact
+      Lexend Medium subtitles, League Spartan presentation body, Arial with
+      Arimo fallback for traditional body per D-102), self-hosted open-licensed files with exact
       pins and NOTICE entries, no runtime Google Fonts requests"
     skills: []
     mcp: []

@@ -2494,3 +2494,16 @@ Engineering constraints and defaults, reversible:
    presenter-mode labels, backed by a legibility screenshot at projector scale; the
    human decides.
 5. The palette is still owed by the human; S-E1 keeps placeholder colors until then.
+
+## D-102 (2026-09-12) - Traditional body text is Arial (supersedes D-101's Calibri row and item 2)
+
+Human ruling, right after D-101: traditional body text (form fields, panels, reading
+text) uses **Arial** instead of Calibri. The rest of D-101 stands.
+
+Arial is also a proprietary Monotype/Microsoft font and cannot be bundled. It is
+installed on nearly all Windows, macOS, and iOS devices, which covers far more
+participants than Calibri did. Android generally does not ship it. Stack:
+`Arial, Arimo, Helvetica, sans-serif`. Arimo is metric-compatible with Arial, Apache 2.0,
+on Google Fonts, and self-hosted like the other faces (no runtime Google requests, per
+D-101 item 1), so layout holds on devices without Arial. D-101's Calibri/Carlito stack is
+superseded.

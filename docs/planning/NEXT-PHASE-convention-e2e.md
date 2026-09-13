@@ -383,8 +383,8 @@ ATNI-built artifact specifically.
 - ATNI brand palette (hex or OKLCH values) for the dark-mode theme - E1 ships
   placeholder colors until then; nothing invented or scraped. FONTS RESOLVED
   (D-101): League Spartan SemiBold titles and Bold for bold body text, Lexend Medium
-  subtitles, League Spartan presentation body, Calibri traditional body (falls back to
-  Carlito). Self-hosted OFL files only; no runtime Google Fonts requests
+  subtitles, League Spartan presentation body, Arial traditional body (D-102; falls back
+  to self-hosted Arimo). Self-hosted open-licensed files only; no runtime Google Fonts requests
   (`form/index.html:23` CSP, R8 offline, participant IP privacy).
 - RESOLVED (D-100: state of residence). D-099c: what `s` should mean on the presenter keyboard (see research
   question (d)) - state of residence, something else, or repurposed to
