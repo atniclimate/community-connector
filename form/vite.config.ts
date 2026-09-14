@@ -53,15 +53,36 @@ const DEFAULT_TEMPLATE_PATH = path.resolve(
   "research-network.template.json",
 );
 
+// Optional build-time kind restriction: a comma-separated list of kind ids
+// from the template (e.g. "person"). Empty = every kind the template defines
+// (the default, unchanged behavior). scripts/build-form.ps1 -Kinds sets it.
+const DEFAULT_KINDS = "";
+
 const publicKeyHex = process.env["CN_FORM_PUBLIC_KEY_HEX"] ?? DEFAULT_PUBLIC_KEY_HEX;
 const keyFingerprint = process.env["CN_FORM_KEY_FINGERPRINT"] ?? DEFAULT_KEY_FINGERPRINT;
 const relayOrigin = process.env["CN_FORM_RELAY_ORIGIN"] ?? DEFAULT_RELAY_ORIGIN;
 const formVersion = process.env["CN_FORM_VERSION"] ?? DEFAULT_FORM_VERSION;
 const templatePath = process.env["CN_FORM_TEMPLATE_PATH"] ?? DEFAULT_TEMPLATE_PATH;
+const kinds = process.env["CN_FORM_KINDS"] ?? DEFAULT_KINDS;
 
 // Raw file bytes: deterministic given the same source file. config.ts parses
 // this at load time (the template drives the R2 field widgets, blueprint 4.1).
 const templateJson = readFileSync(templatePath, "utf8");
+
+// Fail the BUILD, not the participant, when the restriction names a kind the
+// template does not define (a typo here would otherwise ship an empty form).
+// config.ts re-applies the same check at runtime via restrictKinds.
+{
+  const template = JSON.parse(templateJson) as { readonly kinds?: readonly { readonly id?: unknown }[] };
+  const known = new Set((template.kinds ?? []).map((kind) => kind.id).filter((id): id is string => typeof id === "string"));
+  for (const id of kinds.split(",").map((item) => item.trim()).filter((item) => item.length > 0)) {
+    if (!known.has(id)) {
+      throw new Error(
+        `CN_FORM_KINDS names "${id}", which ${templatePath} does not define (known: ${[...known].join(", ")})`,
+      );
+    }
+  }
+}
 
 export default defineConfig({
   // Deploy target is the blueprint's documented pages_origin
@@ -77,6 +98,7 @@ export default defineConfig({
     __CN_FORM_RELAY_ORIGIN__: JSON.stringify(relayOrigin),
     __CN_FORM_VERSION__: JSON.stringify(formVersion),
     __CN_FORM_TEMPLATE_JSON__: JSON.stringify(templateJson),
+    __CN_FORM_KINDS__: JSON.stringify(kinds),
   },
   plugins: [
     {

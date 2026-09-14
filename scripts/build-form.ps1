@@ -19,10 +19,18 @@
   via -PublicKeyHex / -Fingerprint. These defaults MUST match the defaults in
   form/vite.config.ts, which bakes the same values into the bundle.
 
+.PARAMETER Kinds
+  Comma-separated kind ids the built form offers (CN_FORM_KINDS), e.g.
+  "person". Empty (default) = every kind the template defines. With exactly
+  one kind the form renders that kind's fields directly, without the
+  "What are you adding?" selector. An id the template does not define fails
+  the build.
+
 .EXAMPLE
   pwsh scripts/build-form.ps1
   pwsh scripts/build-form.ps1 -CheckReproducible
   pwsh scripts/build-form.ps1 -RelayOrigin https://relay.example.test -CheckReproducible
+  pwsh scripts/build-form.ps1 -TemplatePath fixtures/templates/atni-convention.template.json -Kinds person
 #>
 [CmdletBinding()]
 param(
@@ -31,6 +39,7 @@ param(
   [string]$RelayOrigin  = "http://localhost:8787",
   [string]$FormVersion  = "remote-draft-2026-08-11",
   [string]$TemplatePath = "",
+  [string]$Kinds        = "",
   [string]$Builder      = "local-build",
   [string]$ManifestOut  = "",
   [switch]$CheckReproducible
@@ -52,6 +61,7 @@ $env:CN_FORM_KEY_FINGERPRINT = $Fingerprint
 $env:CN_FORM_RELAY_ORIGIN = $RelayOrigin
 $env:CN_FORM_VERSION = $FormVersion
 $env:CN_FORM_TEMPLATE_PATH = $TemplatePath
+$env:CN_FORM_KINDS = $Kinds
 
 $commit = (& git -C $RepoRoot rev-parse HEAD).Trim()
 
