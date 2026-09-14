@@ -28,6 +28,18 @@ const COMMITTEE_COUNT = 15;
 const ORG_COUNT = 12;
 const ENERGY = 0;
 const CLIMATE_RESILIENCE = 14;
+// The one designated spotlight person for the A9 constellation (D-103 pick 2/3/8,
+// CS-02). A member of the heavy-overlap group (Energy + Climate Resilience +
+// Native Vote + Housing, see committeesFor below), so areas_of_interest reads as
+// an energy-plus-resilience-plus-housing mix and connected_to gives them 4-10
+// neighbors (checked by app/scripts/check-atni-edges.mjs). Fixed index, so the
+// UUID below is stable across regenerations.
+// SPOTLIGHT_PERSON_INDEX 20 => personId(20) = 00000000-0000-0000-0000-0000000de2c5
+const SPOTLIGHT_PERSON_INDEX = 20;
+// Tribe stays one of FICTIONAL_TRIBES for every person, spotlight included, while
+// OQ-02 (Makah naming) is open. If OQ-02 clears, the only change needed here is
+// swapping this string into FICTIONAL_TRIBES (or adding it) - nothing else in this
+// generator references tribe identity.
 
 function uuid(n) {
   const hex = BigInt(n).toString(16).padStart(32, "0");
@@ -97,14 +109,40 @@ const COMMITTEES = [
   "Telecomms & Tech", "Food Sovereignty", "Economic Development", "Native Vote", "TERO",
   "Gaming", "Drug Abuse & Prevention", "Housing", "Climate Resilience",
 ];
-// One thematic tag per committee, used to give person interest/specialty tags
-// real correlation with their committee ties (visible Jaccard affinity, Track B).
-const COMMITTEE_TAG = [
-  "renewable-energy", "tax-policy", "stem-education", "child-welfare", "tribal-court",
-  "grant-writing", "broadband-access", "food-sovereignty", "small-business",
-  "voter-registration", "workforce-development", "gaming-regulation",
-  "substance-prevention", "affordable-housing", "climate-adaptation",
+// Three thematic tags per committee (CS-02, D-103 pick 2), used to give person
+// interest/specialty tags real correlation with their committee ties (visible
+// Jaccard affinity, Track B) while keeping connected_to legible: a person's tag
+// for a given committee is one of three deterministic variants
+// (tagVariant below), so two people on the same committee share that
+// committee's tag only when their variants line up, rather than every
+// co-member sharing it. This is what keeps the Energy+Climate-Resilience
+// overlap group from becoming one 66-edge clique (see connectedPairs below).
+const COMMITTEE_TAG_POOL = [
+  ["renewable-energy", "solar-microgrids", "grid-modernization"],
+  ["tax-policy", "tax-credits", "revenue-sharing"],
+  ["stem-education", "early-childhood-ed", "higher-ed-access"],
+  ["child-welfare", "family-services", "foster-care-reform"],
+  ["tribal-court", "public-safety", "restorative-justice"],
+  ["grant-writing", "donor-relations", "philanthropic-partnerships"],
+  ["broadband-access", "digital-literacy", "telehealth-infrastructure"],
+  ["food-sovereignty", "traditional-foods", "agricultural-resilience"],
+  ["small-business", "workforce-training", "entrepreneur-support"],
+  ["voter-registration", "civic-engagement", "election-access"],
+  ["workforce-development", "apprenticeships", "job-placement"],
+  ["gaming-regulation", "gaming-revenue", "compact-negotiation"],
+  ["substance-prevention", "behavioral-health", "recovery-support"],
+  ["affordable-housing", "home-ownership", "rental-assistance"],
+  ["climate-adaptation", "climate-resilience-planning", "disaster-preparedness"],
 ];
+
+// Deterministic variant selection: no randomness, no Date.now (I1/D-103 pick 2).
+function tagVariant(personIndex, committeeIndex) {
+  return (personIndex + committeeIndex) % COMMITTEE_TAG_POOL[committeeIndex].length;
+}
+
+function committeeTagFor(personIndex, committeeIndex) {
+  return COMMITTEE_TAG_POOL[committeeIndex][tagVariant(personIndex, committeeIndex)];
+}
 
 // --- Structural assignment: which committees/orgs each person belongs to ---
 const committeesFor = [];
@@ -136,6 +174,14 @@ for (let i = 0; i < PEOPLE_COUNT; i += 1) {
   orgsFor.push(orgs);
 }
 
+// Each person's areas_of_interest tags (CS-02): derived once here so both the
+// EntityCreate attribute and the connected_to derivation below read the exact
+// same tag set per person.
+const areasOfInterestFor = committeesFor.map((committees, i) => {
+  const tags = [...new Set(committees.map((c) => committeeTagFor(i, c)))];
+  return tags.length > 0 ? tags : [committeeTagFor(i, i % COMMITTEE_COUNT)];
+});
+
 // --- People ---
 function displayName(i) {
   return `${wordA[i % wordA.length]} ${wordB[Math.floor(i / 6) % wordB.length]} ${i + 1}`;
@@ -147,8 +193,7 @@ function personEntityOp(i) {
   const id = personId(i);
   const name = displayName(i);
   const slug = name.toLowerCase().replaceAll(" ", ".");
-  const tags = [...new Set(committeesFor[i].map((c) => COMMITTEE_TAG[c]))];
-  const interestTags = tags.length > 0 ? tags : [COMMITTEE_TAG[i % COMMITTEE_TAG.length]];
+  const interestTags = areasOfInterestFor[i];
   sort += 1;
   const attrs = {
     display_name: attribute({ type: "text", value: name }, "group", id, sort),
@@ -319,20 +364,25 @@ for (let i = 0; i < PEOPLE_COUNT; i += 1) {
   }
 }
 
-const connectedPairs = new Set();
+// connected_to edges (CS-02, D-103 pick 2): deterministic from shared
+// areas_of_interest, not the old arbitrary (i*13+7) formula. Two people connect
+// when they share at least SHARED_TAG_THRESHOLD tags - legible "shared
+// priorities" rather than a coincidence of indices. No randomness, no Date.now.
+const SHARED_TAG_THRESHOLD = 2;
 let connectedIndex = 0;
-for (let i = 0; i < PEOPLE_COUNT && connectedIndex < 45; i += 1) {
-  const j = (i * 13 + 7) % PEOPLE_COUNT;
-  if (j === i) {
-    continue;
+let spotlightNeighborCount = 0;
+for (let i = 0; i < PEOPLE_COUNT; i += 1) {
+  for (let j = i + 1; j < PEOPLE_COUNT; j += 1) {
+    const shared = areasOfInterestFor[i].filter((tag) => areasOfInterestFor[j].includes(tag)).length;
+    if (shared < SHARED_TAG_THRESHOLD) {
+      continue;
+    }
+    connectedIndex += 1;
+    if (i === SPOTLIGHT_PERSON_INDEX || j === SPOTLIGHT_PERSON_INDEX) {
+      spotlightNeighborCount += 1;
+    }
+    ops.push(edgeOp(uuid(970000 + connectedIndex), "connected_to", personId(i), personId(j), false, null, personId(i)));
   }
-  const key = i < j ? `${i}-${j}` : `${j}-${i}`;
-  if (connectedPairs.has(key)) {
-    continue;
-  }
-  connectedPairs.add(key);
-  connectedIndex += 1;
-  ops.push(edgeOp(uuid(970000 + connectedIndex), "connected_to", personId(i), personId(j), false, null, personId(i)));
 }
 
 mkdirSync(outDir, { recursive: true });
@@ -343,3 +393,9 @@ writeFileSync(
 console.log(`Wrote ${ops.length} ops to fixtures/groups/atni-convention.ops.jsonl`);
 console.log(`People: ${PEOPLE_COUNT}, committees: ${COMMITTEE_COUNT}, organizations: ${ORG_COUNT}`);
 console.log(`member_of: ${memberOfIndex}, affiliated_with: ${affiliatedIndex}, connected_to: ${connectedIndex}`);
+console.log(
+  `Spotlight person (SPOTLIGHT_PERSON_INDEX=${SPOTLIGHT_PERSON_INDEX}): id ${personId(SPOTLIGHT_PERSON_INDEX)}, ` +
+    `tribe "${FICTIONAL_TRIBES[SPOTLIGHT_PERSON_INDEX % FICTIONAL_TRIBES.length]}", ` +
+    `areas_of_interest [${areasOfInterestFor[SPOTLIGHT_PERSON_INDEX].join(", ")}], ` +
+    `connected_to neighbors: ${spotlightNeighborCount}`,
+);
