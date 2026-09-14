@@ -11,6 +11,9 @@
       relay. The meta tag lives inside the same HTML the D8 bundle-hash pin
       covers, so tampering with the CSP is caught by the same manifest check.
       No service worker (D8 prohibition); no analytics; no third-party requests.
+      Fonts are same-origin files emitted by the build (no font-src exception:
+      they fall under default-src 'self'; the build never inlines them as data:
+      URIs - assetsInlineLimit is 0).
       script-src adds 'wasm-unsafe-eval': libsodium-wrappers compiles and
       instantiates its WebAssembly module, which the WebAssembly-CSP integration
       blocks under a bare script-src 'self' (the form cannot seal). This keyword
@@ -22,9 +25,13 @@
       http-equiv="Content-Security-Policy"
       content="default-src 'self'; connect-src %CN_RELAY_ORIGIN%; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'"
     />
-    <title>Community Navigator - Intake (DRAFT)</title>
+    <title>Community Connector: Join the Network Map (DRAFT)</title>
   </head>
   <body>
+    <header class="cn-wordmark" aria-label="ATNI Climate">
+      <span class="cn-wordmark-atni" aria-hidden="true">ATNI</span>
+      <span class="cn-wordmark-climate" aria-hidden="true">CLIMATE</span>
+    </header>
     <main id="app"></main>
     <script type="module" src="/src/main.ts"></script>
   </body>

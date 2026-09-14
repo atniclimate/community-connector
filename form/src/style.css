@@ -1,21 +1,42 @@
 /*
- * Remote intake form styling. Class-based only (no inline styles), so the CSP
- * needs no style 'unsafe-inline'. Layout holds at 375px (R9). System font
- * stack - no web fonts, keeping the build dependency-closed (D8). Colors meet
- * WCAG AA contrast on the light background.
+ * Remote intake form styling, ATNI design system (revised 2026-09-12; digest at
+ * docs/design/atni-design-system-digest.md, "Applied 2026-09-14 (form)").
+ *
+ * Class-based only (no inline styles), so the CSP needs no style
+ * 'unsafe-inline'. Layout holds at 375px (R9): one reading column, 640px max,
+ * 16px side gutters. Fonts are self-hosted through the pinned @fontsource
+ * packages imported in main.ts; Vite emits them as same-origin assets under
+ * `default-src 'self'` (no data: URIs, no font CDN). The page has no motion:
+ * no transitions, no animations, so prefers-reduced-motion needs no variant.
+ *
+ * Dark-ground doctrine: Black BG ground, Text on Dark for body (never pure
+ * white), surfaces lighten as they rise (base -> raised -> overlay), radius 0
+ * everywhere, no shadows, hairlines in the dark greys. ATNI Red is reserved for
+ * the primary button and bold display emphasis; Red on Dark carries links,
+ * errors, and the focus ring (contrast 6.65:1 on the ground).
  */
 
 :root {
-  --cn-bg: #ffffff;
-  --cn-fg: #1a1a1a;
-  --cn-muted: #55595f;
-  --cn-accent: #0b5c46;
-  --cn-accent-fg: #ffffff;
-  --cn-border: #b7bcc2;
-  --cn-error: #a11a1a;
-  --cn-draft-bg: #fff4d6;
-  --cn-draft-fg: #5a4300;
-  --cn-panel: #f4f6f8;
+  color-scheme: dark;
+
+  /* Core palette (design system section 1.1 and 1.5) */
+  --cn-surface-base: #010b13; /* Black BG: page ground, never #000000 */
+  --cn-surface-raised: #141414; /* cards, grouped content, input fields */
+  --cn-surface-overlay: #1e242c; /* hover, dialogs, field bottom rule */
+  --cn-rule: #2a3138; /* hairline rules on dark */
+  --cn-text: #e8ecf0; /* Text on Dark: body, never pure white */
+  --cn-heading: #ffffff; /* headings and bold lead-ins only */
+  --cn-muted: #8a94a6; /* help, captions, placeholders */
+  --cn-accent: #e13d33; /* ATNI Red: primary button, display emphasis */
+  --cn-accent-text: #ffffff;
+  --cn-red-on-dark: #f26b5e; /* links, small red text, errors, focus ring */
+  --cn-status-review-bg: #fdf3e2; /* Under Review tag */
+  --cn-status-review-fg: #b4740e;
+
+  /* Type (design system section 1.2; D-101/D-102 faces) */
+  --cn-font-display: "League Spartan", "Arial Black", Arial, sans-serif;
+  --cn-font-body: Arial, Arimo, Helvetica, sans-serif;
+  --cn-font-mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
 }
 
 * {
@@ -24,166 +45,278 @@
 
 body {
   margin: 0;
-  background: var(--cn-bg);
-  color: var(--cn-fg);
-  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
+  background: var(--cn-surface-base);
+  color: var(--cn-text);
+  font-family: var(--cn-font-body);
+  font-size: 16px;
+  line-height: 1.6;
+  font-kerning: normal;
+  font-feature-settings: "kern" 1;
+  text-wrap: pretty;
 }
 
+/* Program wordmark: text-only, stacked, League Spartan 800 (design system
+   section 4: permitted without the seal in dense black product chrome). */
+.cn-wordmark {
+  display: flex;
+  flex-direction: column;
+  padding: 16px 16px 0;
+  font-family: var(--cn-font-display);
+  font-weight: 800;
+  font-size: 13px;
+  line-height: 1;
+  letter-spacing: 0.04em;
+  text-rendering: optimizeLegibility;
+}
+
+.cn-wordmark-atni {
+  color: var(--cn-heading);
+}
+
+.cn-wordmark-climate {
+  color: var(--cn-accent);
+}
+
+/* Reading column: 640px measure (~75 characters at 16px), never wider. */
 #app {
-  max-width: 34rem;
+  width: 100%;
+  max-width: 640px;
   margin: 0 auto;
-  padding: 1rem;
+  padding: 32px 16px 48px;
 }
 
-.cn-form-title,
-.cn-confirmation h1,
-.cn-fatal h1 {
-  font-size: 1.4rem;
-  margin: 0.25rem 0 0.75rem;
+/* Heading 1: League Spartan 700, 2.25 x body, tight tracking, balanced. */
+.cn-form-title {
+  font-family: var(--cn-font-display);
+  font-weight: 700;
+  font-size: 36px;
+  line-height: 1.1;
+  letter-spacing: -0.025em;
+  color: var(--cn-heading);
+  text-wrap: balance;
+  text-rendering: optimizeLegibility;
+  margin: 0 0 12px;
 }
 
+.cn-form-intro {
+  margin: 0 0 20px;
+}
+
+/* Status tag, Under Review style: square, weight 600, ~12.5px. */
 .cn-form-draft-banner {
-  background: var(--cn-draft-bg);
-  color: var(--cn-draft-fg);
-  border: 1px solid #e0c66a;
-  border-radius: 6px;
-  padding: 0.5rem 0.75rem;
+  display: inline-block;
+  background: var(--cn-status-review-bg);
+  color: var(--cn-status-review-fg);
   font-weight: 600;
-  margin: 0 0 1rem;
+  font-size: 12.5px;
+  line-height: 1.4;
+  padding: 4px 12px;
+  margin: 0 0 28px;
 }
 
 .cn-form-row {
   display: flex;
   flex-direction: column;
-  gap: 0.3rem;
-  margin-bottom: 1rem;
+  gap: 6px;
+  margin-bottom: 22px;
 }
 
 .cn-form-row label {
   font-weight: 600;
 }
 
+/* Caption: 13px, line-height 1.4, muted. */
+.cn-form-help {
+  color: var(--cn-muted);
+  font-size: 13px;
+  line-height: 1.4;
+  margin: 0;
+}
+
+/* Inputs: raised surface, bottom rule only, square. */
 .cn-form input[type="text"],
 .cn-form input[type="date"],
 .cn-form select,
 .cn-form textarea {
   width: 100%;
   max-width: 100%;
-  padding: 0.55rem 0.6rem;
+  padding: 11px 12px;
   font: inherit;
-  color: inherit;
-  background: var(--cn-bg);
-  border: 1px solid var(--cn-border);
-  border-radius: 6px;
+  color: var(--cn-text);
+  background: var(--cn-surface-raised);
+  border: 0;
+  border-bottom: 1px solid var(--cn-rule);
+  border-radius: 0;
 }
 
-.cn-form input:focus-visible,
-.cn-form select:focus-visible,
-.cn-form textarea:focus-visible,
-.cn-form button:focus-visible {
-  outline: 3px solid var(--cn-accent);
-  outline-offset: 1px;
+.cn-form input::placeholder,
+.cn-form textarea::placeholder {
+  color: var(--cn-muted);
+  opacity: 1;
+}
+
+.cn-form input:hover,
+.cn-form select:hover,
+.cn-form textarea:hover {
+  border-bottom-color: var(--cn-muted);
 }
 
 .cn-form [aria-invalid="true"] {
-  border-color: var(--cn-error);
+  border-bottom-color: var(--cn-red-on-dark);
+}
+
+/* Focus ring on every focusable element: Red on Dark, 2px, 2px offset. */
+:focus-visible {
+  outline: 2px solid var(--cn-red-on-dark);
+  outline-offset: 2px;
 }
 
 .cn-form-error {
-  color: var(--cn-error);
-  font-size: 0.9rem;
+  color: var(--cn-red-on-dark);
+  font-size: 13px;
+  line-height: 1.4;
   margin: 0;
-  min-height: 1.1rem;
+  min-height: 1.2em;
 }
 
+/* Consent card: raised surface, no border, square; the legend is floated so it
+   sits inside the card as a normal heading block. */
 .cn-form-consent {
-  border: 1px solid var(--cn-border);
-  border-radius: 8px;
-  background: var(--cn-panel);
-  padding: 0.75rem 1rem;
-  margin: 0 0 1rem;
+  background: var(--cn-surface-raised);
+  border: 0;
+  padding: 22px 24px;
+  margin: 8px 0 24px;
+  min-width: 0;
 }
 
 .cn-form-consent legend {
+  float: left;
+  width: 100%;
+  padding: 0;
+  margin: 0 0 12px;
+  font-family: var(--cn-font-display);
   font-weight: 700;
-  padding: 0 0.4rem;
+  font-size: 18.7px;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  color: var(--cn-heading);
+  text-wrap: balance;
 }
 
-.cn-form-consent p {
-  margin: 0.5rem 0;
+/* Square bullets: small filled squares in the text color, never discs. */
+.cn-form-consent-list {
+  clear: both;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.cn-form-consent-list li {
+  position: relative;
+  padding-left: 18px;
+  margin: 0 0 12px;
+}
+
+.cn-form-consent-list li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.6em;
+  width: 6px;
+  height: 6px;
+  background: var(--cn-text);
+}
+
+.cn-form-consent-list strong {
+  color: var(--cn-heading);
+  font-weight: 700;
 }
 
 .cn-form-affirm {
   display: flex;
   align-items: flex-start;
-  gap: 0.5rem;
-  margin-top: 0.75rem;
+  gap: 10px;
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--cn-surface-overlay);
 }
 
 .cn-form-affirm input {
-  margin-top: 0.35rem;
-  width: 1.15rem;
-  height: 1.15rem;
+  margin: 4px 0 0;
+  width: 18px;
+  height: 18px;
   flex: 0 0 auto;
+  accent-color: var(--cn-accent);
+  border-radius: 0;
 }
 
 .cn-form-affirm label {
   font-weight: 600;
 }
 
+/* Buttons: square, no border. Primary = ATNI Red with white text (hero
+   padding); secondary on dark = the overlay surface step. */
 .cn-form-submit,
 .cn-form-retry {
   font: inherit;
   font-weight: 600;
-  padding: 0.6rem 1.1rem;
-  border: 1px solid var(--cn-accent);
-  border-radius: 6px;
-  background: var(--cn-accent);
-  color: var(--cn-accent-fg);
+  padding: 13px 22px;
+  border: 0;
+  border-radius: 0;
   cursor: pointer;
 }
 
+.cn-form-submit {
+  background: var(--cn-accent);
+  color: var(--cn-accent-text);
+}
+
 .cn-form-submit[disabled] {
-  background: var(--cn-muted);
-  border-color: var(--cn-muted);
+  background: var(--cn-surface-overlay);
+  color: var(--cn-muted);
   cursor: not-allowed;
 }
 
 .cn-form-retry {
-  margin-top: 0.5rem;
+  background: var(--cn-surface-overlay);
+  color: var(--cn-text);
+  margin-top: 12px;
+}
+
+.cn-form-retry:hover {
+  background: var(--cn-rule);
 }
 
 .cn-form-status {
-  margin-top: 1rem;
+  margin-top: 20px;
 }
 
 .cn-form-status p {
-  margin: 0.25rem 0;
+  margin: 0 0 4px;
+}
+
+a {
+  color: var(--cn-red-on-dark);
 }
 
 .cn-form-footer {
-  margin-top: 1.5rem;
-  padding-top: 0.75rem;
-  border-top: 1px solid var(--cn-border);
+  margin-top: 40px;
+  padding-top: 12px;
+  border-top: 1px solid var(--cn-surface-overlay);
   color: var(--cn-muted);
-  font-size: 0.85rem;
-  font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  font-size: 13px;
+  line-height: 1.4;
+  font-family: var(--cn-font-mono);
   word-break: break-all;
 }
 
 .cn-confirmation,
 .cn-fatal {
-  padding: 1rem 0;
+  padding: 8px 0;
 }
 
-.cn-hidden {
-  display: none;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  * {
-    animation-duration: 0.001ms !important;
-    transition-duration: 0.001ms !important;
-  }
+.cn-confirmation .cn-form-draft-banner {
+  display: block;
+  width: fit-content;
+  margin-top: 8px;
 }

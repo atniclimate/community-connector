@@ -381,3 +381,86 @@ questions 1-6 and 8 above are still unresolved and still the human's call:
   new hex values, the WCAG 4.5:1 caption-on-ground ratio, the 3:1 floor for
   every default kind color against the new ground, and no adjustment/warning
   regression on the two fixture templates.
+
+## 9. Applied 2026-09-14 (form)
+
+The remote intake form (`form/`, the page behind the QR code) now follows the
+design system's dark-ground doctrine and the ATNI house voice, built against
+the ATNI convention template with the `person` kind only
+(`scripts/build-form.ps1 -TemplatePath fixtures/templates/atni-convention.template.json -Kinds person`).
+The authorities were the design-system handoff bundle's README (token and
+rule spec, read off-repo) and the public-facing voice skill; nothing from
+either entered the repository except values, rules, and wording.
+
+- **Ground and text** (`form/src/style.css`): page ground Black BG `#010B13`
+  (`color-scheme: dark` so native selects, date pickers, and the checkbox
+  render dark); body Text on Dark `#E8ECF0`, never pure white; headings and
+  bold lead-ins `#FFFFFF`; muted help, captions, placeholders, and the
+  fingerprint footer `#8A94A6`. Surfaces lighten as they rise: the consent
+  card and every input field sit on surface-raised `#141414`; hover states,
+  the disabled and secondary buttons, and the footer rule use surface-overlay
+  `#1E242C`; the input bottom rule is `#2A3138`. No light hairlines, no
+  shadows, radius 0 on every element (inputs, buttons, tag, card, checkbox).
+- **Accent**: ATNI Red `#E13D33` only on the primary button ("Send to the
+  Facilitator": white text, weight 600, `13px 22px` hero padding, square), the
+  wordmark's CLIMATE line, and the checkbox accent. Red on Dark `#F26B5E`
+  carries links, per-field error text, the invalid-field rule, and the focus
+  ring (`2px solid`, `2px` offset, on every focusable element via
+  `:focus-visible`; 6.65:1 on the ground). Never a red page ground.
+- **DRAFT notice** as an Under Review status tag: bg `#FDF3E2`, text `#B4740E`,
+  weight 600, 12.5px, `4px 12px`, square. Text unchanged in substance: "DRAFT
+  wording, pending human review (D-023). Not for community use." The D-023
+  gate is unchanged.
+- **Typography, self-hosted only** (`form/src/main.ts` imports; packages pinned
+  exactly in `form/package.json`: `@fontsource/league-spartan` 5.2.8, same as
+  `app/`, and `@fontsource/arimo` 5.3.0). Display: League Spartan 700 for
+  Heading 1 (36px, line-height 1.1, tracking -0.025em, Title Case,
+  `text-wrap: balance`) and the consent heading at the Heading 3 size (18.7px,
+  -0.01em); League Spartan 800 for the wordmark. Body: the D-102 stack
+  `Arial, Arimo, Helvetica, sans-serif` at 16px / 1.6, sentence case, never
+  tracked; labels weight 600 in the body face; captions and help text 13px /
+  1.4. Reading column `max-width: 640px`, centered, 16px side gutters; holds
+  at 375px. Subsets: Latin plus Latin Extended per D-101 item 3 (the per-subset
+  `latin-*.css` and `latin-ext-*.css` files, weights 700/800 for League
+  Spartan and 400/600/700 for Arimo), which keeps the deploy set to twenty
+  font files instead of every script the packages ship; switch to the
+  all-subset `700.css`/`800.css` imports if a wider subset is ever wanted.
+  Vite emits the fonts as same-origin hashed assets (`assetsInlineLimit: 0`,
+  no `data:` URIs), so they fall under the existing `default-src 'self'` CSP
+  with no `font-src` change; the built `dist/` was grepped for
+  `fonts.googleapis`, `fonts.gstatic`, and `https://` (only the relay origin
+  appears) and the page makes no non-self requests in the browser.
+- **Font-file substitution, recorded**: the handoff bundle's Spartan MB and
+  TeX Gyre Heros are represented by League Spartan (Spartan MB is an OFL
+  rework of it) and by the Arial/Arimo stack (Arimo is metric-compatible with
+  Arial, D-102), per D-101/D-102. The bundle's own font files were not copied;
+  no font file enters the public repo, only the pinned open-licensed packages.
+- **Wordmark**: text-only stacked "ATNI" (`#FFFFFF`) over "CLIMATE"
+  (`#E13D33`), League Spartan 800, 13px, top-left, `aria-label="ATNI
+  Climate"`; permitted in dense black chrome per the README. No logo file.
+- **Components**: square bullets (6px `#E8ECF0` squares) in the consent list,
+  no disc bullets; the consent statement renders as a list of bold lead-in +
+  colon items; the secondary buttons on dark ("Try Again", "Add Another
+  Response") use the overlay step with body text, since the README's
+  `#EEF1F6`/`#3B3B3B` secondary is defined for light grounds only (open for
+  the human, like section 7 items 1-6).
+- **Motion**: the page declares no transitions or animations, so
+  `prefers-reduced-motion` needs no variant (the old blanket override was
+  dropped as dead code). Print and light mode are out of scope.
+- **Voice** (`form/src/consent.ts`, `render.ts`, `main.ts`, `config.ts`,
+  `index.html`): institutional third person, Title Case headings and buttons,
+  sentence case elsewhere, no em dashes, no exclamation points, Oxford comma,
+  the Tiered Sovereign Data Framework expanded on first use; labels keyed per
+  template id so the research-network build is unaffected. The full wording is
+  recorded verbatim in `docs/design/intake-consent-text-draft-2026-09-14.md`
+  (draft v2, supersedes the 2026-07-24 draft, pending D-023); the consent
+  digest changed accordingly.
+- **Verification**: `tsc --noEmit`, `vitest run` (59/59, including the new
+  `config.test.ts` kind-restriction and label-map suites and the regenerated
+  consent golden), the ATNI `-Kinds person` build (23-file deploy set, "Build
+  complete"), the dist grep above, a Playwright proof at 390x844 and 1280x800
+  (zero console errors, no kind selector, the eight labels exact, DRAFT tag
+  visible in the Under Review style, League Spartan on the h1 and Arial in the
+  body stack, `rgb(1, 11, 19)` ground, column at most 640px, focus ring on
+  every focusable element, consent block free of "we"/"our" and em dashes),
+  and `scripts/pii-scan.ps1`.
