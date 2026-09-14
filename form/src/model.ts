@@ -157,16 +157,65 @@ export function fieldValue(attr: FormAttr, raw: RawFieldValue): JsonValue | unde
   }
 }
 
+/** The advisory message for an empty required field (exported so callers can
+ * gate its display without duplicating the literal string). */
+export const REQUIRED_FIELD_MESSAGE = "This field is required.";
+
+/**
+ * True when a raw UI input holds no content at all, regardless of type - the
+ * same emptiness test `fieldValue` applies before any type-specific parsing.
+ * Used by `shouldShowRequiredError` to decide whether a field is blank,
+ * independent of whether that blankness should currently be surfaced as an
+ * error.
+ */
+function isRawValueEmpty(raw: RawFieldValue): boolean {
+  if (Array.isArray(raw)) {
+    return raw.every((item) => item.trim().length === 0);
+  }
+  return (raw as string).trim().length === 0;
+}
+
+/** Inputs to the required-field error display decision. */
+export type RequiredErrorInputs = {
+  /** The field has been blurred after focus, or edited, at least once. */
+  readonly touched: boolean;
+  /** A submit attempt has been made (regardless of whether it succeeded). */
+  readonly submitted: boolean;
+  readonly value: RawFieldValue;
+  readonly required: boolean;
+};
+
+/**
+ * Pure decision: should a required-field error be shown right now? A blank
+ * required field is never an error on first paint - only once the visitor has
+ * interacted with it (touched) or tried to submit the form. The "(required)"
+ * label marker and aria-required attribute are unconditional from first paint
+ * (render.ts); this gates only the advisory error text/aria-invalid.
+ */
+export function shouldShowRequiredError(inputs: RequiredErrorInputs): boolean {
+  if (!inputs.required) {
+    return false;
+  }
+  if (!isRawValueEmpty(inputs.value)) {
+    return false;
+  }
+  return inputs.touched || inputs.submitted;
+}
+
 /**
  * Advisory issues for one field (empty list = no advisory finding). The core's
- * validation report is the authoritative one (I2).
+ * validation report is the authoritative one (I2). This always includes the
+ * required-field message when the field is blank and required, regardless of
+ * touched/submitted state - callers that render error text to a visitor (e.g.
+ * render.ts) filter that one message through `shouldShowRequiredError` before
+ * display; callers that gate submission (`canSubmit`) use the full set.
  */
 export function advisoryIssues(attr: FormAttr, raw: RawFieldValue): readonly string[] {
   const issues: string[] = [];
   const value = fieldValue(attr, raw);
   if (value === undefined) {
     if (attr.required) {
-      issues.push("This field is required.");
+      issues.push(REQUIRED_FIELD_MESSAGE);
     }
     if (attr.attrType === "number" && typeof raw === "string" && raw.trim().length > 0) {
       issues.push("Enter a number.");

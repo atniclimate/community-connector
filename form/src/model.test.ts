@@ -5,7 +5,15 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import type { JsonObject } from "./json";
-import { buildFields, canSubmit, fieldValue, formModel, type FormAttr } from "./model";
+import {
+  REQUIRED_FIELD_MESSAGE,
+  buildFields,
+  canSubmit,
+  fieldValue,
+  formModel,
+  shouldShowRequiredError,
+  type FormAttr,
+} from "./model";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -125,6 +133,56 @@ describe("buildFields", () => {
     });
     // media never appears (family_canoe_photo was excluded from attrs).
     expect(Object.keys(fields)).not.toContain("family_canoe_photo");
+  });
+});
+
+describe("shouldShowRequiredError (fix: no required error on first paint)", () => {
+  it("stays hidden for a blank required field until touched or submitted", () => {
+    expect(
+      shouldShowRequiredError({ touched: false, submitted: false, value: "", required: true }),
+    ).toBe(false);
+  });
+
+  it("shows once the field has been touched", () => {
+    expect(
+      shouldShowRequiredError({ touched: true, submitted: false, value: "", required: true }),
+    ).toBe(true);
+  });
+
+  it("shows once a submit attempt has been made", () => {
+    expect(
+      shouldShowRequiredError({ touched: false, submitted: true, value: "", required: true }),
+    ).toBe(true);
+  });
+
+  it("stays hidden once the field has content, even if touched and submitted", () => {
+    expect(
+      shouldShowRequiredError({ touched: true, submitted: true, value: "Ada", required: true }),
+    ).toBe(false);
+  });
+
+  it("treats whitespace-only text as blank", () => {
+    expect(
+      shouldShowRequiredError({ touched: true, submitted: false, value: "   ", required: true }),
+    ).toBe(true);
+  });
+
+  it("treats an all-blank tag list as blank", () => {
+    expect(
+      shouldShowRequiredError({ touched: true, submitted: false, value: ["", "  "], required: true }),
+    ).toBe(true);
+  });
+
+  it("never shows for a field that is not required, regardless of state", () => {
+    expect(
+      shouldShowRequiredError({ touched: true, submitted: true, value: "", required: false }),
+    ).toBe(false);
+  });
+});
+
+describe("advisoryIssues uses the shared REQUIRED_FIELD_MESSAGE literal", () => {
+  it("is the exact string callers filter on", () => {
+    expect(REQUIRED_FIELD_MESSAGE).toBe("This field is required.");
   });
 });
 

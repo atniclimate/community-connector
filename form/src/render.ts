@@ -30,10 +30,12 @@ import {
 } from "./consent";
 import { buildInnerPayload, buildOuterEnvelope, type OuterEnvelope } from "./envelope";
 import {
+  REQUIRED_FIELD_MESSAGE,
   advisoryIssues,
   buildFields,
   canSubmit,
   formModel,
+  shouldShowRequiredError,
   type FormAttr,
   type FormKind,
   type RawFieldValue,
@@ -107,6 +109,8 @@ type FieldControl = {
   readonly read: () => RawFieldValue;
   readonly errorElement: HTMLElement;
   readonly input: HTMLElement;
+  /** Has this field been blurred after focus, or edited, at least once? */
+  readonly isTouched: () => boolean;
 };
 
 function draftTag(): HTMLElement {
@@ -131,6 +135,9 @@ export function mountForm(container: HTMLElement, deps: FormDeps): void {
   const form = el("form", { className: "cn-form", attrs: { novalidate: "" } });
   const fieldsRegion = el("div", { className: "cn-form-fields" });
   let controls: FieldControl[] = [];
+  // A required-field error is never shown on first paint (I9): only once the
+  // visitor has touched that field, or attempted to submit the form.
+  let submitted = false;
 
   const heading = el("h1", { className: "cn-form-title", text: "Add Yourself to the Network Map" });
   const intro = el("p", {
@@ -220,7 +227,18 @@ export function mountForm(container: HTMLElement, deps: FormDeps): void {
   function refreshAdvisories(): void {
     const kind = currentKind();
     for (const control of controls) {
-      const issues = advisoryIssues(control.attr, control.read());
+      const value = control.read();
+      const issues = advisoryIssues(control.attr, value).filter((issue) => {
+        if (issue !== REQUIRED_FIELD_MESSAGE) {
+          return true;
+        }
+        return shouldShowRequiredError({
+          touched: control.isTouched(),
+          submitted,
+          value,
+          required: control.attr.required,
+        });
+      });
       control.errorElement.textContent = issues.join(" ");
       control.input.setAttribute("aria-invalid", issues.length > 0 ? "true" : "false");
     }
@@ -293,7 +311,15 @@ export function mountForm(container: HTMLElement, deps: FormDeps): void {
         break;
       }
     }
-    input.addEventListener("input", refreshAdvisories);
+    let touched = false;
+    function markTouched(): void {
+      touched = true;
+      refreshAdvisories();
+    }
+    // "Touched" per the fix spec: any input, or a blur after focus (covers a
+    // visitor who tabs through a required field without typing anything).
+    input.addEventListener("input", markTouched);
+    input.addEventListener("blur", markTouched);
 
     const rowChildren: HTMLElement[] = [
       el("label", { text: labelFor(attr), attrs: { for: inputId } }),
@@ -304,7 +330,7 @@ export function mountForm(container: HTMLElement, deps: FormDeps): void {
     rowChildren.push(input, errorElement);
     const row = el("div", { className: "cn-form-row" }, rowChildren);
     fieldsRegion.append(row);
-    return { attr, read, errorElement, input };
+    return { attr, read, errorElement, input, isTouched: () => touched };
   }
 
   function renderFields(): void {
@@ -412,6 +438,8 @@ export function mountForm(container: HTMLElement, deps: FormDeps): void {
 
   form.addEventListener("submit", (event) => {
     event.preventDefault();
+    submitted = true;
+    refreshAdvisories();
     const kind = currentKind();
     if (kind === undefined || submit.disabled) {
       return;
