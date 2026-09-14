@@ -2665,9 +2665,13 @@ projection (fixed `7cee537`); membership rules hardcoded in Rust rather than tem
 data (moved into the template as a schema-validated block, `e1d5273`, Rust table kept as
 the documented fallback); membership resolution extracted to `membership.rs` so the
 durable owner shrinks (`b6c3d9e`); a test against the shipped ATNI template (`f92c19c`);
-still landing at the time of this entry: warnings preserved on the crash-recovery path
-(I12) and a multi-op crash-recovery test through the durable seam. The branch's
-`docs/blueprints/intake-edges.md` carries the round's per-finding dispositions.
+warnings preserved on the crash-recovery path (I12) and a multi-op crash-recovery test
+through the durable seam (`c189afc`); the round recorded in the blueprint (`6c92eed`).
+Final branch tip `6c92eed`: 23 files, cargo workspace 308 tests green, clippy clean, app
+suite green, PII scan clean. The branch's `docs/blueprints/intake-edges.md` carries the
+round's per-finding dispositions. Open for the human at merge: whether
+`intake_validate_record` should also gate on the facilitator role at the facade (it
+leaks nothing to a non-facilitator viewer today).
 
 The branch is NOT merged: per D-056.1/D-056.2 the verdict is the human's to record, and
 merging a durable-owner change the night before the show is outside this sprint's
