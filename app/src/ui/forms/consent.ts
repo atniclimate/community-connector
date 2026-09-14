@@ -1,84 +1,74 @@
 /**
- * Consent statement boilerplate for the in-app (facilitator-entered) form.
+ * Consent statement for the in-app (facilitator-entered) form.
  *
- * DRAFT TEXT v2 (2026-09-14): the wording is ported verbatim from
- * docs/design/intake-consent-text-draft-2026-09-14.md section 3 (the ATNI
- * house voice - institutional third person, bold lead-in + colon, no em
- * dashes, Oxford comma), which supersedes the 2026-07-24 draft this file
- * previously carried (DECISIONS.md D-072.1 authorized that draft as
- * functionality-matching boilerplate; the wording itself was never the
- * subject of that authorization and moves to v2 here). Every truthfulness
- * correction the 07-24 draft's section 7 recorded is still in force:
- *  - the collection claim is scoped to "only what is typed here";
- *  - the removal promise is worded as "no longer be shown" (append-only log;
- *    the no-longer-shown vs true-erasure decision is the human's, still
- *    open);
- *  - the classification paragraph names the Tiered Sovereign Data Framework
- *    in full on first use, per the v2 draft.
+ * The wording is the human's own, verbatim (source of truth:
+ * docs/design/intake-consent-text-2026-09-14-v3.md), superseding the
+ * session-drafted v2 wording this file previously carried (DECISIONS.md
+ * D-072.1 authorized that draft as functionality-matching boilerplate; the
+ * wording itself was never the subject of that authorization and moves to
+ * v3 here). v3 is reproduced exactly - every sentence, punctuation mark, and
+ * capitalization, in the same order - except the one paragraph the source
+ * file's own notes anticipate cannot travel unchanged to this path (below).
+ * The session notes recorded alongside the v3 wording are NOT applied to
+ * the wording generally; they are flagged questions for the human, not
+ * authorized edits.
  *
- * Divergence from the remote form (form/src/consent.ts, same draft): the v2
- * draft's sixth item ("Your answers are sealed on your phone") describes the
- * remote path, where an attendee's own phone encrypts the answers before they
- * cross the network. That is not true of this path - the in-app form runs on
- * the facilitator's own computer, entered by the facilitator, with no phone
- * and no network hop before staging. That item is replaced below with one
- * that truthfully states the in-app case ("Where this entry is kept"); the
- * other five items are verbatim from the v2 draft. This is a content
- * divergence the draft anticipates in its own builder notes, not a wording
- * error.
+ * Divergence from the remote form (form/src/consent.ts, same source): the v3
+ * statement's fifth paragraph ("Sealed on your phone. Your answers are
+ * encrypted on your own device before they are sent...") describes the
+ * remote path, where an attendee's own phone encrypts the answers before
+ * they cross the network. That is not true of this path - the in-app form
+ * runs on the facilitator's own computer, entered by the facilitator, with
+ * no phone and no network hop before staging. That paragraph is replaced
+ * below with one that truthfully states the in-app case ("Where this entry
+ * is kept"); the other seven paragraphs are verbatim from v3. This is a
+ * content divergence the source file's own session notes anticipate (note
+ * 3), not a wording error.
  *
  * The D-023 human review remains the bar before ANY community-facing use;
  * the UI renders the DRAFT banner until that sign-off lands and this
- * marker is removed. Placeholders stay [BRACKETED] and must never be
- * filled with a real person's contact information in this repository (I1).
+ * marker is removed.
  */
 
 /** Rendered prominently above the statement until D-023 sign-off. */
 export const CONSENT_DRAFT_BANNER =
   "DRAFT wording, pending human review (D-023). Not for community use.";
 
-/** The consent block heading (Title Case per house style; v2 draft section 3). */
+/** The consent block heading (accessible group label for the fieldset). */
 export const CONSENT_HEADING = "Before You Send This";
 
 /** Version tag carried in the payload's form_version. */
 export const FORM_VERSION = "in-app-draft-2026-07-24";
 
-/** The consent statement paragraphs, in display order. */
-export const CONSENT_PARAGRAPHS: readonly (readonly [string, string])[] = [
+/**
+ * The consent statement paragraphs, in display order. Each entry is
+ * `[lead, body]`: `lead` is the bold lead-in text where the source uses one
+ * (verbatim, including its own trailing punctuation), or `null` where the
+ * source paragraph has no lead-in. The renderer joins `lead` and `body` with
+ * a single space, so together they reproduce the source paragraph exactly.
+ */
+export const CONSENT_PARAGRAPHS: readonly (readonly [string | null, string])[] = [
   [
-    "What the form keeps:",
-    "only what is typed here. Nothing else is gathered from you or your device.",
+    null,
+    "This is a demonstration of the connections between all of us here; where effort " +
+      "overlaps, and brings to light what is already here between us.",
+  ],
+  [null, "A name badge tells you who is here. This asks what holds us together."],
+  [
+    null,
+    "Everything you share here stays here. This runs entirely on ATNI software; no " +
+      "outside platforms, no third-party services. The only data collected is what you " +
+      "enter into this form. Nothing more.",
   ],
   [
-    "A person reviews it first:",
-    "every entry goes to the network facilitator, a person working for the " +
-      "ATNI Climate program. Nothing appears in the network until the " +
-      "facilitator has read and approved it; anything that looks off is set " +
-      "aside rather than published.",
+    "How your information is held:",
+    "Everything entered here is designated Tier 1 of the Tiered Sovereign Data " +
+      "Framework; shared within the network and governed by the community it belongs to.",
   ],
   [
-    "How it is classified:",
-    "everything entered here is held at Tier 1 (T1) of the Tiered Sovereign " +
-      "Data Framework, shared within the network and governed by the " +
-      "community. Under the framework, ATNI Climate decides how it is " +
-      "classified and used; that decision never belongs to a company or to a " +
-      "server.",
-  ],
-  [
-    "Taking part is your choice:",
-    "every question except your name is optional. You can stop at any time " +
-      "before sending, and nothing is kept. After sending, you can ask to be " +
-      "removed at any time, and your information will no longer be shown in " +
-      "the network.",
-  ],
-  [
-    "To be removed or to ask a question:",
-    "contact [REMOVAL CONTACT, set at deployment; never a real name or " +
-      "address in this repository].",
-  ],
-  [
-    // Divergence from the v2 draft's sixth item ("Your answers are sealed on
-    // your phone"): that item describes the remote (attendee-phone) path.
+    // Divergence from the v3 source's fifth paragraph ("Sealed on your
+    // phone. Your answers are encrypted on your own device before they are
+    // sent..."): that paragraph describes the remote (attendee-phone) path.
     // This is the in-app path - the facilitator types the entry on the
     // facilitator's own computer, so there is no phone and no network hop
     // to describe. Replaced with a truthful in-app statement; see the file
@@ -88,12 +78,26 @@ export const CONSENT_PARAGRAPHS: readonly (readonly [string, string])[] = [
       "computer and stays there until the facilitator applies it to the " +
       "network.",
   ],
+  [
+    null,
+    "Nothing appears in the network without care and human review. The content and " +
+      "narrative remains yours, and what is presented are the common connection points.",
+  ],
+  [
+    null,
+    "After the conference ends on Wednesday, all information entered here is deleted " +
+      "from the system entirely.",
+  ],
+  [
+    null,
+    "The connections you make, the conversations that follow, the shared experiences; " +
+      "those are yours to keep.",
+  ],
 ];
 
-/** The affirmation the checkbox asserts (the D-030 consent instrument). */
+/** The affirmation the checkbox asserts (the D-030 consent instrument), the human's exact wording. */
 export const CONSENT_AFFIRMATION =
-  "I understand, and I agree to be included in the network at the level " +
-  "described above.";
+  "I understand and consent to my information being used for this demonstration.";
 
 /**
  * The canonical consent text the payload digest covers: banner and heading
@@ -101,7 +105,7 @@ export const CONSENT_AFFIRMATION =
  * affirmation joined in display order.
  */
 export function consentText(): string {
-  const blocks = CONSENT_PARAGRAPHS.map(([lead, body]) => `${lead} ${body}`);
+  const blocks = CONSENT_PARAGRAPHS.map(([lead, body]) => (lead !== null ? `${lead} ${body}` : body));
   blocks.push(CONSENT_AFFIRMATION);
   return blocks.join("\n\n");
 }

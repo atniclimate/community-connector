@@ -152,13 +152,25 @@ describe("canSubmit (the D-030 structural consent gate)", () => {
   });
 });
 
-describe("consent boilerplate (D-072.1 draft, v2 wording 2026-09-14)", () => {
-  it("keeps the corrected claims and the placeholder discipline", () => {
+describe("consent boilerplate (v3, the human's wording verbatim - D-106)", () => {
+  it("carries the v3 statement, with the in-app divergence in place of the phone paragraph", () => {
     const text = consentText();
-    expect(text).toContain("only what is typed here");
-    expect(text).toContain("no longer be shown");
-    expect(text).toContain("[REMOVAL CONTACT");
-    expect(text).not.toContain("taken out of the network");
+    expect(text).toContain("This is a demonstration of the connections between all of us here");
+    expect(text).toContain(
+      "How your information is held: Everything entered here is designated Tier 1 of the " +
+        "Tiered Sovereign Data Framework",
+    );
+    // The in-app path has no phone and no network hop, so the v3 "Sealed on
+    // your phone" paragraph is replaced with the truthful in-app wording.
+    expect(text).not.toMatch(/sealed on your phone/i);
+    expect(text).toContain(
+      "Where this entry is kept: this entry is typed by the facilitator on the facilitator's " +
+        "own computer and stays there until the facilitator applies it to the network.",
+    );
+    expect(text).toContain(
+      "After the conference ends on Wednesday, all information entered here is deleted from " +
+        "the system entirely.",
+    );
     expect(text).not.toMatch(/@/);
   });
 

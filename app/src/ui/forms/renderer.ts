@@ -71,7 +71,9 @@ export function mountEntryForm(container: HTMLElement, deps: EntryFormDeps): () 
     el("legend", { text: CONSENT_HEADING }),
     el("p", { className: "cn-entry-form-draft-banner", text: CONSENT_DRAFT_BANNER }),
     ...CONSENT_PARAGRAPHS.map(([lead, body]) =>
-      el("p", {}, [el("strong", { text: `${lead} ` }), body]),
+      lead !== null
+        ? el("p", {}, [el("strong", { text: `${lead} ` }), body])
+        : el("p", { text: body }),
     ),
     el("div", { className: "cn-entry-form-affirm" }, [
       consentCheckbox,
