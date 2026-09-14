@@ -2507,3 +2507,66 @@ participants than Calibri did. Android generally does not ship it. Stack:
 on Google Fonts, and self-hosted like the other faces (no runtime Google requests, per
 D-101 item 1), so layout holds on devices without Arial. D-101's Calibri/Carlito stack is
 superseded.
+
+## D-103 (2026-09-14) - Convention sprint: A9 constellation choreography, pregenerated synthetic shape, and the picks that resolve source conflicts
+
+Trigger: the human's 2026-09-14 directive to run the convention sprint as a long-running
+autonomous workflow (discovery swarm, Sonnet sorting team, orchestrated execution) whose
+output is the A9 finale of the General Assembly session on 2026-09-15: after a 30-minute
+role-play focused on one Nation, the constellation shows that Nation as one node among
+Relatives at ATNI, that shared goals connect them, and that the interconnection surfaces
+the Tribes, allies, and affinities that make complex tasks achievable. Plan of record:
+`docs/planning/CONVENTION-SPRINT-2026-09-14.md`.
+
+Causal chain: a 22-agent discovery-and-sort workflow found the reveal mechanically ready
+(fixture, presenter mode, reveal launcher) but no beat performs the A9 moment, the
+fixture's person-to-person edges are arbitrary rather than priority-based, and the spine
+still lists OQ-10 (live vs pregenerated) open with the deploy bar D-059.8 unmet. Three
+skeptics then found: the synthesized caption "connected across shared priorities" was
+an overclaim; a `focusEntityId` beat implies a camera flight that the stage's visual
+language forbids ("outputs resolve in, no fly-ins"); the consent line is already recorded
+in the spine as spoken, never a screen; measure captions at topN 8 would flood the screen;
+and `beats.atni.json` has no validation, so a mistyped id fails silently.
+
+Options: (1) the synthesizer's minimal path (three data-only beats, cue sheet,
+verification; ~10 h); (2) that path plus the changes that make the story structurally
+true (priority-derived edges in the synthetic fixture, opacity-only spotlight with a
+camera hold, a shared-priorities beat, count-only measure captions, beat validation,
+the S-E3 keys and rail, a bounded ATNI styling slice); (3) also attempt S-E2 edges at
+approval on main before Tuesday.
+
+Choice: (2), with S-E2 built only on a branch behind its mandatory adversarial round and
+never merged without the human's recorded verdict. Recorded picks:
+
+1. Tuesday's shape is pregenerated synthetic only, RECOMMENDED pending the human's
+   OQ-10 answer; nothing live, nothing deployed, no real data.
+2. `connected_to` person-to-person edges in the synthetic fixture derive from shared
+   `areas_of_interest` tags (two or more), replacing the `(i*13+7)` formula, so a
+   "shared priorities" claim on screen matches the data. Synthetic data only; the
+   generator stays deterministic.
+3. The one-node beat spotlights by opacity with the camera holding the full frame
+   (new optional `camera` field on `PresentBeat`, default unchanged). This honors
+   stage-flow.yaml's "no fly-ins" rule and is a stronger image than a flight: one lit
+   node among many. The human may flip it to a flight by editing the beat.
+4. The finale beat carries no filter and no measure so the whole constellation is lit
+   through applause; the connectors (betweenness) beat is a floor beat, not an A9 beat.
+5. Captions show counts, never names (D-099). Measure captions become "label - N
+   highlighted"; explanations are not concatenated on stage.
+6. The consent line stays spoken (spine decision "TSDF is spoken, never a screen");
+   no caption carries it unless the human reverses that decision with a reason.
+7. The cue sheet keeps the spine's single documented cue as the entry point and uses
+   three Space presses across the last three sentences; a pre-switch at "These tools
+   can be more" is offered to the human as an alternative, since it needs a spine edit.
+8. The spotlight node's Tribe stays fictional until OQ-02 clears Makah; naming it is a
+   one-line generator change.
+9. Spine-side edits (OQ-10 resolution, tool-reference wording, QR sign-up lines) are
+   drafted as a new reconciliation note beside the spine, never applied to its YAML.
+10. Screenshots committed to this public repo capture the browser viewport only and are
+    eyeballed by a human first; `pii-scan` never inspects pixels.
+
+Strongest surviving objection: the presenter capability changes (camera hold, edge-kind
+filter, count-only captions) touch the render path the human has not yet seen on a real
+GPU, the night before the show. Mitigation: defaults preserve today's behavior, every
+change ships with tests, the full loop and a browser walk run before the freeze, and the
+human's real-GPU walkthrough remains the gate; any beat can be cut by deleting one array
+entry.
