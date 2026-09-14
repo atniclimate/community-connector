@@ -157,6 +157,29 @@ export function fieldValue(attr: FormAttr, raw: RawFieldValue): JsonValue | unde
   }
 }
 
+/**
+ * The input's placeholder attribute value for a field (human direction,
+ * 2026-09-14: "The description should show in the entry box, and disappears
+ * when people start to type into it."). The question's help text, verbatim
+ * including any trailing ellipsis, when the template config supplies one for
+ * this attribute; otherwise the type's own default -- "One per line" for a
+ * tags textarea (the original hint, unchanged for a tags attribute that
+ * carries no help text), empty for every other type. The accessible
+ * description (an always-present, visually-hidden help element referenced by
+ * aria-describedby) carries the same help text regardless of this value, so
+ * screen readers still hear it once the visitor has typed over the
+ * placeholder.
+ */
+export function placeholderFor(
+  attr: Pick<FormAttr, "attrType">,
+  helpText: string | undefined,
+): string {
+  if (helpText !== undefined) {
+    return helpText;
+  }
+  return attr.attrType === "tags" ? "One per line" : "";
+}
+
 /** The advisory message for an empty required field (exported so callers can
  * gate its display without duplicating the literal string). */
 export const REQUIRED_FIELD_MESSAGE = "This field is required.";

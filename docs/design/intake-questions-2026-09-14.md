@@ -21,6 +21,12 @@ Dropped from the QR form (kept in the template so the synthetic fixture and the 
 facilitator form stay valid): `tribe`, `role`, `events_of_interest`, `contact_email`,
 `contact_preference`.
 
+UI note (human direction, 2026-09-14): each Help text column value renders as
+that field's placeholder (visible in the empty box, gone once typing starts),
+not a visible caption; the description still reaches screen readers via a
+visually-hidden element wired to aria-describedby, and "One per line" survives
+as a caption shown only while a tags field has focus.
+
 Notes for the human:
 - Only question 6 carries "(Optional)" in the wording; every question except the name is
   optional in fact, and the consent text says so. Confirm whether the marker stays on

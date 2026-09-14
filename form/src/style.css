@@ -129,12 +129,37 @@ body {
   font-weight: 600;
 }
 
-/* Caption: 13px, line-height 1.4, muted. */
-.cn-form-help {
+/* Visually hidden (standard clip pattern): keeps an element in the DOM and
+   reachable by aria-describedby/screen readers without occupying layout space
+   or being visible to sighted users. Used for the field description now that
+   it shows as the placeholder instead of a visible caption (human direction,
+   2026-09-14). */
+.cn-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* "One per line" list-entry hint for a tags field: 13px, muted, visible only
+   while that field has focus (:focus-within on the row), so the empty form
+   shows only the questions. No transition/animation - it appears and
+   disappears immediately, matching the page's no-motion design. */
+.cn-form-caption {
+  display: none;
   color: var(--cn-muted);
   font-size: 13px;
   line-height: 1.4;
   margin: 0;
+}
+
+.cn-form-row:focus-within .cn-form-caption {
+  display: block;
 }
 
 /* Inputs: raised surface, bottom rule only, square. */
@@ -153,6 +178,10 @@ body {
   border-radius: 0;
 }
 
+/* Placeholder now carries the field description (human direction,
+   2026-09-14): --cn-muted (#8A94A6) against the field background
+   --cn-surface-raised (#141414) computes to ~6.02:1, above the WCAG AA
+   4.5:1 floor for text. */
 .cn-form input::placeholder,
 .cn-form textarea::placeholder {
   color: var(--cn-muted);

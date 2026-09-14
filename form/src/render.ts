@@ -35,6 +35,7 @@ import {
   buildFields,
   canSubmit,
   formModel,
+  placeholderFor,
   shouldShowRequiredError,
   type FormAttr,
   type FormKind,
@@ -119,6 +120,15 @@ type FieldControl = {
   /** Has this field been blurred after focus, or edited, at least once? */
   readonly isTouched: () => boolean;
 };
+
+/** Adds a placeholder attribute only when there is text to show (an empty
+ * placeholder attribute is pointless DOM noise). */
+function withPlaceholder(
+  attrs: Record<string, string>,
+  placeholder: string,
+): Record<string, string> {
+  return placeholder.length > 0 ? { ...attrs, placeholder } : attrs;
+}
 
 function draftTag(): HTMLElement {
   return el("p", {
@@ -292,7 +302,7 @@ export function mountForm(container: HTMLElement, deps: FormDeps): void {
       }
       case "tags": {
         const area = el("textarea", {
-          attrs: { ...baseAttrs, rows: "3", placeholder: "One per line" },
+          attrs: withPlaceholder({ ...baseAttrs, rows: "3" }, placeholderFor(attr, helpText)),
         });
         input = area;
         read = () => area.value;
@@ -320,7 +330,9 @@ export function mountForm(container: HTMLElement, deps: FormDeps): void {
       }
       default: {
         // text, link: plain text input (link format is advisory only).
-        const field = el("input", { attrs: { ...baseAttrs, type: "text" } });
+        const field = el("input", {
+          attrs: withPlaceholder({ ...baseAttrs, type: "text" }, placeholderFor(attr, helpText)),
+        });
         input = field;
         read = () => field.value;
         break;
@@ -340,9 +352,23 @@ export function mountForm(container: HTMLElement, deps: FormDeps): void {
       el("label", { text: labelFor(attr), attrs: { for: inputId } }),
     ];
     if (helpText !== undefined) {
-      rowChildren.push(el("p", { className: "cn-form-help", text: helpText, attrs: { id: helpId } }));
+      // Visually hidden (not a visible caption): the description now shows in
+      // the placeholder instead, but this element - same text, same id, still
+      // the aria-describedby target - keeps it reaching screen readers even
+      // after the visitor has typed over the placeholder.
+      rowChildren.push(
+        el("p", { className: "cn-visually-hidden", text: helpText, attrs: { id: helpId } }),
+      );
     }
-    rowChildren.push(input, errorElement);
+    rowChildren.push(input);
+    if (attr.attrType === "tags") {
+      // "One per line" moved out of the placeholder (now the help text) and
+      // into a plain caption, shown only while this field has focus (CSS
+      // :focus-within on .cn-form-row) so the empty form shows only the
+      // questions. Not part of aria-describedby - the description already is.
+      rowChildren.push(el("p", { className: "cn-form-caption", text: "One per line" }));
+    }
+    rowChildren.push(errorElement);
     const row = el("div", { className: "cn-form-row" }, rowChildren);
     fieldsRegion.append(row);
     return { attr, read, errorElement, input, isTouched: () => touched };

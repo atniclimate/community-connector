@@ -16,7 +16,7 @@ import {
   restrictKinds,
 } from "./config";
 import type { JsonObject } from "./json";
-import { formModel } from "./model";
+import { formModel, placeholderFor } from "./model";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -169,6 +169,16 @@ describe("per-template question order", () => {
     // And nothing beyond the nine (a label for an unasked attribute is dead text).
     expect(Object.keys(labels).sort()).toEqual([...(order ?? [])].sort());
     expect(Object.keys(help).sort()).toEqual([...(order ?? [])].sort());
+  });
+
+  it("puts each question's help text verbatim into that field's placeholder", () => {
+    const help = FIELD_HELP_BY_TEMPLATE["atni-convention"] ?? {};
+    const attributes = atniPerson().attributes;
+    for (const [id, , helpText] of ATNI_QUESTIONS) {
+      const attr = attributes.find((a) => a.id === id);
+      expect(attr, `attribute ${id}`).toBeDefined();
+      expect(placeholderFor(attr!, help[id]), `placeholder for ${id}`).toBe(helpText);
+    }
   });
 
   it("throws on a listed attribute the template does not define (never a silent skip)", () => {

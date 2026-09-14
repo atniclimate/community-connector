@@ -11,6 +11,7 @@ import {
   canSubmit,
   fieldValue,
   formModel,
+  placeholderFor,
   shouldShowRequiredError,
   type FormAttr,
 } from "./model";
@@ -183,6 +184,32 @@ describe("shouldShowRequiredError (fix: no required error on first paint)", () =
 describe("advisoryIssues uses the shared REQUIRED_FIELD_MESSAGE literal", () => {
   it("is the exact string callers filter on", () => {
     expect(REQUIRED_FIELD_MESSAGE).toBe("This field is required.");
+  });
+});
+
+describe("placeholderFor (description-as-placeholder, human direction 2026-09-14)", () => {
+  const text: FormAttr = { id: "t", attrType: "text", required: false, values: [], defaultVisibility: null };
+  const tags: FormAttr = { id: "g", attrType: "tags", required: false, values: [], defaultVisibility: null };
+  const number: FormAttr = { id: "n", attrType: "number", required: false, values: [], defaultVisibility: null };
+  const HELP = "How do you prefer to be addressed?";
+  const HELP_WITH_ELLIPSIS = "Share as many roles as feel right...";
+
+  it("uses the help text verbatim, ellipsis included, on a text field", () => {
+    expect(placeholderFor(text, HELP)).toBe(HELP);
+    expect(placeholderFor(text, HELP_WITH_ELLIPSIS)).toBe(HELP_WITH_ELLIPSIS);
+  });
+
+  it("uses the help text verbatim on a tags field, replacing 'One per line'", () => {
+    expect(placeholderFor(tags, HELP_WITH_ELLIPSIS)).toBe(HELP_WITH_ELLIPSIS);
+  });
+
+  it("falls back to 'One per line' for a tags field with no help text", () => {
+    expect(placeholderFor(tags, undefined)).toBe("One per line");
+  });
+
+  it("falls back to empty for a text (or other non-tags) field with no help text", () => {
+    expect(placeholderFor(text, undefined)).toBe("");
+    expect(placeholderFor(number, undefined)).toBe("");
   });
 });
 
