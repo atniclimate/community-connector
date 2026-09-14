@@ -13,7 +13,7 @@ Primary shell: PowerShell 7. Re-verify this file whenever a tool is upgraded.
 | node | v24.14.1 | |
 | npm | 11.12.1 | npx same |
 | rustup | 1.29.0 | |
-| rustc / cargo | 1.96.1 | 2026-06-26 toolchain |
+| rustc / cargo | 1.98.1 | 2026-09-14 toolchain; pinned in `rust-toolchain.toml` (rustfmt, clippy, wasm32-unknown-unknown) |
 | wasm-pack | 0.15.0 | installed via `cargo install wasm-pack --locked` this session |
 | codex CLI | codex-cli 0.142.5 | authenticated (ChatGPT login) |
 
