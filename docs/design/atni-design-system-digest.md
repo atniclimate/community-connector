@@ -351,3 +351,33 @@ muted tone on dark).
    large/bold text and UI strokes in the app, per the system's own usage rule.
 8. **Seal artwork is explicitly marked not-final** (thin linework pending a retrace) -
    fine as a placeholder now, but any go-live asset should wait for that retrace.
+
+## 8. Applied 2026-09-14 (CS-05)
+
+A bounded slice of this digest is now live in `app/`, scoped to exactly what the
+convention sprint plan (CS-05) ruled - nothing else was restyled, and open
+questions 1-6 and 8 above are still unresolved and still the human's call:
+
+- Presenter caption (`.cn-present-beat`, `app/src/ui/ui.css`): League Spartan
+  SemiBold 600, self-hosted via the pinned `@fontsource/league-spartan` 5.2.8
+  package (`600.css`, latin + latin-ext + vietnamese subsets), imported once in
+  `app/src/main.ts`. Zero runtime font requests; verified against the built
+  `dist/` output. Computed size clears 28px at 1920x1080 (the existing
+  `clamp(1.125rem, 2.5vw, 2rem)` already hit its 32px ceiling at that width).
+- Stage ground and caption text color, through the theme-token pipeline
+  (`app/src/theme/defaults.ts`), since `bg.center`/`bg.edge` feed the canvas
+  background as tokens (`app/src/viz/scene.ts`, not touched here) rather than
+  CSS: `bg.center` is now Black BG `#010b13` exactly (closes open question 7 by
+  option (a)); `bg.edge` is a shifted-lightness step off the same hue
+  (`#00040a`), never pure black. `text.primary` is now Text on Dark `#e8ecf0`,
+  and `.cn-present-beat` reads it via `var(--cn-text-primary, #e8ecf0)` instead
+  of its old hardcoded literal.
+- ATNI Red was not applied anywhere in this slice - the selection ring and
+  kind colors are unchanged, per the plan's "reserved for the selection ring
+  only if contrast passes" caveat and open question 5 (no categorical
+  palette exists yet).
+- Verification: `tsc --noEmit`, `vite build`, `vitest run` (170/170) and
+  `scripts/pii-scan.ps1` all green; a new `theme.test.ts` suite pins the two
+  new hex values, the WCAG 4.5:1 caption-on-ground ratio, the 3:1 floor for
+  every default kind color against the new ground, and no adjustment/warning
+  regression on the two fixture templates.

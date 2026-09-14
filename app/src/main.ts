@@ -1,3 +1,6 @@
+// Presenter-mode caption face (D-101/CS-05): self-hosted via Vite, weight 600
+// only, latin + latin-ext + vietnamese subsets, zero runtime font requests.
+import "@fontsource/league-spartan/600.css";
 import { createInitialState, type JsonObject, type PresentBeat } from "./state/state";
 import { createStore } from "./state/store";
 import { selectProjectedEntityCount } from "./state/selectors";

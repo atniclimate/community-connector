@@ -5,6 +5,7 @@ import researchJson from "../../../fixtures/templates/research-network.template.
 import themeSchemaJson from "../../../schemas/theme-tokens.schema.json?raw";
 import { contrastRatio, hexToOklch, hexToRgb, hueDistance, oklchToHex, rgbToHex } from "./color";
 import { preservesHue } from "./contrast";
+import { DEFAULT_THEME_TOKENS } from "./defaults";
 import { deriveTheme } from "./derive";
 import type { GroupTemplateDto } from "./tokens";
 
@@ -103,5 +104,41 @@ describe("theme derivation", () => {
     expect(() => deriveTheme({ ...fixture("research-network.template.json"), schema_version: "2.0.0" })).toThrow(
       /Unsupported group template schema major/,
     );
+  });
+});
+
+describe("ATNI stage defaults (CS-05, D-101/D-102, digest sections 2 and 6)", () => {
+  it("matches the design system's Black BG ground and Text on Dark caption color", () => {
+    expect(DEFAULT_THEME_TOKENS["bg.center"].hex).toBe("#010b13");
+    expect(DEFAULT_THEME_TOKENS["text.primary"].hex).toBe("#e8ecf0");
+  });
+
+  it("keeps bg.edge a shifted-lightness step off bg.center, never pure black", () => {
+    const edge = DEFAULT_THEME_TOKENS["bg.edge"].hex;
+    expect(edge).not.toBe("#000000");
+    expect(hexToOklch(edge).l).toBeLessThan(hexToOklch(DEFAULT_THEME_TOKENS["bg.center"].hex).l);
+  });
+
+  it("passes WCAG text contrast for the presenter caption against the stage ground", () => {
+    expect(
+      contrastRatio(DEFAULT_THEME_TOKENS["text.primary"].hex, DEFAULT_THEME_TOKENS["bg.center"].hex),
+    ).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it("keeps every default kind base above the 3:1 non-text floor against the new ground", () => {
+    const bgCenter = DEFAULT_THEME_TOKENS["bg.center"].hex;
+    for (const [name, token] of Object.entries(DEFAULT_THEME_TOKENS)) {
+      if (name.startsWith("kind.default-") && name.endsWith(".base")) {
+        expect(contrastRatio(token.hex, bgCenter)).toBeGreaterThanOrEqual(3);
+      }
+    }
+  });
+
+  it("derives the fisheries and research fixtures against the new ground with no adjustments", () => {
+    for (const name of ["fisheries-committee.template.json", "research-network.template.json"] as const) {
+      const derived = deriveTheme(fixture(name));
+      expect(derived.report.adjustments).toEqual([]);
+      expect(derived.report.warnings).toEqual([]);
+    }
   });
 });

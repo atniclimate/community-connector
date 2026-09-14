@@ -74,9 +74,15 @@
   bottom: clamp(1rem, 5vh, 4rem);
   left: clamp(1rem, 4vw, 4rem);
   padding: 0.75rem 1rem;
-  color: #f1f3f7;
+  color: var(--cn-text-primary, #e8ecf0);
   background: rgb(8 11 17 / 0.82);
   border-radius: 6px;
+  /* ATNI stage caption face (D-101, digest section 3 Hall mode): League
+     Spartan SemiBold 600, self-hosted (CS-05). Legible from the back of a
+     hall: clamp floor/ceiling keep the computed size >=28px at 1920x1080
+     (2.5vw of 1920px hits the 2rem/32px ceiling). */
+  font-family: "League Spartan", "Arial Narrow", Arial, sans-serif;
+  font-weight: 600;
   font-size: clamp(1.125rem, 2.5vw, 2rem);
   line-height: 1.35;
   text-align: center;
