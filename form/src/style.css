@@ -236,31 +236,23 @@ body {
   text-wrap: balance;
 }
 
-/* Square bullets: small filled squares in the text color, never discs. */
-.cn-form-consent-list {
+/* Consent statement: plain paragraphs, no bullets (the human's own prose,
+   verbatim, v3/D-106). The card surface, radius-0, and spacing are
+   unchanged from the earlier bulleted layout; only the list styling is
+   gone, since this text is prose, not a list. */
+.cn-form-consent-text {
   clear: both;
-  list-style: none;
-  margin: 0;
-  padding: 0;
 }
 
-.cn-form-consent-list li {
-  position: relative;
-  padding-left: 18px;
+.cn-form-consent-text p {
   margin: 0 0 12px;
 }
 
-.cn-form-consent-list li::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 0.6em;
-  width: 6px;
-  height: 6px;
-  background: var(--cn-text);
+.cn-form-consent-text p:last-child {
+  margin-bottom: 0;
 }
 
-.cn-form-consent-list strong {
+.cn-form-consent-text strong {
   color: var(--cn-heading);
   font-weight: 700;
 }

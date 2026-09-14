@@ -1,32 +1,31 @@
 /**
- * Consent statement boilerplate for the REMOTE (attendee phone) intake form.
+ * Consent statement for the REMOTE (attendee phone) intake form.
  *
- * DRAFT TEXT - not yet approved. Draft v2 (2026-09-14): the wording follows
- * the ATNI house voice (institutional third person, bold lead-in + colon, no
- * em dashes, Oxford comma) and is recorded verbatim in
- * docs/design/intake-consent-text-draft-2026-09-14.md, which supersedes the
- * 2026-07-24 draft. It keeps every truthfulness correction that draft's
- * section 7 recorded from the ADR-005 round:
- *  - the collection claim is scoped to what is TYPED (the relay operator
- *    necessarily observes traffic metadata - correction 1);
- *  - the sealed-phone paragraph says the key is USED only on the facilitator's
- *    computer, NOT that it is the only copy (the ceremony creates offline
- *    recovery copies - correction 2);
- *  - the removal promise is worded as "no longer be shown" (append-only log;
- *    the no-longer-shown vs true-erasure decision is still the human's - matches
- *    the in-app precedent for product-wide consistency - correction 3).
- * Correction 4 (confirmation-screen wording) lives in the confirmation screen
- * (render.ts), not here.
+ * The wording is the human's own, verbatim (source of truth:
+ * docs/design/intake-consent-text-2026-09-14-v3.md), superseding the
+ * session-drafted v2 wording this file previously carried (which followed
+ * the ATNI house voice - institutional third person, bold lead-in + colon on
+ * every paragraph, bulleted). v3 is prose written in the human's own voice,
+ * addressed directly to the reader; it is reproduced exactly - every
+ * sentence, punctuation mark, and capitalization, in the same order - and
+ * the session notes recorded alongside it in that file are NOT applied to
+ * the wording (they are flagged questions for the human, not authorized
+ * edits).
+ *
+ * Two of the eight paragraphs carry a bold lead-in in the source text
+ * ("How your information is held:" and "Sealed on your phone."); the rest
+ * are plain paragraphs with no lead-in. `CONSENT_PARAGRAPHS` models this as
+ * `[lead, body]` pairs with `lead` null where the source has none; the
+ * renderer bolds only a non-null lead.
  *
  * This is the REMOTE path, so - unlike the in-app version
- * (app/src/ui/forms/consent.ts, not updated here) - it INCLUDES the
- * phone-encryption paragraph (this form runs on an attendee's phone, not the
- * facilitator's PC).
+ * (app/src/ui/forms/consent.ts) - it keeps the "Sealed on your phone."
+ * paragraph verbatim (this form runs on an attendee's own phone, not the
+ * facilitator's computer); the in-app file substitutes a truthful in-app
+ * paragraph in its place, per that file's own doc comment.
  *
  * D-023 human review remains the bar before ANY community-facing use; the UI
- * shows the DRAFT tag until that sign-off lands. Placeholders stay
- * [BRACKETED] and must never be filled with a real person's contact
- * information in this repository (I1).
+ * shows the DRAFT tag until that sign-off lands.
  *
  * This module imports nothing so the D8 manifest generator can import
  * `consentTextDigest` directly (single source of truth for the digest, no
@@ -38,57 +37,61 @@
 export const CONSENT_DRAFT_BANNER =
   "DRAFT wording, pending human review (D-023). Not for community use.";
 
-/** The consent block heading (Title Case per house style). */
+/** The consent block heading (accessible group label for the fieldset). */
 export const CONSENT_HEADING = "Before You Send This";
 
 /**
- * The consent statement, in display order: [bold lead-in, body]. The renderer
- * shows each as a square-bulleted item with the lead-in in bold.
+ * The consent statement, in display order. Each entry is `[lead, body]`:
+ * `lead` is the bold lead-in text where the source uses one (verbatim,
+ * including its own trailing punctuation - a colon for one, a period for
+ * the other), or `null` where the source paragraph has no lead-in. The
+ * renderer joins `lead` and `body` with a single space, so together they
+ * reproduce the source paragraph exactly.
  */
-export const CONSENT_PARAGRAPHS: readonly (readonly [string, string])[] = [
+export const CONSENT_PARAGRAPHS: readonly (readonly [string | null, string])[] = [
   [
-    "What the form keeps:",
-    "only what is typed here. Nothing else is gathered from you or your device.",
+    null,
+    "This is a demonstration of the connections between all of us here; where effort " +
+      "overlaps, and brings to light what is already here between us.",
+  ],
+  [null, "A name badge tells you who is here. This asks what holds us together."],
+  [
+    null,
+    "Everything you share here stays here. This runs entirely on ATNI software; no " +
+      "outside platforms, no third-party services. The only data collected is what you " +
+      "enter into this form. Nothing more.",
   ],
   [
-    "A person reviews it first:",
-    "every entry goes to the network facilitator, a person working for the " +
-      "ATNI Climate program. Nothing appears in the network until the " +
-      "facilitator has read and approved it; anything that looks off is set " +
-      "aside rather than published.",
+    "How your information is held:",
+    "Everything entered here is designated Tier 1 of the Tiered Sovereign Data " +
+      "Framework; shared within the network and governed by the community it belongs to.",
   ],
   [
-    "How it is classified:",
-    "everything entered here is held at Tier 1 (T1) of the Tiered Sovereign " +
-      "Data Framework, shared within the network and governed by the " +
-      "community. Under the framework, ATNI Climate decides how it is " +
-      "classified and used; that decision never belongs to a company or to a " +
-      "server.",
+    "Sealed on your phone.",
+    "Your answers are encrypted on your own device before they are sent. The internet " +
+      "services that carry the message cannot read them; the key that opens them is " +
+      "used only on the facilitator's computer.",
   ],
   [
-    "Taking part is your choice:",
-    "every question except your name is optional. You can stop at any time " +
-      "before sending, and nothing is kept. After sending, you can ask to be " +
-      "removed at any time, and your information will no longer be shown in " +
-      "the network.",
+    null,
+    "Nothing appears in the network without care and human review. The content and " +
+      "narrative remains yours, and what is presented are the common connection points.",
   ],
   [
-    "To be removed or to ask a question:",
-    "contact [REMOVAL CONTACT, set at deployment; never a real name or " +
-      "address in this repository].",
+    null,
+    "After the conference ends on Wednesday, all information entered here is deleted " +
+      "from the system entirely.",
   ],
   [
-    "Your answers are sealed on your phone:",
-    "your answers are locked (encrypted) on your own phone before they are " +
-      "sent. The internet services that carry the message cannot read them; " +
-      "the key that opens them is used only on the facilitator's computer.",
+    null,
+    "The connections you make, the conversations that follow, the shared experiences; " +
+      "those are yours to keep.",
   ],
 ];
 
-/** The affirmation the checkbox asserts (the D-030 consent instrument). */
+/** The affirmation the checkbox asserts (the D-030 consent instrument), the human's exact wording. */
 export const CONSENT_AFFIRMATION =
-  "I understand, and I agree to be included in the network at the level " +
-  "described above.";
+  "I understand and consent to my information being used for this demonstration.";
 
 /**
  * The canonical consent text the payload digest covers: banner and heading
@@ -97,7 +100,7 @@ export const CONSENT_AFFIRMATION =
  * app/src/ui/forms/consent.ts `consentText`.
  */
 export function consentText(): string {
-  const blocks = CONSENT_PARAGRAPHS.map(([lead, body]) => `${lead} ${body}`);
+  const blocks = CONSENT_PARAGRAPHS.map(([lead, body]) => (lead !== null ? `${lead} ${body}` : body));
   blocks.push(CONSENT_AFFIRMATION);
   return blocks.join("\n\n");
 }

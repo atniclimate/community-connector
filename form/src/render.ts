@@ -195,10 +195,12 @@ export function mountForm(container: HTMLElement, deps: FormDeps): void {
   const consentPanel = el("fieldset", { className: "cn-form-consent" }, [
     el("legend", { text: CONSENT_HEADING }),
     el(
-      "ul",
-      { className: "cn-form-consent-list", attrs: { role: "list" } },
+      "div",
+      { className: "cn-form-consent-text" },
       CONSENT_PARAGRAPHS.map(([lead, body]) =>
-        el("li", {}, [el("strong", { text: `${lead} ` }), body]),
+        lead !== null
+          ? el("p", {}, [el("strong", { text: `${lead} ` }), body])
+          : el("p", { text: body }),
       ),
     ),
     el("div", { className: "cn-form-affirm" }, [

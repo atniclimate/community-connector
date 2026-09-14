@@ -9,7 +9,7 @@ import {
   consentTextDigest,
 } from "./consent";
 
-describe("consent text", () => {
+describe("consent text (v3, the human's wording verbatim - D-106)", () => {
   it("is deterministic", async () => {
     expect(consentText()).toBe(consentText());
     expect(await consentTextDigest()).toBe(await consentTextDigest());
@@ -20,47 +20,62 @@ describe("consent text", () => {
     expect(CONSENT_DRAFT_BANNER).toMatch(/D-023/);
   });
 
-  it("includes the phone-encryption paragraph (remote path) with corrected key-custody wording", () => {
-    const text = consentText();
-    expect(text).toMatch(/sealed on your phone/i);
-    // Correction 2: the key is USED only on the facilitator's computer, not
-    // "the only copy".
-    expect(text).toMatch(/used only on the facilitator's computer/);
-  });
-
-  it("scopes the collection claim to what the person typed (correction 1)", () => {
-    expect(consentText()).toMatch(/only what is typed here/);
-  });
-
-  it("words removal as no longer shown, not erased (correction 3)", () => {
-    expect(consentText()).toMatch(/no longer be shown/);
-    expect(consentText()).not.toMatch(/taken out of the network/);
-  });
-
-  it("follows the house voice: institutional third person, no em dashes, lead-in + colon", () => {
-    const statement = CONSENT_PARAGRAPHS.map(([lead, body]) => `${lead} ${body}`).join("\n");
-    expect(statement).not.toMatch(/\b(we|our|ours|us)\b/i);
-    expect(statement).not.toMatch(/\bI\b/);
-    expect(consentText()).not.toMatch(/—|--/);
-    expect(consentText()).not.toMatch(/!/);
-    for (const [lead] of CONSENT_PARAGRAPHS) {
-      expect(lead.endsWith(":"), lead).toBe(true);
-    }
+  it("keeps the accessible group heading", () => {
     expect(CONSENT_HEADING).toBe("Before You Send This");
-    // The affirmation is the participant's own statement (D-030 instrument),
-    // so "I" is theirs, not the institution's.
-    expect(CONSENT_AFFIRMATION).toMatch(/^I understand/);
   });
 
-  it("expands the framework name on first use and names the tier authority", () => {
-    expect(consentText()).toMatch(/Tier 1 \(T1\) of the Tiered Sovereign Data Framework/);
-    expect(consentText()).toMatch(/ATNI Climate decides/);
+  it("includes the phone-encryption paragraph (remote path) verbatim", () => {
+    const text = consentText();
+    expect(text).toContain(
+      "Sealed on your phone. Your answers are encrypted on your own device before they are sent. " +
+        "The internet services that carry the message cannot read them; the key that opens them is " +
+        "used only on the facilitator's computer.",
+    );
+  });
+
+  it("reproduces every v3 paragraph verbatim, in order, joined into the exact statement", () => {
+    expect(consentText()).toBe(
+      [
+        "This is a demonstration of the connections between all of us here; where effort " +
+          "overlaps, and brings to light what is already here between us.",
+        "A name badge tells you who is here. This asks what holds us together.",
+        "Everything you share here stays here. This runs entirely on ATNI software; no " +
+          "outside platforms, no third-party services. The only data collected is what you " +
+          "enter into this form. Nothing more.",
+        "How your information is held: Everything entered here is designated Tier 1 of the " +
+          "Tiered Sovereign Data Framework; shared within the network and governed by the " +
+          "community it belongs to.",
+        "Sealed on your phone. Your answers are encrypted on your own device before they are " +
+          "sent. The internet services that carry the message cannot read them; the key that " +
+          "opens them is used only on the facilitator's computer.",
+        "Nothing appears in the network without care and human review. The content and " +
+          "narrative remains yours, and what is presented are the common connection points.",
+        "After the conference ends on Wednesday, all information entered here is deleted " +
+          "from the system entirely.",
+        "The connections you make, the conversations that follow, the shared experiences; " +
+          "those are yours to keep.",
+        CONSENT_AFFIRMATION,
+      ].join("\n\n"),
+    );
+  });
+
+  it("has exactly two lead-ins, verbatim including their own trailing punctuation", () => {
+    const leads = CONSENT_PARAGRAPHS.map(([lead]) => lead).filter((lead) => lead !== null);
+    expect(leads).toEqual(["How your information is held:", "Sealed on your phone."]);
+  });
+
+  it("carries the exact affirmation wording (the checkbox label)", () => {
+    expect(CONSENT_AFFIRMATION).toBe(
+      "I understand and consent to my information being used for this demonstration.",
+    );
   });
 
   it("has a stable golden SHA-256 digest (catches accidental text edits)", async () => {
     // Regenerate deliberately if the consent wording is intentionally changed:
     //   node --input-type=module -e "import('./src/consent.ts').then(m=>m.consentTextDigest()).then(console.log)"
-    // Draft v2 (2026-09-14; docs/design/intake-consent-text-draft-2026-09-14.md).
-    expect(await consentTextDigest()).toBe("501bc30da042601f683d24bf50670d4d69ab960a913a7739b93e2c5b546a478b");
+    // v3 (2026-09-14; docs/design/intake-consent-text-2026-09-14-v3.md; D-106).
+    expect(await consentTextDigest()).toBe(
+      "460112188735f0d45cabbb08a762aaf3e636fd5d420c16f386cfdf927bebf235",
+    );
   });
 });
