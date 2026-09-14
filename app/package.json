@@ -26,13 +26,13 @@
     "ajv-formats": "^3.0.1",
     "fake-indexeddb": "^6.2.5",
     "three-forcegraph": "^1.43.4",
-    "troika-three-text": "0.52.4",
     "typescript": "^6.0.3",
     "vite": "^7.3.6",
     "vite-plugin-singlefile": "^2.3.3",
     "vitest": "4.1.10"
   },
   "dependencies": {
-    "three": "^0.185.1"
+    "three": "^0.185.1",
+    "troika-three-text": "0.52.4"
   }
 }
