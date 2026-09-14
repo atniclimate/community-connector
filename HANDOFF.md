@@ -73,6 +73,20 @@ PASS at `202e762`; only docs commits since):**
     `#010B13`, text `#E8ECF0`, kind colors untouched.
   - Intake: live in-app entry rehearsed on the ATNI template up to the native folder
     picker; `cn intake selftest --dry` passes; a silent pre-grant error was found and fixed.
+  - QR-target form (D-104, morning of 2026-09-14): `form/` now builds against the ATNI
+    template with `-Kinds person` (`pwsh scripts/build-form.ps1 -TemplatePath
+    fixtures/templates/atni-convention.template.json -Kinds person`), styled to the ATNI
+    design system (Black BG ground, League Spartan title, Arial/Arimo body, ATNI Red
+    button, Under Review draft tag, square bullets, 640px column) and worded in the public
+    voice (labels Name / Tribal Nation or organization / Role / Priority areas / ...);
+    consent draft v2 at `docs/design/intake-consent-text-draft-2026-09-14.md` is shared
+    by the form and the in-app path; required-field errors show only after interaction.
+    Still DRAFT (D-023), still not deployed (D-059.8). Preview locally with
+    `cd form && npx vite preview --port 4173` at `/community-connector/`.
+    **Degraded mode:** Codex hit its usage limit (retry after 2026-09-19), so the form
+    commits `256f47f..` through the contrast fix are `[unreviewed-by-codex]`; a
+    documented self-review with an independent contrast check stands in
+    (`C:\dev\_reviews\community-connector\2026-09-14_form-atni-review.md`, D-104).
   - Verification: check-all 12/12, app suite green, PII scan clean, a real-Chromium walk of
     every beat, key, and rail button under normal and reduced-motion settings (all
     assertions passing), three Codex review rounds with every blocking finding fixed and
@@ -108,8 +122,11 @@ PASS at `202e762`; only docs commits since):**
 2. **The eight parked one-liners** (sprint plan section 4). Defaults if unanswered:
    pregenerated synthetic; fictional tribe; camera hold; three presses from the single cue;
    consent line spoken; QR lines are the spine owner's call; operator unnamed; S-E2 parked.
-3. **Brand reconciliation** (digest section 7) still open; only the ruled title face and
-   the ground and text values were applied.
+3. **Brand reconciliation** (digest section 7) still open: which design-system edition is
+   the sole authority (the 07/16 bundle in `I:\ATNI design system.zip` or the 09/12
+   revision in `I:\ATNI_design-system\`); the D-104 typography mapping holds under either.
+   Also: D-023 review of consent draft v2 (`docs/design/intake-consent-text-draft-2026-09-14.md`),
+   and the public product name on the form ("Community Connector" vs "Community Navigator").
 4. **Go live at the convention or not** (D-090c): unchanged, every deploy-bar and real-data
    row is still NOT DONE; the sprint assumed no.
 5. **Record, amend, or reject D-090c..D-096c**; D-096c (toolchain pin) is now done.

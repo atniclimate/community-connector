@@ -2686,3 +2686,71 @@ whether the D-093c alias table comes first.
 refreshed; `SESSION_ROSTER.yaml` S-R0 done, S-E1 / S-E2 / S-E3 partial with outcomes;
 `CONTROLS.md` states the fail-closed gate; memory pointer updated. Final code HEAD for the
 convention is `202e762` (check-all 12/12 there); everything after it is docs.
+
+## D-104 (2026-09-14) - The remote intake form follows the ATNI design system and the public voice; typography mapping across the two design-system editions
+
+Trigger: the human opened the QR-target form locally (built against the ATNI convention
+template for the first time; the build script's relative-path bug was fixed in
+`f2a8dbe`) and saw the unstyled research skeleton with raw attribute ids as labels. The
+human then handed over two authorities: `I:\ATNI design system.zip` and `I:\Voice.zip`,
+with the direction to use both.
+
+Findings: the zip is the **07/16/2026 foundations edition** of the design system (Spartan
+MB display, TeX Gyre Heros body, both files inside it dated 07/16), while
+`I:\ATNI_design-system\` holds the **09/12/2026 revision** (League Spartan, Lexend Deca)
+the repo digest treats as current. The palette, dark-ground doctrine, radius-0 rule,
+surface ladder, components, and house style are identical between the editions; only the
+type families differ. The Voice zip is the "PF Voice" skill (five files); it is now
+installed at `C:\Users\PatrickFreeland\.claude\skills\pf-voice\` for every session, and
+its rules for public copy (institutional third person, no em dashes, Title Case headings,
+sentence case body, Tribe and Tribal capitalized, acronyms expanded, blocked-word list)
+bind every community-facing surface in this repo.
+
+Choice (form, commits `256f47f`, `fb629f0`, `82a1c73`):
+1. **Typography mapping.** League Spartan (pinned `@fontsource/league-spartan` 5.2.8, the
+   package already used by `app/`) stands in for Spartan MB, which is an OFL rework of the
+   same face; the D-102 body stack `Arial, Arimo, Helvetica, sans-serif` with pinned
+   `@fontsource/arimo` 5.3.0 stands in for TeX Gyre Heros, which is metric-compatible.
+   No font file from either edition enters the public repo (HANDOFF non-negotiable;
+   D-101 item 1). Fonts are emitted as same-origin assets, so the CSP is unchanged.
+2. **Tokens applied as the README states:** Black BG `#010B13`, Text on Dark `#E8ECF0`,
+   muted `#8A94A6`, surface-raised `#141414` for inputs and the consent card, overlay
+   `#1E242C`, ATNI Red `#E13D33` primary button, Red on Dark `#F26B5E` for links, errors,
+   and the focus ring, Under Review tag for the DRAFT notice, radius 0, no shadows,
+   square bullets, 640px reading column, text-only stacked ATNI / CLIMATE wordmark.
+3. **Single-kind build.** `CN_FORM_KINDS` (`-Kinds person`) hides the kind selector when
+   one kind is offered; the sealed payload's kind is unchanged.
+4. **Copy in the voice**, keyed per template id: Name, Tribal Nation or organization,
+   Role, Priority areas, Specialties, Events you plan to attend, Email, How you prefer
+   to be reached; heading "Add Yourself to the Network Map"; button "Send to the
+   Facilitator"; consent draft v2 in institutional third person with the bold lead-in
+   and colon pattern, recorded verbatim at
+   `docs/design/intake-consent-text-draft-2026-09-14.md`, superseding the 2026-07-24
+   draft. **D-023 sign-off is still owed**; the DRAFT tag stays until then.
+
+Deferred or open: which design-system edition is the sole authority (digest section 7,
+question 1) is still the human's call; the mapping above is valid under either. The
+product name on the form ("Community Connector", as the convention spine and the
+terminology guide use it) differs from the repo's "Community Navigator"; the human
+decides the public name. A NOTICE entry for `@fontsource/arimo` (Apache-2.0) is owed if
+the repo adopts a third-party notice file. The Playwright proof, the Codex review of the
+diff, and its dispositions are recorded below.
+
+Verification and review: Playwright proof at 390x844 and 1280x800 (42 assertions: no
+console errors, no external requests, CSP intact, fonts loaded from self, labels and
+tag exact, focus ring on every focusable element, consent free of "we" and em dashes);
+form suite 67 tests green; app suite 207 green after the in-app consent port
+(`c69b02d`, `7d3bef7`); PII scan clean. **Codex was unavailable** (usage limit until
+2026-09-19), so the diff got a documented self-review at
+`C:\dev\_reviews\community-connector\2026-09-14_form-atni-review.md` (isolated worktree,
+independent contrast computation); the form commits are marked
+`[unreviewed-by-codex]` in HANDOFF.md per the degraded-mode rule. Dispositions: the one
+blocking finding (Under Review tag text `#B4740E` at 3.5:1 on its tint) FIXED by
+darkening to `#8A5209` (5.8:1) with a comment pointing back at the system; fonts moved
+from devDependencies to dependencies (both in the fix commit that follows `7d3bef7`);
+the "nothing else is gathered" consent phrasing is flagged for the D-023 reviewer
+against ADR-005's metadata wording; the product-name question is recorded above; the
+bare `catch {}` in `form/src/main.ts` and `render.ts` nearing the I5 size guideline are
+pre-existing and deferred. Follow-ups from the build: required-field errors gated to
+interaction or submit (`6e3cf64`), the in-app consent path carries draft v2 (`c69b02d`,
+`7d3bef7`).
