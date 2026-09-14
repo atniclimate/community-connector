@@ -31,16 +31,23 @@ const COLOR = new Color();
 const HOVER_LIGHTNESS_DELTA = 0.08;
 const DIM_CHROMA_SCALE = 0.35;
 
+/**
+ * `highlightedIds` and `highlightedEdgeIds` are extra members the caller
+ * wants lit (presenter beats: kind / edge-kind filters, measure results).
+ * They union with the focused entity's own neighborhood, so a beat with a
+ * focusEntityId lights that node and its neighbors through this one path.
+ */
 export function computeFocusSet(
   projection: ProjectionDto,
   focusedId: string | null,
   highlightedIds: ReadonlySet<string> = new Set<string>(),
+  highlightedEdgeIds: ReadonlySet<string> = new Set<string>(),
 ): FocusSet | null {
-  if (focusedId === null && highlightedIds.size === ZERO) {
+  if (focusedId === null && highlightedIds.size === ZERO && highlightedEdgeIds.size === ZERO) {
     return null;
   }
   const neighborIds = new Set(highlightedIds);
-  const adjacentEdgeIds = new Set<string>();
+  const adjacentEdgeIds = new Set(highlightedEdgeIds);
   if (focusedId !== null) {
     for (const edge of projectedEdges(projection)) {
       if (edge.from !== focusedId && edge.to !== focusedId) {

@@ -83,12 +83,27 @@ export type ShapeName = "sphere" | "cube" | "octahedron" | "tetrahedron" | "toru
 
 export type PresentMeasure = "betweenness_top_n" | "single_tie";
 
+/**
+ * Camera behavior on a beat change. Undefined keeps the pre-D-103 behavior
+ * (fly to a newly focused entity, otherwise fit the beat's positions).
+ * "hold" performs no camera motion at all, even with a focusEntityId, so an
+ * opacity-only spotlight satisfies the stage's "no fly-ins" rule (D-103.3).
+ * "fit" always frames the beat's positions; "fly" always flies to the
+ * focused entity when one is set (and fits when none is).
+ */
+export type PresentCamera = "hold" | "fit" | "fly";
+
 export type PresentBeat = {
   readonly id: string;
   readonly label: string;
   readonly focusEntityId?: string;
+  readonly camera?: PresentCamera;
   readonly filter?: {
     readonly kinds?: readonly string[];
+    /** Entities incident to an edge of one of these kinds are highlighted and
+     * those edges stay bright while others dim. With `kinds` also set the
+     * entity set is the intersection (see viz/presenter.ts beatHighlights). */
+    readonly edgeKinds?: readonly string[];
   };
   readonly measure?: PresentMeasure;
   readonly topN?: number;

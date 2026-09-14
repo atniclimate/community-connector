@@ -1,8 +1,26 @@
-import type { JsonObject, JsonValue, PresentBeat } from "../state/state";
+import type { JsonObject, JsonValue, PresentBeat, ProjectionDto } from "../state/state";
+import { edgeEndpoints } from "./projection";
 
 export type MeasureHighlights = {
   readonly ids: ReadonlySet<string>;
   readonly explanations: readonly string[];
+};
+
+/** Entities and edges a non-measure beat lights; everything else dims. */
+export type BeatHighlights = {
+  readonly ids: ReadonlySet<string>;
+  readonly edgeIds: ReadonlySet<string>;
+};
+
+/** The camera motion a beat change performs (D-103.3). */
+export type CameraMove = "none" | "fit" | "fly";
+
+export type CameraMoveContext = {
+  readonly present: boolean;
+  readonly focusedId: string | null;
+  readonly focusChanged: boolean;
+  readonly beatChanged: boolean;
+  readonly rebuilt: boolean;
 };
 
 type RankedMeasure = {
@@ -10,6 +28,8 @@ type RankedMeasure = {
   readonly value: number;
   readonly explanation: string;
 };
+
+const EMPTY_IDS: ReadonlySet<string> = new Set<string>();
 
 function objectValue(value: JsonValue | undefined): JsonObject | null {
   return typeof value === "object" && value !== null && !Array.isArray(value)
@@ -75,14 +95,126 @@ export function kindBeatHighlights(
   return new Set(entities.filter((entity) => kinds.includes(entity.kind ?? "")).map((entity) => entity.id));
 }
 
+/**
+ * An edge-kind beat lights every entity incident to an edge whose kind is in
+ * `filter.edgeKinds`, and those edges themselves. Null for measure beats
+ * (the measure owns the highlight set) and empty sets when the beat has no
+ * edgeKinds. Edges are read from the permission-filtered projection, so a
+ * kind the viewer cannot see simply lights nothing (I2).
+ */
+export function edgeKindBeatHighlights(
+  edges: ProjectionDto["edges"],
+  beat: PresentBeat | undefined,
+): BeatHighlights | null {
+  if (beat?.measure !== undefined) {
+    return null;
+  }
+  const edgeKinds = beat?.filter?.edgeKinds;
+  if (edgeKinds === undefined || edgeKinds.length === 0) {
+    return { ids: new Set<string>(), edgeIds: new Set<string>() };
+  }
+  const ids = new Set<string>();
+  const edgeIds = new Set<string>();
+  for (const edge of edges ?? []) {
+    const endpoints = edgeEndpoints(edge);
+    if (endpoints === null || typeof edge["kind"] !== "string" || !edgeKinds.includes(edge["kind"])) {
+      continue;
+    }
+    edgeIds.add(edge.id);
+    ids.add(endpoints.from);
+    ids.add(endpoints.to);
+  }
+  return { ids, edgeIds };
+}
+
+/**
+ * The highlight set a non-measure beat derives from its filter, or null when
+ * a measure owns it. Combination rule when both `kinds` and `edgeKinds` are
+ * set: the entity set is the INTERSECTION (entities of those kinds that are
+ * incident to an edge of those edge kinds) and only edges whose endpoints
+ * both survive stay bright. With only `edgeKinds` every incident entity is
+ * lit; with only `kinds` no edge is singled out (today's behavior). A beat's
+ * focusEntityId neighborhood is added later by computeFocusSet, not here.
+ */
+export function beatHighlights(
+  projection: ProjectionDto | null,
+  beat: PresentBeat | undefined,
+): BeatHighlights | null {
+  const entities = projection?.entities ?? [];
+  const byKind = kindBeatHighlights(entities, beat);
+  const byEdgeKind = edgeKindBeatHighlights(projection?.edges, beat);
+  if (byKind === null || byEdgeKind === null) {
+    return null;
+  }
+  const hasKinds = (beat?.filter?.kinds?.length ?? 0) > 0;
+  const hasEdgeKinds = (beat?.filter?.edgeKinds?.length ?? 0) > 0;
+  if (!hasEdgeKinds) {
+    return { ids: byKind, edgeIds: EMPTY_IDS };
+  }
+  if (!hasKinds) {
+    return byEdgeKind;
+  }
+  const ids = new Set([...byEdgeKind.ids].filter((id) => byKind.has(id)));
+  const edgeIds = new Set<string>();
+  for (const edge of projection?.edges ?? []) {
+    const endpoints = edgeEndpoints(edge);
+    if (endpoints !== null && byEdgeKind.edgeIds.has(edge.id) && ids.has(endpoints.from) && ids.has(endpoints.to)) {
+      edgeIds.add(edge.id);
+    }
+  }
+  return { ids, edgeIds };
+}
+
+/**
+ * Decides the camera motion for a beat change. Pure so the rule is testable
+ * without a renderer; reduced motion is applied by the camera rig (snap),
+ * never here (I9).
+ *
+ * - undefined camera: today's behavior - fly when the focused entity just
+ *   changed to something, otherwise fit the beat's positions on a beat
+ *   change or rebuild.
+ * - "hold": never moves, even with a focusEntityId (opacity-only spotlight).
+ * - "fit": always fits on a beat change or rebuild; never flies.
+ * - "fly": flies to the focused entity whenever one is set, even if it did
+ *   not change; fits when the beat has no focused entity.
+ * Outside present mode the beat is ignored and the default rule applies.
+ */
+export function beatCameraMove(beat: PresentBeat | undefined, context: CameraMoveContext): CameraMove {
+  const mode = context.present ? beat?.camera : undefined;
+  const beatMoved = context.present && (context.beatChanged || context.rebuilt);
+  if (mode === "hold") {
+    return "none";
+  }
+  if (mode === "fit") {
+    return beatMoved ? "fit" : "none";
+  }
+  if (mode === "fly") {
+    if (context.focusedId !== null && (context.focusChanged || beatMoved)) {
+      return "fly";
+    }
+    return beatMoved ? "fit" : "none";
+  }
+  if (context.focusChanged && context.focusedId !== null) {
+    return "fly";
+  }
+  return beatMoved ? "fit" : "none";
+}
+
+/**
+ * The stage caption. Measure beats show a count only - "label - N
+ * highlighted" - never the per-entity explanations (D-099: counts, never
+ * names; D-103.5). `highlightCount` defaults to the number of explanations,
+ * which is one per highlighted entity.
+ */
 export function presenterBeatText(
   beat: PresentBeat | undefined,
   explanations: readonly string[],
+  highlightCount: number = explanations.length,
 ): string {
   if (beat === undefined) {
     return "";
   }
   return explanations.length === 0
     ? beat.label
-    : `${beat.label}: ${explanations.join("; ")}`;
+    : `${beat.label} - ${highlightCount} highlighted`;
 }

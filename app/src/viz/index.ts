@@ -14,7 +14,7 @@ import { projectedEntities } from "./projection";
 import { createVizScene, type SceneSetup } from "./scene";
 import { createCameraRig, zoomToFit, type CameraRig } from "./camera";
 import { applyFocusToNodeLayer, computeFocusSet, FocusBlend, writeNodeHover, type FocusSet } from "./focus";
-import { kindBeatHighlights, measureHighlights, presenterBeatText } from "./presenter";
+import { beatCameraMove, beatHighlights, measureHighlights, presenterBeatText } from "./presenter";
 import { effectivePixelRatio, QualityManager, type QualityProfile } from "./quality";
 
 export type MountedViz = () => void;
@@ -52,6 +52,7 @@ type RenderState = {
   presentBeatIndex: number | null;
   presentMeasureKey: string | null;
   highlightedIds: ReadonlySet<string>;
+  highlightedEdgeIds: ReadonlySet<string>;
   measureExplanations: readonly string[];
   live: HTMLDivElement;
   beatLabel: HTMLDivElement;
@@ -108,6 +109,7 @@ export function mountViz(container: HTMLElement, store: Store, client: WasmClien
     presentBeatIndex: null,
     presentMeasureKey: null,
     highlightedIds: new Set<string>(),
+    highlightedEdgeIds: new Set<string>(),
     measureExplanations: [],
     live,
     beatLabel,
@@ -239,11 +241,13 @@ function syncMotion(
   renderState.sceneSetup.setPresentMode(present);
   const beat = present ? state.presentation.beats[state.presentation.beatIndex] : undefined;
   syncPresenterMeasure(renderState, state, beat, store, client);
-  const kindHighlights = kindBeatHighlights(state.data.projection?.entities ?? [], present ? beat : undefined);
-  if (kindHighlights !== null) {
+  const highlights = beatHighlights(state.data.projection, present ? beat : undefined);
+  if (highlights !== null) {
     // Measure beats own highlightedIds (set asynchronously); every other beat,
-    // and leaving presenter mode, derives it from the beat's kind filter.
-    renderState.highlightedIds = kindHighlights;
+    // and leaving presenter mode, derives it from the beat's kind and
+    // edge-kind filters.
+    renderState.highlightedIds = highlights.ids;
+    renderState.highlightedEdgeIds = highlights.edgeIds;
   }
   updatePresenterLabel(renderState, present, beat);
   fitNewLoad(renderState, state, rebuilt);
@@ -260,13 +264,22 @@ function syncMotion(
   if (projection === null || renderState.nodes === null || renderState.edges === null || renderState.degrees === null) {
     return;
   }
-  const focus = applyFocusRendering(renderState, state, focusedId);
-  if (focusChanged && focusedId !== null) {
+  // Highlight (opacity through the focus pipeline) and camera are decoupled:
+  // the focus rendering always applies; the camera move is the beat's call.
+  applyFocusRendering(renderState, state, focusedId);
+  const move = beatCameraMove(beat, {
+    present,
+    focusedId,
+    focusChanged,
+    beatChanged: presentBeatChanged,
+    rebuilt,
+  });
+  if (move === "fly" && focusedId !== null) {
     const position = renderState.layout?.positions.get(focusedId);
     if (position !== undefined) {
       renderState.cameraRig.flyTo(position.clone(), reduced);
     }
-  } else if (present && (presentBeatChanged || rebuilt) && renderState.layout !== null) {
+  } else if (move === "fit" && renderState.layout !== null) {
     zoomToFit(renderState.cameraRig, positionsForBeat(projection, renderState.layout, beat), {
       paddingWorldUnits: RENDER_TOKENS.camera.fitAllPaddingWorldUnits,
       reducedMotion: reduced,
@@ -306,7 +319,7 @@ function applyFocusRendering(
   if (projection === null || renderState.nodes === null || renderState.edges === null || renderState.degrees === null) {
     return null;
   }
-  const focus = computeFocusSet(projection, focusedId, renderState.highlightedIds);
+  const focus = computeFocusSet(projection, focusedId, renderState.highlightedIds, renderState.highlightedEdgeIds);
   renderState.focus = focus;
   applyFocusToNodeLayer(renderState.nodes, projection, state.theme.resolved, renderState.degrees, focus);
   // The role pass rewrote every instance; put the hover emphasis back on top.
@@ -360,6 +373,7 @@ function syncPresenterMeasure(
   }
   renderState.presentMeasureKey = key;
   renderState.highlightedIds = new Set<string>();
+  renderState.highlightedEdgeIds = new Set<string>();
   renderState.measureExplanations = [];
   if (key !== null && beat?.measure !== undefined && state.session.groupId !== null) {
     void loadPresenterMeasure(renderState, store, client, state, beat, key);
@@ -389,8 +403,10 @@ async function loadPresenterMeasure(
     }
     const highlights = measureHighlights(response, beat);
     renderState.highlightedIds = highlights.ids;
+    renderState.highlightedEdgeIds = new Set<string>();
     renderState.measureExplanations = highlights.explanations;
     updatePresenterLabel(renderState, true, beat);
+    updateAria(renderState, current);
     applyFocusRendering(renderState, current, current.view.focusedEntityId);
     renderState.dirty = true;
     schedule(renderState, store);
@@ -407,7 +423,9 @@ function updatePresenterLabel(
   present: boolean,
   beat: PresentBeat | undefined,
 ): void {
-  const text = present ? presenterBeatText(beat, renderState.measureExplanations) : "";
+  const text = present
+    ? presenterBeatText(beat, renderState.measureExplanations, renderState.highlightedIds.size)
+    : "";
   renderState.beatLabel.hidden = !present || text === "";
   renderState.beatLabel.textContent = text;
   renderState.live.textContent = text;
@@ -475,9 +493,13 @@ function needsRebuild(
 function updateAria(renderState: RenderState, state: AppState): void {
   const count = state.data.projection?.entities?.length ?? ZERO;
   const selected = state.view.focusedEntityId;
-  const label = selected === null
+  const base = selected === null
     ? `Community graph with ${count} entities`
     : `Community graph with ${count} entities. Selected entity ${selected}`;
+  // The presenter caption (count-only on measure beats) is part of what the
+  // canvas shows; the live region announces the same text on each change.
+  const caption = state.view.mode === "present" ? renderState.beatLabel.textContent ?? "" : "";
+  const label = caption === "" ? base : `${base}. ${caption}`;
   renderState.renderer.domElement.setAttribute("aria-label", label);
 }
 

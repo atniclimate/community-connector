@@ -13,3 +13,28 @@ Modules:
 - picking.ts - pointer picking dispatching store actions only (I4).
 - quality.ts / config.ts - adaptive quality tiers and render tokens.
 - index.ts - mountViz(container, store): wiring and the frame loop.
+- presenter.ts - presenter beats (public/beats.*.json): highlight sets,
+  camera decision, and the stage caption.
+
+Presenter beats (D-103):
+- Highlight and camera are decoupled. Every beat's highlight (kind filter,
+  edge-kind filter, measure result, focusEntityId neighborhood) flows through
+  the one focus pipeline (computeFocusSet -> node roles, edge target colors,
+  label emphasis); no second render pass. The camera move is decided
+  separately by `beatCameraMove`.
+- `camera` (optional): undefined keeps the old rule (fly when the focused
+  entity changes, else fit the beat's positions); `hold` never moves the
+  camera, even with a focusEntityId, so a spotlight is opacity-only; `fit`
+  always frames the beat's `filter.kinds` positions (all when none); `fly`
+  always flies to the focused entity and fits when there is none. Reduced
+  motion snaps either move (I9).
+- `filter.edgeKinds` (optional): entities incident to an edge of those kinds
+  are highlighted and those edges stay bright while the rest dim. Combined
+  with `filter.kinds` the entity set is the intersection and only edges with
+  both endpoints lit stay bright. Measure beats ignore both filters for the
+  highlight set (the measure owns it); `filter.kinds` still shapes the fit.
+- Captions show counts, never names: a measure beat reads
+  "label - N highlighted"; explanations are never concatenated on stage.
+- `beats-fixture.test.ts` validates public/beats.atni.json against the
+  atni-convention fixture (ids, kinds, edge kinds, measures, camera values,
+  the finale shape) so a mistyped beat fails in `npm run test`.
