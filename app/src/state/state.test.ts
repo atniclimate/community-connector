@@ -127,7 +127,7 @@ describe("state reducer", () => {
     const advanced = reduce(entered, { kind: "presentBeatAdvanced", beatIndex: 1 });
     const exited = reduce(advanced, { kind: "presentExited" });
 
-    expect(loaded.presentation).toEqual({ beats, beatIndex: 0, loadState: "ready" });
+    expect(loaded.presentation).toEqual({ beats, beatIndex: 0, loadState: "ready", railShown: false });
     expect(entered.view.mode).toBe("present");
     expect(advanced.presentation.beatIndex).toBe(1);
     expect(advanced.view).toEqual({
@@ -138,6 +138,42 @@ describe("state reducer", () => {
       storyStep: 0,
     });
     expect(exited.view.mode).toBe("overview");
+  });
+
+  it("toggles the presenter rail only in present mode and resets it on entering or leaving", () => {
+    const beats = [{ id: "all", label: "All" }, { id: "people", label: "People" }] as const;
+    const loaded = reduce(createInitialState(), { kind: "presentBeatsLoaded", beats });
+    expect(loaded.presentation.railShown).toBe(false);
+
+    // Outside present mode the toggle is inert and state identity is kept.
+    expect(reduce(loaded, { kind: "presentRailToggled" })).toBe(loaded);
+
+    const entered = reduce(loaded, { kind: "presentEntered", beatIndex: 0 });
+    expect(entered.presentation.railShown).toBe(false);
+    const shown = reduce(entered, { kind: "presentRailToggled" });
+    expect(shown.presentation.railShown).toBe(true);
+    expect(shown.view.mode).toBe("present");
+    expect(shown.presentation.beatIndex).toBe(0);
+    // Stepping beats keeps the operator's choice.
+    const advanced = reduce(shown, { kind: "presentBeatAdvanced", beatIndex: 1 });
+    expect(advanced.presentation.railShown).toBe(true);
+    expect(reduce(advanced, { kind: "presentRailToggled" }).presentation.railShown).toBe(false);
+
+    // Leaving present mode resets it, by whichever route.
+    expect(reduce(advanced, { kind: "presentExited" }).presentation.railShown).toBe(false);
+    expect(reduce(advanced, { kind: "entityFocused", entityId: "entity-x" }).presentation.railShown).toBe(false);
+    expect(reduce(advanced, { kind: "storyEntered", storyId: "story-alpha", step: 0 }).presentation.railShown).toBe(false);
+    expect(
+      reduce(advanced, { kind: "groupLoadRequested", groupId: "group-beta", viewer: { kind: "anonymous" } })
+        .presentation.railShown,
+    ).toBe(false);
+
+    // Re-entering starts hidden again, even from a state that still says shown.
+    const exited = reduce(advanced, { kind: "presentExited" });
+    const reentered = reduce(exited, { kind: "presentEntered", beatIndex: 1 });
+    expect(reentered.presentation.railShown).toBe(false);
+    const staleShown: AppState = { ...exited, presentation: { ...exited.presentation, railShown: true } };
+    expect(reduce(staleShown, { kind: "presentEntered", beatIndex: 0 }).presentation.railShown).toBe(false);
   });
 
   it("stores derived theme results without revision staleness rules", () => {

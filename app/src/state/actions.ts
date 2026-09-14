@@ -97,6 +97,11 @@ export type Action =
       readonly kind: "presentExited";
     }
   | {
+      /** The operator's `r` key: flips presentation.railShown while in
+       * present mode; a no-op in any other mode. */
+      readonly kind: "presentRailToggled";
+    }
+  | {
       readonly kind: "legendToggled";
     }
   | {

@@ -122,6 +122,14 @@ export type PresentationState = {
   readonly beats: readonly PresentBeat[];
   readonly beatIndex: number;
   readonly loadState: LoadState;
+  /**
+   * Whether the operator's button rail is shown in present mode (I4: UI
+   * state lives here, not in the renderer). Toggled by `presentRailToggled`
+   * (`r`); reset to false whenever the view mode enters or leaves "present",
+   * so the stage never shows the rail unless the operator asks. The renderer
+   * only projects it onto the rail's `hidden` attribute.
+   */
+  readonly railShown: boolean;
 };
 
 export type KindMeta = {
@@ -241,6 +249,7 @@ export function initialPresentationState(): PresentationState {
     beats: [],
     beatIndex: 0,
     loadState: "idle",
+    railShown: false,
   };
 }
 

@@ -62,7 +62,10 @@ A small ARIA-labeled button rail (`.cn-present-rail` in `ui.css`, built in
 `index.ts`) mirrors the same keys plus Fit; it dispatches the identical
 `presentBeatAdvanced` action so a button and its hotkey can never resolve to
 different beats. The rail is operator chrome: hidden outside present mode,
-hidden by default inside it, toggled with `r` (`presenter.ts`
-`nextRailShown` / `railHidden`, pure); the `hidden` attribute removes its
-buttons from the tab order, and leaving present mode resets the toggle. No
-new animation; see `CONTROLS.md` for the full key list and the A9 cue sheet.
+hidden by default inside it, toggled with `r`. Its shown/hidden state is
+`state.presentation.railShown` (I4): `r` dispatches `presentRailToggled`, the
+reducer flips it and resets it to false whenever the view mode enters or
+leaves present, and `index.ts` only projects it onto the rail's `hidden`
+attribute (`presenter.ts` `railHidden`, pure), which removes its buttons from
+the tab order. No new animation; see `CONTROLS.md` for the full key list and
+the A9 cue sheet.

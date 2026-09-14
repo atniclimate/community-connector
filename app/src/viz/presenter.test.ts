@@ -9,7 +9,6 @@ import {
   edgeKindBeatHighlights,
   kindBeatHighlights,
   measureHighlights,
-  nextRailShown,
   presenterBeatText,
   railHidden,
   stageLabelIds,
@@ -208,24 +207,14 @@ describe("stage name gate (D-099: no person name on stage)", () => {
   });
 });
 
-describe("presenter rail toggle (r; hidden by default on stage)", () => {
-  it("flips on r in either case and ignores every other key", () => {
-    expect(nextRailShown(false, "r")).toBe(true);
-    expect(nextRailShown(true, "r")).toBe(false);
-    expect(nextRailShown(false, "R")).toBe(true);
-    expect(nextRailShown(false, "f")).toBe(false);
-    expect(nextRailShown(true, " ")).toBe(true);
-    expect(nextRailShown(true, "Escape")).toBe(true);
-  });
-
-  it("is hidden outside present mode and hidden in present mode until shown", () => {
+describe("presenter rail projection (r; hidden by default on stage)", () => {
+  it("is hidden outside present mode and hidden in present mode until state says shown", () => {
+    // `shown` is state.presentation.railShown; the toggle and its resets are
+    // reducer behavior, tested in state/state.test.ts.
     expect(railHidden(false, false)).toBe(true);
     expect(railHidden(false, true)).toBe(true);
     expect(railHidden(true, false)).toBe(true);
     expect(railHidden(true, true)).toBe(false);
-    // The default entry state: present, not yet toggled.
-    expect(railHidden(true, nextRailShown(false, "Space"))).toBe(true);
-    expect(railHidden(true, nextRailShown(false, "r"))).toBe(false);
   });
 });
 

@@ -59,8 +59,28 @@ function sameRequest(left: RequestIdentity | null, right: RequestIdentity): bool
   return left !== null && left.requestId === right.requestId;
 }
 
+/**
+ * The operator's rail is stage chrome that must never survive a mode
+ * change: whenever an action moves the view into or out of "present" (by
+ * any route - presentEntered/presentExited, a picked entity, a story, a
+ * group reload), railShown resets to false so every entry starts hidden.
+ * Returns `next` untouched when nothing crossed or the rail is already
+ * hidden, preserving state identity for unchanged transitions.
+ */
+function resetRailOnPresentBoundary(previous: AppState, next: AppState): AppState {
+  const crossed = (previous.view.mode === "present") !== (next.view.mode === "present");
+  if (!crossed || !next.presentation.railShown) {
+    return next;
+  }
+  return { ...next, presentation: { ...next.presentation, railShown: false } };
+}
+
 /** Implements docs/blueprints/app-state.md state machine and ADR-003 D3 staleness. */
 export function reduce(state: AppState, action: Action): AppState {
+  return resetRailOnPresentBoundary(state, reduceAction(state, action));
+}
+
+function reduceAction(state: AppState, action: Action): AppState {
   switch (action.kind) {
     case "groupLoadRequested":
       return {
@@ -200,7 +220,7 @@ export function reduce(state: AppState, action: Action): AppState {
     case "presentBeatsLoaded":
       return {
         ...state,
-        presentation: { beats: action.beats, beatIndex: 0, loadState: "ready" },
+        presentation: { ...state.presentation, beats: action.beats, beatIndex: 0, loadState: "ready" },
       };
     case "presentEntered":
     case "presentBeatAdvanced":
@@ -211,6 +231,14 @@ export function reduce(state: AppState, action: Action): AppState {
       };
     case "presentExited":
       return { ...state, view: resetView() };
+    case "presentRailToggled":
+      if (state.view.mode !== "present") {
+        return state;
+      }
+      return {
+        ...state,
+        presentation: { ...state.presentation, railShown: !state.presentation.railShown },
+      };
     case "legendToggled":
       return { ...state, ui: { ...state.ui, legendOpen: !state.ui.legendOpen } };
     case "sidebarToggled":

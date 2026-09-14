@@ -295,20 +295,13 @@ export function stageLabelIds(
 export const RAIL_TOGGLE_KEY = "r";
 
 /**
- * The rail toggle, pure so it is testable without a DOM: `r` (either case)
- * flips `shown`; any other key leaves it alone. The rail starts hidden on
- * every entry to present mode (viz/index.ts resets `shown` on exit), so the
- * stage never shows the operator's buttons unless the operator asks.
- */
-export function nextRailShown(shown: boolean, key: string): boolean {
-  return key.toLowerCase() === RAIL_TOGGLE_KEY ? !shown : shown;
-}
-
-/**
  * Whether the rail element carries the `hidden` attribute: hidden outside
  * present mode regardless of `shown`, and hidden in present mode until the
- * operator toggles it. `hidden` removes it from layout and the tab order, so
- * its buttons are never focusable while hidden.
+ * operator toggles it. `shown` is `state.presentation.railShown` - the
+ * reducer owns it (I4): `presentRailToggled` flips it and every entry to or
+ * exit from present mode resets it, so the stage never shows the operator's
+ * buttons unless the operator asks. `hidden` removes the rail from layout
+ * and the tab order, so its buttons are never focusable while hidden.
  */
 export function railHidden(present: boolean, shown: boolean): boolean {
   return !present || !shown;

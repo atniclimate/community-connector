@@ -19,7 +19,6 @@ import {
   beatHighlights,
   beatIndexForKey,
   measureHighlights,
-  nextRailShown,
   presenterBeatText,
   railHidden,
   RAIL_TOGGLE_KEY,
@@ -83,11 +82,9 @@ type RenderState = {
   measureExplanations: readonly string[] | null;
   live: HTMLDivElement;
   beatLabel: HTMLDivElement;
+  /** Operator's rail; its visibility is `state.presentation.railShown`
+   * projected onto `hidden` (I4) - the renderer owns no toggle state. */
   rail: HTMLDivElement;
-  /** Operator's rail toggle (`r`); reset on leaving present mode so every
-   * entry starts with the rail hidden (D-099: nothing but the graph and the
-   * caption on stage). */
-  railShown: boolean;
   dirty: boolean;
   frame: number | null;
   lastTime: number | null;
@@ -149,7 +146,6 @@ export function mountViz(container: HTMLElement, store: Store, client: WasmClien
     live,
     beatLabel,
     rail,
-    railShown: false,
     dirty: true,
     frame: null,
     lastTime: null,
@@ -297,7 +293,7 @@ function syncMotion(
     renderState.highlightedIds = highlights.ids;
     renderState.highlightedEdgeIds = highlights.edgeIds;
   }
-  updatePresenterLabel(renderState, present, beat);
+  updatePresenterLabel(renderState, present, beat, state.presentation.railShown);
   fitNewLoad(renderState, state, rebuilt);
   const focusedId = state.view.mode === "focus" || present ? state.view.focusedEntityId : null;
   const focusChanged = focusedId !== renderState.focusedEntityId;
@@ -460,7 +456,7 @@ async function loadPresenterMeasure(
     renderState.highlightedIds = highlights.ids;
     renderState.highlightedEdgeIds = new Set<string>();
     renderState.measureExplanations = highlights.explanations;
-    updatePresenterLabel(renderState, true, beat);
+    updatePresenterLabel(renderState, true, beat, current.presentation.railShown);
     updateAria(renderState, current);
     applyFocusRendering(renderState, current, current.view.focusedEntityId);
     renderState.dirty = true;
@@ -477,6 +473,7 @@ function updatePresenterLabel(
   renderState: RenderState,
   present: boolean,
   beat: PresentBeat | undefined,
+  railShown: boolean,
 ): void {
   const text = present
     ? presenterBeatText(beat, renderState.measureExplanations, renderState.highlightedIds.size)
@@ -485,13 +482,11 @@ function updatePresenterLabel(
   renderState.beatLabel.textContent = text;
   renderState.live.textContent = text;
   // The rail is operator chrome, not stage chrome: hidden outside present
-  // mode with everything else (ui.css), and hidden by default inside it until
-  // the operator presses `r`. Leaving present mode resets the toggle so the
-  // next entry starts hidden again.
-  if (!present) {
-    renderState.railShown = false;
-  }
-  renderState.rail.hidden = railHidden(present, renderState.railShown);
+  // mode with everything else (ui.css), and hidden inside it until the
+  // operator presses `r`. `railShown` is state.presentation.railShown - the
+  // reducer flips it and resets it on every present-mode boundary (I4); this
+  // only projects it onto the DOM.
+  renderState.rail.hidden = railHidden(present, railShown);
 }
 
 /**
@@ -576,9 +571,9 @@ function handlePresenterKeydown(event: KeyboardEvent, renderState: RenderState, 
   } else if (event.key.toLowerCase() === "f") {
     fitPresenterView(renderState, state);
   } else if (event.key.toLowerCase() === RAIL_TOGGLE_KEY) {
-    // Operator's rail: DOM-only, so no render is scheduled for it.
-    renderState.railShown = nextRailShown(renderState.railShown, event.key);
-    renderState.rail.hidden = railHidden(true, renderState.railShown);
+    // Operator's rail: the store owns the toggle (I4); the subscriber
+    // projects presentation.railShown onto the rail's hidden attribute.
+    store.dispatch({ kind: "presentRailToggled" });
   } else if (event.key === "Escape") {
     store.dispatch({ kind: "presentExited" });
   } else {
