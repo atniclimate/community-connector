@@ -1,16 +1,31 @@
 /**
  * Consent statement boilerplate for the in-app (facilitator-entered) form.
  *
- * DRAFT TEXT - authorized as functionality-matching boilerplate by the
- * human (DECISIONS.md D-072.1) and derived from
- * docs/design/intake-consent-text-draft-2026-07-24.md with that file's
- * section-7 truthfulness corrections applied:
- *  - the collection claim is scoped to "only what you typed";
- *  - the removal promise is worded as "no longer shown" (append-only log;
+ * DRAFT TEXT v2 (2026-09-14): the wording is ported verbatim from
+ * docs/design/intake-consent-text-draft-2026-09-14.md section 3 (the ATNI
+ * house voice - institutional third person, bold lead-in + colon, no em
+ * dashes, Oxford comma), which supersedes the 2026-07-24 draft this file
+ * previously carried (DECISIONS.md D-072.1 authorized that draft as
+ * functionality-matching boilerplate; the wording itself was never the
+ * subject of that authorization and moves to v2 here). Every truthfulness
+ * correction the 07-24 draft's section 7 recorded is still in force:
+ *  - the collection claim is scoped to "only what is typed here";
+ *  - the removal promise is worded as "no longer be shown" (append-only log;
  *    the no-longer-shown vs true-erasure decision is the human's, still
  *    open);
- *  - the phone-encryption paragraph is omitted here because this is the
- *    in-app path on the pilot PC (the draft's builder note).
+ *  - the classification paragraph names the Tiered Sovereign Data Framework
+ *    in full on first use, per the v2 draft.
+ *
+ * Divergence from the remote form (form/src/consent.ts, same draft): the v2
+ * draft's sixth item ("Your answers are sealed on your phone") describes the
+ * remote path, where an attendee's own phone encrypts the answers before they
+ * cross the network. That is not true of this path - the in-app form runs on
+ * the facilitator's own computer, entered by the facilitator, with no phone
+ * and no network hop before staging. That item is replaced below with one
+ * that truthfully states the in-app case ("Where this entry is kept"); the
+ * other five items are verbatim from the v2 draft. This is a content
+ * divergence the draft anticipates in its own builder notes, not a wording
+ * error.
  *
  * The D-023 human review remains the bar before ANY community-facing use;
  * the UI renders the DRAFT banner until that sign-off lands and this
@@ -20,7 +35,10 @@
 
 /** Rendered prominently above the statement until D-023 sign-off. */
 export const CONSENT_DRAFT_BANNER =
-  "DRAFT wording - pending human review (D-023). Not for community use.";
+  "DRAFT wording, pending human review (D-023). Not for community use.";
+
+/** The consent block heading (Title Case per house style; v2 draft section 3). */
+export const CONSENT_HEADING = "Before You Send This";
 
 /** Version tag carried in the payload's form_version. */
 export const FORM_VERSION = "in-app-draft-2026-07-24";
@@ -28,36 +46,47 @@ export const FORM_VERSION = "in-app-draft-2026-07-24";
 /** The consent statement paragraphs, in display order. */
 export const CONSENT_PARAGRAPHS: readonly (readonly [string, string])[] = [
   [
-    "What we collect.",
-    "We collect only what you typed on this form: your name, your Tribe or " +
-      "Nation if you gave it, the organizations you listed, and your roles. " +
-      "Nothing else is gathered from you or your device.",
+    "What the form keeps:",
+    "only what is typed here. Nothing else is gathered from you or your device.",
   ],
   [
-    "A person reviews it first.",
-    "Your entry goes to the network facilitator, a person working for the " +
-      "ATNI Climate community. Nothing you share appears anywhere until the " +
-      "facilitator has read and approved it. If something looks off, the " +
-      "facilitator will set it aside rather than publish it.",
+    "A person reviews it first:",
+    "every entry goes to the network facilitator, a person working for the " +
+      "ATNI Climate program. Nothing appears in the network until the " +
+      "facilitator has read and approved it; anything that looks off is set " +
+      "aside rather than published.",
   ],
   [
-    "How it is classified.",
-    "Everything entered through this form is held at Tier 1 (T1) under the " +
-      "community's data framework: shared within the network, governed by " +
-      "the community. ATNI Climate decides how information is classified " +
-      "and used - not a company, and not a server.",
+    "How it is classified:",
+    "everything entered here is held at Tier 1 (T1) of the Tiered Sovereign " +
+      "Data Framework, shared within the network and governed by the " +
+      "community. Under the framework, ATNI Climate decides how it is " +
+      "classified and used; that decision never belongs to a company or to a " +
+      "server.",
   ],
   [
-    "Taking part is your choice.",
-    "Every question except your name is optional. You can stop at any time " +
-      "before sending, and nothing is kept. After sending, you can ask to " +
-      "be removed at any time, and your information will no longer be shown " +
-      "in the network.",
+    "Taking part is your choice:",
+    "every question except your name is optional. You can stop at any time " +
+      "before sending, and nothing is kept. After sending, you can ask to be " +
+      "removed at any time, and your information will no longer be shown in " +
+      "the network.",
   ],
   [
-    "To be removed or to ask a question,",
-    "contact [REMOVAL CONTACT - set at deployment; never a real name or " +
+    "To be removed or to ask a question:",
+    "contact [REMOVAL CONTACT, set at deployment; never a real name or " +
       "address in this repository].",
+  ],
+  [
+    // Divergence from the v2 draft's sixth item ("Your answers are sealed on
+    // your phone"): that item describes the remote (attendee-phone) path.
+    // This is the in-app path - the facilitator types the entry on the
+    // facilitator's own computer, so there is no phone and no network hop
+    // to describe. Replaced with a truthful in-app statement; see the file
+    // doc comment.
+    "Where this entry is kept:",
+    "this entry is typed by the facilitator on the facilitator's own " +
+      "computer and stays there until the facilitator applies it to the " +
+      "network.",
   ],
 ];
 
@@ -67,9 +96,9 @@ export const CONSENT_AFFIRMATION =
   "described above.";
 
 /**
- * The canonical consent text the payload digest covers: banner excluded
- * (it is UI chrome, not consented content), paragraphs and affirmation
- * joined in display order.
+ * The canonical consent text the payload digest covers: banner and heading
+ * excluded (they are UI chrome, not consented content), paragraphs and
+ * affirmation joined in display order.
  */
 export function consentText(): string {
   const blocks = CONSENT_PARAGRAPHS.map(([lead, body]) => `${lead} ${body}`);

@@ -152,10 +152,10 @@ describe("canSubmit (the D-030 structural consent gate)", () => {
   });
 });
 
-describe("consent boilerplate (D-072.1 draft)", () => {
+describe("consent boilerplate (D-072.1 draft, v2 wording 2026-09-14)", () => {
   it("keeps the corrected claims and the placeholder discipline", () => {
     const text = consentText();
-    expect(text).toContain("only what you typed");
+    expect(text).toContain("only what is typed here");
     expect(text).toContain("no longer be shown");
     expect(text).toContain("[REMOVAL CONTACT");
     expect(text).not.toContain("taken out of the network");
