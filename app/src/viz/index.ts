@@ -14,7 +14,7 @@ import { projectedEntities } from "./projection";
 import { createVizScene, type SceneSetup } from "./scene";
 import { createCameraRig, zoomToFit, type CameraRig } from "./camera";
 import { applyFocusToNodeLayer, computeFocusSet, FocusBlend, writeNodeHover, type FocusSet } from "./focus";
-import { beatCameraMove, beatHighlights, measureHighlights, presenterBeatText } from "./presenter";
+import { beatCameraMove, beatHighlights, beatIndexForKey, measureHighlights, presenterBeatText } from "./presenter";
 import { effectivePixelRatio, QualityManager, type QualityProfile } from "./quality";
 
 export type MountedViz = () => void;
@@ -26,6 +26,21 @@ const MIN_HEIGHT = 320;
 const BLEND_OFF = 0;
 const BLEND_ON = 1;
 const LOGICAL_SIZE = new Vector2();
+
+/**
+ * The on-screen presenter rail (CS-06): one button per beat hotkey, in the
+ * same order as the A9 cue sheet, plus Fit. `key` is the single source of
+ * truth shared with the keyboard handler via `beatIndexForKey` - a rail
+ * button and its hotkey resolve the same beat id and can never drift apart.
+ */
+const PRESENTER_RAIL_BEATS: readonly { readonly label: string; readonly key: string }[] = [
+  { label: "Committees", key: "c" },
+  { label: "Orgs", key: "o" },
+  { label: "Members", key: "m" },
+  { label: "Priorities", key: "p" },
+  { label: "One node", key: "1" },
+  { label: "Constellation", key: "End" },
+];
 
 type RenderState = {
   sceneSetup: SceneSetup;
@@ -56,6 +71,7 @@ type RenderState = {
   measureExplanations: readonly string[];
   live: HTMLDivElement;
   beatLabel: HTMLDivElement;
+  rail: HTMLDivElement;
   dirty: boolean;
   frame: number | null;
   lastTime: number | null;
@@ -66,14 +82,17 @@ export function mountViz(container: HTMLElement, store: Store, client: WasmClien
   const canvas = document.createElement("canvas");
   const live = document.createElement("div");
   const beatLabel = document.createElement("div");
+  const rail = document.createElement("div");
   live.setAttribute("aria-live", "polite");
   live.className = "cn-viz-live";
   beatLabel.className = "cn-present-beat";
   beatLabel.hidden = true;
+  rail.className = "cn-present-rail";
+  rail.hidden = true;
   canvas.setAttribute("role", "img");
   canvas.setAttribute("aria-label", CANVAS_LABEL_EMPTY);
   canvas.setAttribute("tabindex", "0");
-  container.append(canvas, live, beatLabel);
+  container.append(canvas, live, beatLabel, rail);
   const renderer = new WebGLRenderer({ canvas, antialias: true });
   renderer.outputColorSpace = SRGBColorSpace;
   renderer.toneMapping = NeutralToneMapping;
@@ -113,10 +132,12 @@ export function mountViz(container: HTMLElement, store: Store, client: WasmClien
     measureExplanations: [],
     live,
     beatLabel,
+    rail,
     dirty: true,
     frame: null,
     lastTime: null,
   };
+  buildPresentRail(rail, renderState, store);
   markViewDirty = () => {
     renderState.dirty = true;
     schedule(renderState, store);
@@ -429,6 +450,60 @@ function updatePresenterLabel(
   renderState.beatLabel.hidden = !present || text === "";
   renderState.beatLabel.textContent = text;
   renderState.live.textContent = text;
+  // The rail is part of the present-mode chrome: hidden with everything else
+  // (ui.css) outside present mode, shown for the duration of it.
+  renderState.rail.hidden = !present;
+}
+
+/**
+ * Builds the on-screen presenter rail (CS-06): one button per
+ * `PRESENTER_RAIL_BEATS` entry plus Fit, each dispatching the same action as
+ * its keyboard hotkey. Built once at mount time; the buttons read fresh
+ * state from `store` on every click, same as the keyboard handler.
+ */
+function buildPresentRail(rail: HTMLDivElement, renderState: RenderState, store: Store): void {
+  for (const item of PRESENTER_RAIL_BEATS) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = item.label;
+    button.setAttribute("aria-label", `Jump to the ${item.label} beat`);
+    button.addEventListener("click", () => jumpToBeatByKey(item.key, store));
+    rail.append(button);
+  }
+  const fitButton = document.createElement("button");
+  fitButton.type = "button";
+  fitButton.textContent = "Fit";
+  fitButton.setAttribute("aria-label", "Fit the whole constellation to frame");
+  fitButton.addEventListener("click", () => fitPresenterView(renderState, store.getState()));
+  rail.append(fitButton);
+}
+
+/** Shared by the rail buttons and the keyboard handler (CS-06): resolves a
+ * hotkey to a beat by id (never by position) and jumps to it, ignoring keys
+ * whose beat is absent from `beats.atni.json`. */
+function jumpToBeatByKey(key: string, store: Store): void {
+  const state = store.getState();
+  if (state.view.mode !== "present") {
+    return;
+  }
+  const beatIndex = beatIndexForKey(key, state.presentation.beats);
+  if (beatIndex === null) {
+    return;
+  }
+  store.dispatch({ kind: "presentBeatAdvanced", beatIndex });
+}
+
+/** Shared by the Fit rail button and the `f` hotkey. */
+function fitPresenterView(renderState: RenderState, state: AppState): void {
+  const projection = state.data.projection;
+  if (projection === null || renderState.layout === null) {
+    return;
+  }
+  zoomToFit(renderState.cameraRig, positionsForBeat(projection, renderState.layout, undefined), {
+    paddingWorldUnits: RENDER_TOKENS.camera.fitAllPaddingWorldUnits,
+    reducedMotion: state.ui.reducedMotion,
+    bottomInset: RENDER_TOKENS.camera.presentCaptionInset,
+  });
 }
 
 function positionsForBeat(
@@ -460,18 +535,17 @@ function handlePresenterKeydown(event: KeyboardEvent, renderState: RenderState, 
   } else if (event.key === "Home") {
     beatIndex = ZERO;
   } else if (event.key.toLowerCase() === "f") {
-    const projection = state.data.projection;
-    if (projection !== null && renderState.layout !== null) {
-      zoomToFit(renderState.cameraRig, positionsForBeat(projection, renderState.layout, undefined), {
-        paddingWorldUnits: RENDER_TOKENS.camera.fitAllPaddingWorldUnits,
-        reducedMotion: state.ui.reducedMotion,
-        bottomInset: RENDER_TOKENS.camera.presentCaptionInset,
-      });
-    }
+    fitPresenterView(renderState, state);
   } else if (event.key === "Escape") {
     store.dispatch({ kind: "presentExited" });
   } else {
-    return;
+    // CS-06: c/o/m/p/1/End jump to a beat by id (never by position); a key
+    // with no mapping, or whose mapped beat id is absent, is ignored.
+    const mappedIndex = beatIndexForKey(event.key, state.presentation.beats);
+    if (mappedIndex === null) {
+      return;
+    }
+    beatIndex = mappedIndex;
   }
   event.preventDefault();
   if (beatIndex !== null) {

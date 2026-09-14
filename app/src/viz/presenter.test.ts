@@ -4,6 +4,7 @@ import { computeFocusSet } from "./focus";
 import {
   beatCameraMove,
   beatHighlights,
+  beatIndexForKey,
   edgeKindBeatHighlights,
   kindBeatHighlights,
   measureHighlights,
@@ -256,5 +257,54 @@ describe("presenter camera option (D-103.3)", () => {
     };
     expect(beatCameraMove({ ...focusBeat, camera: "hold" }, outside)).toBe("fly");
     expect(beatCameraMove(undefined, { ...outside, focusedId: null, focusChanged: false, rebuilt: true })).toBe("none");
+  });
+});
+
+describe("presenter hotkey rail (CS-06: beatIndexForKey)", () => {
+  const beats: PresentBeat[] = [
+    { id: "network-overview", label: "Overview" },
+    { id: "members", label: "Members", filter: { kinds: ["person"] } },
+    { id: "committees", label: "Committees", filter: { kinds: ["committee"] } },
+    { id: "organizations", label: "Organizations", filter: { kinds: ["organization"] } },
+    { id: "shared-priorities", label: "Shared priorities", filter: { edgeKinds: ["connected_to"] } },
+    { id: "one-node", label: "One node", focusEntityId: "p2", camera: "hold" },
+    { id: "constellation", label: "Constellation" },
+  ];
+
+  it("resolves every hotkey to the index of its beat id, never by position", () => {
+    expect(beatIndexForKey("c", beats)).toBe(2);
+    expect(beats[beatIndexForKey("c", beats) ?? -1]?.id).toBe("committees");
+    expect(beatIndexForKey("o", beats)).toBe(3);
+    expect(beats[beatIndexForKey("o", beats) ?? -1]?.id).toBe("organizations");
+    expect(beatIndexForKey("m", beats)).toBe(1);
+    expect(beats[beatIndexForKey("m", beats) ?? -1]?.id).toBe("members");
+    expect(beatIndexForKey("p", beats)).toBe(4);
+    expect(beats[beatIndexForKey("p", beats) ?? -1]?.id).toBe("shared-priorities");
+    expect(beatIndexForKey("1", beats)).toBe(5);
+    expect(beats[beatIndexForKey("1", beats) ?? -1]?.id).toBe("one-node");
+    expect(beatIndexForKey("End", beats)).toBe(6);
+    expect(beats[beatIndexForKey("End", beats) ?? -1]?.id).toBe("constellation");
+  });
+
+  it("is case-insensitive for letter and named keys", () => {
+    expect(beatIndexForKey("C", beats)).toBe(2);
+    expect(beatIndexForKey("O", beats)).toBe(3);
+    expect(beatIndexForKey("M", beats)).toBe(1);
+    expect(beatIndexForKey("P", beats)).toBe(4);
+    expect(beatIndexForKey("end", beats)).toBe(6);
+    expect(beatIndexForKey("END", beats)).toBe(6);
+  });
+
+  it("returns null for a key with no mapping", () => {
+    expect(beatIndexForKey("a", beats)).toBeNull();
+    expect(beatIndexForKey("2", beats)).toBeNull();
+    expect(beatIndexForKey("Home", beats)).toBeNull();
+    expect(beatIndexForKey(" ", beats)).toBeNull();
+  });
+
+  it("returns null (never a fallback index) when the mapped beat id is absent from beats", () => {
+    const withoutPriorities = beats.filter((beat) => beat.id !== "shared-priorities");
+    expect(beatIndexForKey("p", withoutPriorities)).toBeNull();
+    expect(beatIndexForKey("c", [])).toBeNull();
   });
 });

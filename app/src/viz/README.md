@@ -38,3 +38,15 @@ Presenter beats (D-103):
 - `beats-fixture.test.ts` validates public/beats.atni.json against the
   atni-convention fixture (ids, kinds, edge kinds, measures, camera values,
   the finale shape) so a mistyped beat fails in `npm run test`.
+
+Presenter hotkeys and rail (CS-06): in present mode, `c`/`o`/`m`/`p`/`1`/`End`
+jump straight to the `committees` / `organizations` / `members` /
+`shared-priorities` / `one-node` / `constellation` beat, resolved by beat id
+at keypress time via `presenter.ts`'s `beatIndexForKey` - never by position,
+so a key is simply inert if that beat id is missing from `beats.atni.json`.
+A small ARIA-labeled button rail (`.cn-present-rail` in `ui.css`, built in
+`index.ts`) mirrors the same keys plus Fit, visible only in present mode and
+hidden with the rest of the chrome otherwise; it dispatches the identical
+`presentBeatAdvanced` action so a button and its hotkey can never resolve to
+different beats. No new animation; see `CONTROLS.md` for the full key list
+and the A9 cue sheet.

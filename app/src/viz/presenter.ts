@@ -201,6 +201,39 @@ export function beatCameraMove(beat: PresentBeat | undefined, context: CameraMov
 }
 
 /**
+ * Presenter hotkeys (CS-06) mapped to the beat id each jumps to. `1` and
+ * `End` read as digit/named keys; the rest are letters compared
+ * case-insensitively. This is the single source of truth for the mapping -
+ * the on-screen rail (viz/index.ts) reuses it by key so a button and its
+ * hotkey can never drift apart.
+ */
+const PRESENTER_KEY_BEAT_IDS: Readonly<Record<string, string>> = {
+  c: "committees",
+  o: "organizations",
+  m: "members",
+  p: "shared-priorities",
+  "1": "one-node",
+  end: "constellation",
+};
+
+/**
+ * Resolves a presenter hotkey (case-insensitive) to the index of the beat
+ * whose `id` matches, looked up in `beats` at keypress time - never by
+ * position, so reordering `beats.atni.json` cannot make a key jump to the
+ * wrong beat. Returns null for a key with no mapping, and null (not a
+ * fallback index) when the mapped id is absent from `beats`: the key is
+ * simply inert until that beat exists.
+ */
+export function beatIndexForKey(key: string, beats: readonly PresentBeat[]): number | null {
+  const targetId = PRESENTER_KEY_BEAT_IDS[key.toLowerCase()];
+  if (targetId === undefined) {
+    return null;
+  }
+  const index = beats.findIndex((beat) => beat.id === targetId);
+  return index === -1 ? null : index;
+}
+
+/**
  * The stage caption. Measure beats show a count only - "label - N
  * highlighted" - never the per-entity explanations (D-099: counts, never
  * names; D-103.5). `highlightCount` defaults to the number of explanations,
