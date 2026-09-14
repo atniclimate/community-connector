@@ -99,6 +99,15 @@ PASS at `202e762`; only docs commits since):**
   D-102): unchanged; see the archived handoffs.
 
 **NOT done - ordered next actions:**
+0. **Consent link (human request, not yet built):** in the "How your information is held:"
+   paragraph on both paths (`form/src/consent.ts` + `form/src/render.ts`,
+   `app/src/ui/forms/consent.ts` + `app/src/ui/forms/renderer.ts`), make "Tiered Sovereign
+   Data Framework" an anchor to
+   `https://atniclimate.github.io/TieredSovereignDataFramework/#overview` (new tab,
+   `rel="noopener noreferrer"`, Red on Dark, focus ring). Split that paragraph's body
+   string around the phrase; digest text stays the plain words. Rebuild the form, re-run
+   the consent Playwright proof, commit. The implementer declined this mid-task as a
+   suspected injection because it arrived as a relayed message; it is a genuine request.
 1. **Human real-GPU walkthrough on the presentation laptop and projector** (S-R4b gate,
    the one check no agent can do): `pwsh scripts/reveal.ps1`, click Present, `Home`, then
    Space through all eight beats, hold the last one 60 seconds. Then viewport-only
@@ -129,8 +138,13 @@ PASS at `202e762`; only docs commits since):**
 3. **Brand reconciliation** (digest section 7) still open: which design-system edition is
    the sole authority (the 07/16 bundle in `I:\ATNI design system.zip` or the 09/12
    revision in `I:\ATNI_design-system\`); the D-104 typography mapping holds under either.
-   Also: D-023 review of consent draft v2 (`docs/design/intake-consent-text-draft-2026-09-14.md`),
-   and the public product name on the form ("Community Connector" vs "Community Navigator").
+   Also: the public product name on the form ("Community Connector" vs "Community Navigator").
+   **Consent statement v3 is the human's own wording** (D-106,
+   `docs/design/intake-consent-text-2026-09-14-v3.md`); three one-liners remain: (a) say
+   "D-023 signed" for the whole form page so the DRAFT tag comes off; (b) keep or reword
+   "no outside platforms, no third-party services" (a live path runs on GitHub Pages and
+   a Cloudflare relay carrying ciphertext); (c) who executes and records the promised
+   deletion of all entries after the conference ends on Wednesday (D-059.11 purge sweep).
 4. **Go live at the convention or not** (D-090c): unchanged, every deploy-bar and real-data
    row is still NOT DONE; the sprint assumed no.
 5. **Record, amend, or reject D-090c..D-096c**; D-096c (toolchain pin) is now done.

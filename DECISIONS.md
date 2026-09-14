@@ -2801,3 +2801,33 @@ Flagged for the human: question 6 invites names of third parties who did not con
 reviewer may want the help text to say so); only question 6 carries "(Optional)" although
 every question but the name is optional; the dropped contact fields mean the facilitator
 has no contact route for a respondent unless one is written into an answer.
+
+## D-106 (2026-09-14) - Consent statement v3 is the human's own wording; two truthfulness flags and one operational commitment
+
+Trigger: the human supplied the full privacy and consent statement for the convention
+form on 2026-09-14, verbatim in `docs/design/intake-consent-text-2026-09-14-v3.md`, and
+asked for "Tiered Sovereign Data Framework" to link to
+`https://atniclimate.github.io/TieredSovereignDataFramework/#overview`.
+
+Choice: both intake paths carry v3 verbatim (form and in-app; the in-app path swaps the
+"Sealed on your phone." paragraph for its "Where this entry is kept:" variant, since the
+facilitator types that path on their own computer). The statement renders as prose
+paragraphs with the human's two lead-ins in bold, not as bullets. The framework link is a
+navigation anchor (new tab, `rel="noopener noreferrer"`, Red on Dark) and makes no
+request on page load, so ADR-005's no-third-party-requests rule and the CSP are
+unaffected. The consent digest in the D8 manifest changes accordingly.
+
+Human-authored community-facing text satisfies the "human review before use" rule for
+the statement itself. The DRAFT tag stays on the page until the human says D-023 is
+signed for the whole page (heading, intro sentence, labels, and button text are
+session-authored and have only been seen in screenshots).
+
+Flagged, not altered (ADR-005 truthfulness is the session's duty; the words are the
+human's):
+1. "No outside platforms, no third-party services": a live QR path is served by GitHub
+   Pages and relayed through Cloudflare Workers carrying ciphertext only. A wording that
+   holds either way is offered in the v3 file's notes.
+2. "After the conference ends on Wednesday, all information entered here is deleted from
+   the system entirely": a commitment that needs an owned, recorded purge (relay queue,
+   staging folder, applied group ops, exports; the D-059.11 sweep is the hook). Added to
+   the human's queue in HANDOFF.md.
