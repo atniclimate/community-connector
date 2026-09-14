@@ -1,14 +1,14 @@
 /**
  * Consent statement boilerplate for the REMOTE (attendee phone) intake form.
  *
- * DRAFT TEXT - not yet approved. This mirrors the in-app resolution
- * (app/src/ui/forms/consent.ts, authorized as functionality-matching
- * boilerplate by DECISIONS.md D-072.1) and is derived from
- * docs/design/intake-consent-text-draft-2026-07-24.md with that file's
- * section-7 truthfulness corrections applied:
- *  - "what we collect" is scoped to "only what you typed" (the relay operator
- *    necessarily observes traffic metadata; the content claim must not
- *    overclaim - correction 1);
+ * DRAFT TEXT - not yet approved. Draft v2 (2026-09-14): the wording follows
+ * the ATNI house voice (institutional third person, bold lead-in + colon, no
+ * em dashes, Oxford comma) and is recorded verbatim in
+ * docs/design/intake-consent-text-draft-2026-09-14.md, which supersedes the
+ * 2026-07-24 draft. It keeps every truthfulness correction that draft's
+ * section 7 recorded from the ADR-005 round:
+ *  - the collection claim is scoped to what is TYPED (the relay operator
+ *    necessarily observes traffic metadata - correction 1);
  *  - the sealed-phone paragraph says the key is USED only on the facilitator's
  *    computer, NOT that it is the only copy (the ceremony creates offline
  *    recovery copies - correction 2);
@@ -18,12 +18,13 @@
  * Correction 4 (confirmation-screen wording) lives in the confirmation screen
  * (render.ts), not here.
  *
- * This is the REMOTE path, so - unlike the in-app version - it INCLUDES the
+ * This is the REMOTE path, so - unlike the in-app version
+ * (app/src/ui/forms/consent.ts, not updated here) - it INCLUDES the
  * phone-encryption paragraph (this form runs on an attendee's phone, not the
  * facilitator's PC).
  *
  * D-023 human review remains the bar before ANY community-facing use; the UI
- * shows the DRAFT banner until that sign-off lands. Placeholders stay
+ * shows the DRAFT tag until that sign-off lands. Placeholders stay
  * [BRACKETED] and must never be filled with a real person's contact
  * information in this repository (I1).
  *
@@ -33,46 +34,52 @@
  * TextEncoder, both built into the pinned Node 24 runtime and every browser.
  */
 
-/** Rendered prominently above the statement until D-023 sign-off. */
+/** Rendered as a status tag above the form until D-023 sign-off. */
 export const CONSENT_DRAFT_BANNER =
-  "DRAFT wording - pending human review (D-023). Not for community use.";
+  "DRAFT wording, pending human review (D-023). Not for community use.";
 
-/** The consent statement paragraphs, in display order. */
+/** The consent block heading (Title Case per house style). */
+export const CONSENT_HEADING = "Before You Send This";
+
+/**
+ * The consent statement, in display order: [bold lead-in, body]. The renderer
+ * shows each as a square-bulleted item with the lead-in in bold.
+ */
 export const CONSENT_PARAGRAPHS: readonly (readonly [string, string])[] = [
   [
-    "What we collect.",
-    "We collect only what you typed on this form. Nothing else is gathered " +
-      "from you or your device.",
+    "What the form keeps:",
+    "only what is typed here. Nothing else is gathered from you or your device.",
   ],
   [
-    "A person reviews it first.",
-    "Your entry goes to the network facilitator, a person working for the " +
-      "ATNI Climate community. Nothing you share appears anywhere until the " +
-      "facilitator has read and approved it. If something looks off, the " +
-      "facilitator will set it aside rather than publish it.",
+    "A person reviews it first:",
+    "every entry goes to the network facilitator, a person working for the " +
+      "ATNI Climate program. Nothing appears in the network until the " +
+      "facilitator has read and approved it; anything that looks off is set " +
+      "aside rather than published.",
   ],
   [
-    "How it is classified.",
-    "Everything entered through this form is held at Tier 1 (T1) under the " +
-      "community's data framework: shared within the network, governed by " +
-      "the community. ATNI Climate decides how information is classified " +
-      "and used - not a company, and not a server.",
+    "How it is classified:",
+    "everything entered here is held at Tier 1 (T1) of the Tiered Sovereign " +
+      "Data Framework, shared within the network and governed by the " +
+      "community. Under the framework, ATNI Climate decides how it is " +
+      "classified and used; that decision never belongs to a company or to a " +
+      "server.",
   ],
   [
-    "Taking part is your choice.",
-    "Every question except your name is optional. You can stop at any time " +
-      "before sending, and nothing is kept. After sending, you can ask to " +
-      "be removed at any time, and your information will no longer be shown " +
-      "in the network.",
+    "Taking part is your choice:",
+    "every question except your name is optional. You can stop at any time " +
+      "before sending, and nothing is kept. After sending, you can ask to be " +
+      "removed at any time, and your information will no longer be shown in " +
+      "the network.",
   ],
   [
-    "To be removed or to ask a question,",
-    "contact [REMOVAL CONTACT - set at deployment; never a real name or " +
+    "To be removed or to ask a question:",
+    "contact [REMOVAL CONTACT, set at deployment; never a real name or " +
       "address in this repository].",
   ],
   [
-    "Your answers are sealed on your phone.",
-    "Your answers are locked (encrypted) on your own phone before they are " +
+    "Your answers are sealed on your phone:",
+    "your answers are locked (encrypted) on your own phone before they are " +
       "sent. The internet services that carry the message cannot read them; " +
       "the key that opens them is used only on the facilitator's computer.",
   ],
@@ -84,9 +91,10 @@ export const CONSENT_AFFIRMATION =
   "described above.";
 
 /**
- * The canonical consent text the payload digest covers: banner excluded (it is
- * UI chrome, not consented content), paragraphs and affirmation joined in
- * display order. Same shape as app/src/ui/forms/consent.ts `consentText`.
+ * The canonical consent text the payload digest covers: banner and heading
+ * excluded (they are UI chrome, not consented content), paragraphs and
+ * affirmation joined in display order. Same shape as
+ * app/src/ui/forms/consent.ts `consentText`.
  */
 export function consentText(): string {
   const blocks = CONSENT_PARAGRAPHS.map(([lead, body]) => `${lead} ${body}`);

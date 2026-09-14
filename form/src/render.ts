@@ -6,19 +6,25 @@
  * distinct, honest screens.
  *
  * Accessibility mirrors app/src/ui/forms/renderer.ts: every input has a
- * <label for>, required fields get aria-required, per-field error text is
- * linked via aria-describedby and toggles aria-invalid, and every widget is a
- * native keyboard-operable control. Layout holds at 375px (style.css). All
- * styling is class-based - no inline styles - so the CSP needs no
- * style 'unsafe-inline'.
+ * <label for>, required fields get aria-required, per-field help and error
+ * text are linked via aria-describedby and errors toggle aria-invalid, and
+ * every widget is a native keyboard-operable control. Layout holds at 375px
+ * (style.css). All styling is class-based - no inline styles - so the CSP
+ * needs no style 'unsafe-inline'.
+ *
+ * Community-facing strings follow the ATNI house voice (institutional third
+ * person, Title Case headings and buttons, sentence case elsewhere, no em
+ * dashes, no exclamation points) and remain DRAFT pending D-023.
  *
  * This module touches `document`; it is never imported by the node-env unit
  * tests (which cover the pure modules it composes).
  */
 import type { JsonObject } from "./json";
+import { restrictKinds } from "./config";
 import {
   CONSENT_AFFIRMATION,
   CONSENT_DRAFT_BANNER,
+  CONSENT_HEADING,
   CONSENT_PARAGRAPHS,
   consentTextDigest,
 } from "./consent";
@@ -43,6 +49,13 @@ export type FormDeps = {
   readonly fingerprint: string;
   /** Optional friendly labels keyed by attribute id; falls back to raw id. */
   readonly friendlyLabels?: Readonly<Record<string, string>>;
+  /** Optional caption help text keyed by attribute id. */
+  readonly fieldHelp?: Readonly<Record<string, string>>;
+  /**
+   * Kind ids the form offers (CN_FORM_KINDS). Empty or absent = every kind in
+   * the template. With exactly one kind the selector is not rendered at all.
+   */
+  readonly allowedKinds?: readonly string[];
   /** Relay origin to POST to. */
   readonly relayOrigin: string;
   /** InnerPayload.form_version. */
@@ -96,10 +109,20 @@ type FieldControl = {
   readonly input: HTMLElement;
 };
 
+function draftTag(): HTMLElement {
+  return el("p", {
+    className: "cn-form-draft-banner",
+    text: CONSENT_DRAFT_BANNER,
+    attrs: { role: "note" },
+  });
+}
+
 /** Mounts the intake form into `container`, replacing its contents. */
 export function mountForm(container: HTMLElement, deps: FormDeps): void {
   const model = formModel(deps.template);
+  const kinds = restrictKinds(model.kinds, deps.allowedKinds ?? []);
   const friendlyLabels = deps.friendlyLabels ?? {};
+  const fieldHelp = deps.fieldHelp ?? {};
   const newSubmissionId = deps.newSubmissionId ?? (() => globalThis.crypto.randomUUID());
   const postImpl = deps.postEnvelopeImpl ?? postEnvelope;
 
@@ -109,36 +132,42 @@ export function mountForm(container: HTMLElement, deps: FormDeps): void {
   const fieldsRegion = el("div", { className: "cn-form-fields" });
   let controls: FieldControl[] = [];
 
-  const heading = el("h1", { className: "cn-form-title", text: "Join the network map" });
-  const draftBanner = el("p", {
-    className: "cn-form-draft-banner",
-    text: CONSENT_DRAFT_BANNER,
-    attrs: { role: "note" },
+  const heading = el("h1", { className: "cn-form-title", text: "Add Yourself to the Network Map" });
+  const intro = el("p", {
+    className: "cn-form-intro",
+    text:
+      "Community Connector maps the people, committees, and organizations at work " +
+      "across the Affiliated Tribes of Northwest Indians (ATNI) so that relatives " +
+      "pursuing the same priorities can find one another.",
   });
+  const draftBanner = draftTag();
 
-  // Kind picker (R2). Hidden when the template has exactly one kind.
+  // Kind picker (R2). Not rendered at all when exactly one kind is offered
+  // (a single-kind template, or a CN_FORM_KINDS build restriction).
   const kindId = uiId("cn-form-kind");
   const kindSelect = el("select", { attrs: { id: kindId } });
-  for (const kind of model.kinds) {
+  for (const kind of kinds) {
     kindSelect.append(el("option", { text: kind.label, attrs: { value: kind.id } }));
   }
   const kindRow = el("div", { className: "cn-form-row" }, [
     el("label", { text: "What are you adding?", attrs: { for: kindId } }),
     kindSelect,
   ]);
-  const singleKind = model.kinds.length <= 1;
-  if (singleKind) {
-    kindRow.classList.add("cn-hidden");
-  }
+  const singleKind = kinds.length <= 1;
 
-  // Consent panel: DRAFT banner + statement + the structural checkbox gate.
+  // Consent card: heading + statement (square-bulleted, bold lead-in + colon)
+  // + the structural checkbox gate.
   const consentCheckbox = el("input", {
     attrs: { type: "checkbox", id: uiId("cn-form-consent") },
   });
   const consentPanel = el("fieldset", { className: "cn-form-consent" }, [
-    el("legend", { text: "Before you send this" }),
-    ...CONSENT_PARAGRAPHS.map(([lead, body]) =>
-      el("p", {}, [el("strong", { text: `${lead} ` }), body]),
+    el("legend", { text: CONSENT_HEADING }),
+    el(
+      "ul",
+      { className: "cn-form-consent-list", attrs: { role: "list" } },
+      CONSENT_PARAGRAPHS.map(([lead, body]) =>
+        el("li", {}, [el("strong", { text: `${lead} ` }), body]),
+      ),
     ),
     el("div", { className: "cn-form-affirm" }, [
       consentCheckbox,
@@ -151,7 +180,7 @@ export function mountForm(container: HTMLElement, deps: FormDeps): void {
 
   const submit = el("button", {
     className: "cn-form-submit",
-    text: "Send to the facilitator",
+    text: "Send to the Facilitator",
     attrs: { type: "submit" },
   });
   submit.disabled = true;
@@ -170,9 +199,9 @@ export function mountForm(container: HTMLElement, deps: FormDeps): void {
 
   function currentKind(): FormKind | undefined {
     if (singleKind) {
-      return model.kinds[0];
+      return kinds[0];
     }
-    return model.kinds.find((kind) => kind.id === kindSelect.value);
+    return kinds.find((kind) => kind.id === kindSelect.value);
   }
 
   function labelFor(attr: FormAttr): string {
@@ -203,11 +232,14 @@ export function mountForm(container: HTMLElement, deps: FormDeps): void {
   function widgetFor(attr: FormAttr): FieldControl {
     const inputId = uiId("cn-form-field");
     const errorId = `${inputId}-error`;
+    const helpId = `${inputId}-help`;
+    const helpText = fieldHelp[attr.id];
     const errorElement = el("p", {
       className: "cn-form-error",
       attrs: { id: errorId, role: "status" },
     });
-    const baseAttrs: Record<string, string> = { id: inputId, "aria-describedby": errorId };
+    const describedBy = helpText !== undefined ? `${helpId} ${errorId}` : errorId;
+    const baseAttrs: Record<string, string> = { id: inputId, "aria-describedby": describedBy };
     if (attr.required) {
       baseAttrs["aria-required"] = "true";
     }
@@ -217,7 +249,7 @@ export function mountForm(container: HTMLElement, deps: FormDeps): void {
     switch (attr.attrType) {
       case "enum": {
         const select = el("select", { attrs: baseAttrs });
-        select.append(el("option", { text: "(choose)", attrs: { value: "" } }));
+        select.append(el("option", { text: "Choose one", attrs: { value: "" } }));
         for (const value of attr.values) {
           select.append(el("option", { text: value, attrs: { value } }));
         }
@@ -263,11 +295,14 @@ export function mountForm(container: HTMLElement, deps: FormDeps): void {
     }
     input.addEventListener("input", refreshAdvisories);
 
-    const row = el("div", { className: "cn-form-row" }, [
+    const rowChildren: HTMLElement[] = [
       el("label", { text: labelFor(attr), attrs: { for: inputId } }),
-      input,
-      errorElement,
-    ]);
+    ];
+    if (helpText !== undefined) {
+      rowChildren.push(el("p", { className: "cn-form-help", text: helpText, attrs: { id: helpId } }));
+    }
+    rowChildren.push(input, errorElement);
+    const row = el("div", { className: "cn-form-row" }, rowChildren);
     fieldsRegion.append(row);
     return { attr, read, errorElement, input };
   }
@@ -304,19 +339,17 @@ export function mountForm(container: HTMLElement, deps: FormDeps): void {
     // POST means the relay ACCEPTED the sealed envelope for delivery - it does
     // NOT mean the facilitator has it yet. Do not overclaim.
     const panel = el("section", { className: "cn-confirmation", attrs: { role: "status" } }, [
-      el("h1", { text: "Thank you" }),
+      el("h1", { className: "cn-form-title", text: "Thank You" }),
       el("p", {
-        text: "Your sealed answers were accepted for delivery to the facilitator.",
+        text:
+          "Your sealed answers were accepted for delivery to the facilitator. " +
+          "Nothing appears in the network until the facilitator has read and approved them.",
       }),
-      el("p", {
-        className: "cn-form-draft-banner",
-        text: CONSENT_DRAFT_BANNER,
-        attrs: { role: "note" },
-      }),
+      draftTag(),
     ]);
     // Start over = a genuinely NEW submission (fresh submission_id + fresh seal).
     panel.append(
-      retryButton("Add another response", () => {
+      retryButton("Add Another Response", () => {
         mountForm(container, deps);
       }),
     );
@@ -324,7 +357,7 @@ export function mountForm(container: HTMLElement, deps: FormDeps): void {
   }
 
   async function attempt(outer: OuterEnvelope): Promise<void> {
-    setStatus(["Sending your sealed answers..."]);
+    setStatus(["Sending your sealed answers."]);
     const outcome = await postImpl(deps.relayOrigin, outer);
     switch (outcome.kind) {
       case "accepted":
@@ -335,8 +368,8 @@ export function mountForm(container: HTMLElement, deps: FormDeps): void {
         setStatus([
           el("p", {
             text:
-              "This form is out of date and needs to be reloaded before you can " +
-              "send. Please reload the page (or rescan the code) and try again.",
+              "This form is out of date and cannot send. Reload the page, or scan " +
+              "the code again, and then try once more.",
           }),
         ]);
         submit.disabled = true;
@@ -344,34 +377,34 @@ export function mountForm(container: HTMLElement, deps: FormDeps): void {
       case "rate_limited": {
         const wait =
           outcome.retryAfter !== null
-            ? ` Please wait ${outcome.retryAfter} seconds and try again.`
-            : " Please wait a moment and try again.";
+            ? ` Wait ${outcome.retryAfter} seconds and try again.`
+            : " Wait a moment and try again.";
         setStatus([
-          el("p", { text: `Too many submissions right now.${wait}` }),
-          retryButton("Try again", () => void attempt(outer)),
+          el("p", { text: `Too many submissions are arriving right now.${wait}` }),
+          retryButton("Try Again", () => void attempt(outer)),
         ]);
         return;
       }
       case "unavailable":
         setStatus([
-          el("p", { text: "The service is temporarily unavailable. Please try again shortly." }),
-          retryButton("Try again", () => void attempt(outer)),
+          el("p", { text: "The service is temporarily unavailable. Try again shortly." }),
+          retryButton("Try Again", () => void attempt(outer)),
         ]);
         return;
       case "network_error":
         setStatus([
           el("p", {
             text:
-              "Could not reach the service - your answers were not sent. Check your " +
-              "connection and try again.",
+              "The service could not be reached, so your answers were not sent. " +
+              "Check your connection and try again.",
           }),
-          retryButton("Try again", () => void attempt(outer)),
+          retryButton("Try Again", () => void attempt(outer)),
         ]);
         return;
       case "error":
         setStatus([
           el("p", { text: `Something went wrong (code ${outcome.status}). Your answers were not sent.` }),
-          retryButton("Try again", () => void attempt(outer)),
+          retryButton("Try Again", () => void attempt(outer)),
         ]);
         return;
     }
@@ -384,7 +417,7 @@ export function mountForm(container: HTMLElement, deps: FormDeps): void {
       return;
     }
     submit.disabled = true;
-    setStatus(["Sealing your answers on this device..."]);
+    setStatus(["Sealing your answers on this device."]);
     void consentTextDigest()
       .then((digest) => {
         const inner = buildInnerPayload({
@@ -403,7 +436,9 @@ export function mountForm(container: HTMLElement, deps: FormDeps): void {
       })
       .catch(() => {
         setStatus([
-          el("p", { text: "Could not prepare your answers on this device. Please reload and try again." }),
+          el("p", {
+            text: "Your answers could not be prepared on this device. Reload the page and try again.",
+          }),
         ]);
       });
   });
@@ -411,7 +446,11 @@ export function mountForm(container: HTMLElement, deps: FormDeps): void {
   kindSelect.addEventListener("change", renderFields);
   consentCheckbox.addEventListener("change", refreshAdvisories);
 
-  form.append(heading, draftBanner, kindRow, fieldsRegion, consentPanel, submit, status);
+  form.append(heading, intro, draftBanner);
+  if (!singleKind) {
+    form.append(kindRow);
+  }
+  form.append(fieldsRegion, consentPanel, submit, status);
   container.append(form, footer);
   renderFields();
 }
