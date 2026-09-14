@@ -20,7 +20,7 @@
  * tests (which cover the pure modules it composes).
  */
 import type { JsonObject } from "./json";
-import { restrictKinds } from "./config";
+import { orderAttributes, restrictKinds } from "./config";
 import {
   CONSENT_AFFIRMATION,
   CONSENT_DRAFT_BANNER,
@@ -53,6 +53,13 @@ export type FormDeps = {
   readonly friendlyLabels?: Readonly<Record<string, string>>;
   /** Optional caption help text keyed by attribute id. */
   readonly fieldHelp?: Readonly<Record<string, string>>;
+  /**
+   * Optional per-kind question order (attribute ids, in display order, also
+   * the allowlist of what is rendered and submitted). A kind with no entry
+   * renders every attribute in template order. An id the kind does not define
+   * throws before anything renders, so main.ts shows its fatal panel.
+   */
+  readonly questionOrder?: Readonly<Record<string, readonly string[]>>;
   /**
    * Kind ids the form offers (CN_FORM_KINDS). Empty or absent = every kind in
    * the template. With exactly one kind the selector is not rendered at all.
@@ -124,7 +131,15 @@ function draftTag(): HTMLElement {
 /** Mounts the intake form into `container`, replacing its contents. */
 export function mountForm(container: HTMLElement, deps: FormDeps): void {
   const model = formModel(deps.template);
-  const kinds = restrictKinds(model.kinds, deps.allowedKinds ?? []);
+  const questionOrder = deps.questionOrder ?? {};
+  // The question order is applied per kind; a kind without an entry keeps every
+  // attribute in template order. Resolved up front, before any DOM exists, so a
+  // list naming an attribute the template lacks fails loudly here (the caller's
+  // fatal panel) rather than as a silently shorter form on a later kind switch.
+  const kinds = restrictKinds(model.kinds, deps.allowedKinds ?? []).map((kind) => ({
+    ...kind,
+    attributes: orderAttributes(kind.attributes, questionOrder[kind.id]),
+  }));
   const friendlyLabels = deps.friendlyLabels ?? {};
   const fieldHelp = deps.fieldHelp ?? {};
   const newSubmissionId = deps.newSubmissionId ?? (() => globalThis.crypto.randomUUID());

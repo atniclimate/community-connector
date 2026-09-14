@@ -84,39 +84,131 @@ export function restrictKinds<K extends { readonly id: string }>(
 /** Kind ids the built form offers; empty = every kind in the template. */
 export const ALLOWED_KINDS: readonly string[] = parseKindList(__CN_FORM_KINDS__);
 
+// --- Per-template question order ---------------------------------------------
+
+/**
+ * The questions a template's form asks, per kind, as attribute ids in display
+ * order. The list is also an ALLOWLIST: an attribute the template defines but
+ * the list omits is neither rendered nor submitted (every omitted attribute is
+ * optional in the template, so the core's validation still passes). A kind or
+ * template with no entry keeps today's behavior: every attribute, in template
+ * order. An id the template does not define is a configuration error and
+ * `orderAttributes` throws, so it surfaces as the fatal panel on first render
+ * (and fails config.test.ts against the template on disk), never as a
+ * silently shorter form.
+ *
+ * atni-convention: the nine convention questions the human wrote on
+ * 2026-09-14 (docs/design/intake-questions-2026-09-14.md), in their order.
+ * tribe, role, events_of_interest, contact_email, and contact_preference stay
+ * in the template for the fixture and the in-app facilitator form but are
+ * not asked here.
+ */
+export const QUESTION_ORDER_BY_TEMPLATE: Readonly<
+  Record<string, Readonly<Record<string, readonly string[]>>>
+> = {
+  "atni-convention": {
+    person: [
+      "display_name",
+      "roles",
+      "origins",
+      "areas_of_interest",
+      "specialties",
+      "connections",
+      "seeking",
+      "offering",
+      "committee_memberships",
+    ],
+  },
+};
+
+/**
+ * Applies a question order to a kind's attributes: the listed attributes, in
+ * the listed order, and nothing else. An undefined `order` returns
+ * `attributes` unchanged. A listed id the kind does not define throws.
+ */
+export function orderAttributes<A extends { readonly id: string }>(
+  attributes: readonly A[],
+  order: readonly string[] | undefined,
+): readonly A[] {
+  if (order === undefined) {
+    return attributes;
+  }
+  const byId = new Map(attributes.map((attr) => [attr.id, attr] as const));
+  return order.map((id) => {
+    const attr = byId.get(id);
+    if (attr === undefined) {
+      throw new Error(`question order names unknown attribute "${id}"`);
+    }
+    return attr;
+  });
+}
+
 // --- Per-template labels and help text ---------------------------------------
 
 /**
- * Friendlier labels for attribute ids, keyed by template id and consulted by
- * the renderer before falling back to the raw id (the group-template schema
- * carries no human-readable label per attribute). Keyed per template so a
- * build against another template is unaffected; templates with no entry fall
- * back to raw ids. Community-facing wording: pending D-023 review, so the UI
- * keeps the DRAFT tag.
+ * Labels for attribute ids, keyed by template id and consulted by the renderer
+ * before falling back to the raw id (the group-template schema carries no
+ * human-readable label per attribute). Keyed per template so a build against
+ * another template is unaffected; templates with no entry fall back to raw
+ * ids. Community-facing wording: pending D-023 review, so the UI keeps the
+ * DRAFT tag.
+ *
+ * atni-convention: the human's question wording, verbatim, including the
+ * capitalization and the "(Optional)" marker on the connections question.
+ * The renderer appends " (required)" to the required name question.
  */
 export const FRIENDLY_LABELS_BY_TEMPLATE: Readonly<
   Record<string, Readonly<Record<string, string>>>
 > = {
   "atni-convention": {
-    display_name: "Name",
-    tribe: "Tribal Nation or organization",
-    role: "Role",
-    areas_of_interest: "Priority areas",
-    specialties: "Specialties",
-    events_of_interest: "Events you plan to attend",
-    contact_email: "Email",
-    contact_preference: "How you prefer to be reached",
+    display_name: "What is your Name?",
+    roles: "What do you Do?",
+    origins: "Where are you from?",
+    areas_of_interest: "What is important to you?",
+    specialties: "What are you good at?",
+    connections: "Who are you connected with? (Optional)",
+    seeking: "What are you hoping to find?",
+    offering: "What are you here to share?",
+    committee_memberships: "What committees will you attend?",
   },
 };
 
-/** Caption-style help text shown under a field, keyed like the labels. */
+/**
+ * Caption-style help text shown under a field, keyed like the labels. The
+ * atni-convention entries are the human's help wording, verbatim, trailing
+ * ellipses included.
+ */
 export const FIELD_HELP_BY_TEMPLATE: Readonly<
   Record<string, Readonly<Record<string, string>>>
 > = {
   "atni-convention": {
-    areas_of_interest: "One or two areas, one per line.",
+    display_name: "How do you prefer to be addressed?",
+    roles:
+      "Share as many roles, positions, or areas of responsibility as feel right; " +
+      "a single title rarely tells the whole story...",
+    origins: "The Tribe(s), Places, Communities, and Organizations that bring you here...",
+    areas_of_interest:
+      "The issues, committees, and areas you devote your time, energy, and thinking to... " +
+      "(e.g. climate, healthcare, human rights, etc.)",
+    specialties:
+      "The things people come to you for, whether or not they show up in a job description...",
+    connections:
+      "The people, communities, and organizations you carry with you; " +
+      "the ones that stay on your mind when you think about this work...",
+    seeking:
+      "The connection you came here looking for; a collaborator, a conversation, " +
+      "someone doing similar work, or something you haven't found yet...",
+    offering:
+      "Your presence matters. The Knowledge, experience, opportunities, or gifts " +
+      "you bring into this room...",
+    committee_memberships:
+      "ATNI committees, working groups, or sessions you plan to participate in...",
   },
 };
+
+/** The per-kind question order for the baked-in template (empty when it has none). */
+export const QUESTION_ORDER: Readonly<Record<string, readonly string[]>> =
+  QUESTION_ORDER_BY_TEMPLATE[TEMPLATE_ID] ?? {};
 
 /** The label map for the baked-in template (empty when it has none). */
 export const FRIENDLY_LABELS: Readonly<Record<string, string>> =

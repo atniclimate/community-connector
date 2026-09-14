@@ -29,6 +29,7 @@ import {
   FRIENDLY_LABELS,
   KEY_FINGERPRINT,
   PUBLIC_KEY_HEX,
+  QUESTION_ORDER,
   RELAY_ORIGIN,
   TEMPLATE,
 } from "./config";
@@ -72,6 +73,7 @@ async function main(): Promise<void> {
       fingerprint: KEY_FINGERPRINT,
       friendlyLabels: FRIENDLY_LABELS,
       fieldHelp: FIELD_HELP,
+      questionOrder: QUESTION_ORDER,
       allowedKinds: ALLOWED_KINDS,
       relayOrigin: RELAY_ORIGIN,
       formVersion: FORM_VERSION,
