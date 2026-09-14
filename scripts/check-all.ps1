@@ -14,7 +14,9 @@ Members (in order):
   app-typecheck   app/   npm run typecheck
   app-build       app/   npm run build
   app-test        app/   npm run test
-  app-templates   app/   npm run validate:templates
+  app-templates   app/   npm run validate:templates  (chains npm run check:fixture: the
+                                                     atni-convention shared-priority edge
+                                                     invariant, D-103 pick 2)
   app-smoke       app/   npm run smoke:node
   app-snapshot    app/   npm run build:snapshot   (includes the 5MB size gate, I8)
   pii-scan        root   pwsh scripts/pii-scan.ps1  (always runs, every mode)

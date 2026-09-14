@@ -19,7 +19,14 @@ type FixtureIndex = {
   readonly entityIds: ReadonlySet<string>;
   readonly entityKinds: ReadonlySet<string>;
   readonly edgeKinds: ReadonlySet<string>;
+  /** EntityCreate count per entity kind. */
+  readonly countByKind: ReadonlyMap<string, number>;
+  /** Distinct entities incident to at least one connected_to edge. */
+  readonly connectedPeople: number;
 };
+
+const TIE_EDGE_KIND = "connected_to";
+const PERSON_KIND = "person";
 
 function isObject(value: JsonValue | undefined): value is JsonObject {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -37,6 +44,8 @@ function loadFixture(): FixtureIndex {
   const entityIds = new Set<string>();
   const entityKinds = new Set<string>();
   const edgeKinds = new Set<string>();
+  const countByKind = new Map<string, number>();
+  const tied = new Set<string>();
   const lines = readFileSync(opsPath, "utf8").split("\n").filter((line) => line.trim() !== "");
   for (const line of lines) {
     const op: unknown = JSON.parse(line);
@@ -51,15 +60,25 @@ function loadFixture(): FixtureIndex {
       }
       if (typeof entity["kind"] === "string") {
         entityKinds.add(entity["kind"]);
+        countByKind.set(entity["kind"], (countByKind.get(entity["kind"]) ?? 0) + 1);
       }
     } else if (kind["op"] === "EdgeCreate" && isObject(kind["edge"])) {
       const edge = kind["edge"];
       if (typeof edge["kind"] === "string") {
         edgeKinds.add(edge["kind"]);
       }
+      if (edge["kind"] === TIE_EDGE_KIND && typeof edge["from"] === "string" && typeof edge["to"] === "string") {
+        tied.add(edge["from"]);
+        tied.add(edge["to"]);
+      }
     }
   }
-  return { entityIds, entityKinds, edgeKinds };
+  return { entityIds, entityKinds, edgeKinds, countByKind, connectedPeople: tied.size };
+}
+
+/** Every integer that appears in a caption, in order of appearance. */
+function captionNumbers(label: string): readonly number[] {
+  return [...label.matchAll(/\d+/g)].map((match) => Number.parseInt(match[0], 10));
 }
 
 const beats = loadBeats();
@@ -127,6 +146,47 @@ describe("beats.atni.json against the atni-convention fixture", () => {
           .toBeGreaterThan(0);
       }
     }
+  });
+
+  it("gates labels on every beat to kinds in the fixture, never person (D-099: no person name on stage)", () => {
+    // The sheet is presented on a stage; every beat must carry the gate, so a
+    // beat added without one fails here instead of naming someone on screen.
+    for (const beat of beats) {
+      expect(beat.labelKinds, `${beat.id}: labelKinds missing`).toBeDefined();
+      expect(beat.labelKinds, `${beat.id}: labelKinds must name at least one kind`).not.toHaveLength(0);
+      for (const kind of beat.labelKinds ?? []) {
+        expect(fixture.entityKinds.has(kind), `${beat.id}: label kind ${kind}`).toBe(true);
+        expect(kind, `${beat.id}: person labels are never rendered on stage`).not.toBe(PERSON_KIND);
+      }
+    }
+  });
+
+  it("states only counts the fixture makes true (48 tied people; 60 / 15 / 12 per kind)", () => {
+    const perKind = (kind: string): number => fixture.countByKind.get(kind) ?? 0;
+    // Every number any caption states must be one of these fixture-derived
+    // truths, so a regenerated fixture cannot drift from a caption unnoticed.
+    const truths = new Set([fixture.connectedPeople, ...fixture.countByKind.values()]);
+    for (const beat of beats) {
+      for (const number of captionNumbers(beat.label)) {
+        expect(truths.has(number), `${beat.id}: caption states ${number}, fixture supports ${[...truths].join(", ")}`)
+          .toBe(true);
+      }
+    }
+    const priorities = beats.find((beat) => beat.id === "shared-priorities");
+    if (priorities !== undefined) {
+      expect(captionNumbers(priorities.label)).toEqual([fixture.connectedPeople]);
+      expect(priorities.filter?.edgeKinds).toEqual([TIE_EDGE_KIND]);
+    }
+    const finale = beats.find((beat) => beat.id === "constellation");
+    if (finale !== undefined) {
+      expect(captionNumbers(finale.label)).toEqual([perKind(PERSON_KIND), perKind("committee"), perKind("organization")]);
+    }
+    // The values the 2026-09-15 sheet was authored against; a regenerated
+    // fixture that changes them must re-author the captions deliberately.
+    expect(fixture.connectedPeople).toBe(48);
+    expect(perKind(PERSON_KIND)).toBe(60);
+    expect(perKind("committee")).toBe(15);
+    expect(perKind("organization")).toBe(12);
   });
 
   it("carries an all-lit beat, and once the constellation finale exists it is last (D-103.4)", () => {
