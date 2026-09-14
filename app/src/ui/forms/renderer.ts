@@ -17,6 +17,7 @@ import { el, uiId } from "../dom";
 import {
   CONSENT_AFFIRMATION,
   CONSENT_DRAFT_BANNER,
+  CONSENT_HEADING,
   CONSENT_PARAGRAPHS,
   FORM_VERSION,
   consentTextDigest,
@@ -67,7 +68,7 @@ export function mountEntryForm(container: HTMLElement, deps: EntryFormDeps): () 
     attrs: { type: "checkbox", id: uiId("cn-form-consent") },
   });
   const consentPanel = el("fieldset", { className: "cn-entry-form-consent" }, [
-    el("legend", { text: "Before you send this" }),
+    el("legend", { text: CONSENT_HEADING }),
     el("p", { className: "cn-entry-form-draft-banner", text: CONSENT_DRAFT_BANNER }),
     ...CONSENT_PARAGRAPHS.map(([lead, body]) =>
       el("p", {}, [el("strong", { text: `${lead} ` }), body]),
