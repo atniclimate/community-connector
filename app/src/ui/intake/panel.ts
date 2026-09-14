@@ -25,6 +25,7 @@ import {
 import type { Store } from "../../state/store";
 import type {
   IntakeRecordSummaryDto,
+  IntakeState,
   JsonObject,
   ViewerContextDto,
 } from "../../state/state";
@@ -32,6 +33,37 @@ import type { WasmClient } from "../../wasm/client";
 import { el } from "../dom";
 import { mountEntryForm } from "../forms/renderer";
 import { dashboard, dedupKeys, nearDupRequest, reviewable } from "./model";
+
+export type DashboardErrorLine = {
+  readonly className: string;
+  readonly text: string;
+};
+
+/**
+ * Pure derivation of the notice/scan-issue/lastError lines the dashboard
+ * must surface, independent of whether a queue directory is granted.
+ *
+ * Defect (found in rehearsal): renderDashboard() used to return before
+ * this logic ran whenever intake.dirName === null, so intakeFailed
+ * errors dispatched pre-grant (stageFromForm's IntakeNoDirectory, and
+ * the "Use previously granted folder" button's IntakeNoSavedFolder /
+ * IntakeRestoreFailed) never reached the DOM - the facilitator got zero
+ * feedback. Kept DOM-free and exported so the fix is unit-testable
+ * without a browser DOM.
+ */
+export function dashboardErrorLines(intake: IntakeState): readonly DashboardErrorLine[] {
+  const lines: DashboardErrorLine[] = [];
+  for (const notice of intake.notices) {
+    lines.push({ className: "cn-intake-error", text: `Notice: ${notice}` });
+  }
+  for (const issue of intake.scanIssues) {
+    lines.push({ className: "cn-intake-error", text: `Scan issue: ${issue}` });
+  }
+  if (intake.lastError !== null) {
+    lines.push({ className: "cn-intake-error", text: `Error: ${intake.lastError.message}` });
+  }
+  return lines;
+}
 
 export type IntakeWizardDeps = {
   readonly store: Store;
@@ -138,10 +170,24 @@ export function mountIntakeWizard(container: HTMLElement, deps: IntakeWizardDeps
     dirRegion.append(el("span", { text: `Queue folder: ${dirName} ` }), rescan);
   }
 
+  /** Renders the notices/scan-issues/lastError lines shared by both the
+   * pre-grant empty state and the post-grant summary, from the pure
+   * derivation below. Defect fix: these must render even with
+   * intake.dirName === null - stageFromForm() and the "Use previously
+   * granted folder" button both dispatch intakeFailed before any
+   * directory is granted, and the facilitator must see that error either
+   * way (I12 visibility). */
+  function renderDashboardErrors(intake: IntakeState): void {
+    for (const line of dashboardErrorLines(intake)) {
+      dashRegion.append(el("p", { className: line.className, text: line.text }));
+    }
+  }
+
   function renderDashboard(): void {
     const intake = deps.store.getState().intake;
     dashRegion.replaceChildren();
     if (intake.dirName === null) {
+      renderDashboardErrors(intake);
       return;
     }
     const summary = dashboard(intake.records, intake.pendingDecisionFiles, now());
@@ -166,19 +212,7 @@ export function mountIntakeWizard(container: HTMLElement, deps: IntakeWizardDeps
         }),
       );
     }
-    for (const notice of intake.notices) {
-      dashRegion.append(el("p", { className: "cn-intake-error", text: `Notice: ${notice}` }));
-    }
-    for (const issue of intake.scanIssues) {
-      dashRegion.append(
-        el("p", { className: "cn-intake-error", text: `Scan issue: ${issue}` }),
-      );
-    }
-    if (intake.lastError !== null) {
-      dashRegion.append(
-        el("p", { className: "cn-intake-error", text: `Error: ${intake.lastError.message}` }),
-      );
-    }
+    renderDashboardErrors(intake);
   }
 
   function stageFromForm(payload: JsonObject): void {

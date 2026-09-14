@@ -15,5 +15,8 @@ ARIA-labeled, `prefers-reduced-motion` respected, layouts hold at 375px.
   3D scene renders (D-035 accessibility down-payment).
 - `format.ts` - pure formatting helpers for the detail panel.
 - `dom.ts` - element construction helpers.
+- `intake/panel.ts` - P3.5 facilitator intake wizard; dashboard notice/error
+  lines are derived by the exported, DOM-free `dashboardErrorLines()` so they
+  render whether or not a queue directory is granted yet.
 - `ui.css` - component styles on the derived theme's `--cn-*` custom
   properties.
