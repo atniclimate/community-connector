@@ -2570,3 +2570,48 @@ GPU, the night before the show. Mitigation: defaults preserve today's behavior, 
 change ships with tests, the full loop and a browser walk run before the freeze, and the
 human's real-GPU walkthrough remains the gate; any beat can be cut by deleting one array
 entry.
+
+### D-103 addendum 1 (2026-09-14, ~02:00) - Codex review dispositions and the stage name gate
+
+Codex review (profile `review`, gpt-5.6-sol) of `6165d03..d3d2283` is at
+`C:\dev\_reviews\community-connector\2026-09-14_convention-sprint-review.md`. One
+blocking finding, seven advisories. Dispositions:
+
+- **BLOCKING - person names rendered on stage via the label layer and hover** (beats
+  that focus or emphasize people rendered synthetic `display_name` labels; hover showed
+  full names). Accepted and FIXED in `0c2b756`: optional `labelKinds` on `PresentBeat`
+  filters the lit set's labels to the named kinds in present mode; every authored beat
+  now carries `labelKinds` without `person` and the beat-fixture test forbids `person`
+  there; the hover tooltip is suppressed in present mode. Browser proof: zero person
+  labels on every beat (48/48 assertions). Also folded in: the operator rail is hidden
+  by default in present mode and `r` toggles it, so the projector shows results, not UI.
+- **Advisory 1 - ATNI ground and text tokens apply to every mode, not only present
+  mode.** Accepted as intended: the design system is the app-wide visual authority
+  (D-101, digest); a mode-scoped ground would put two grounds in one product. Recorded,
+  no change.
+- **Advisory 2 - beats file has no `schema_version` and no runtime validation (I7).**
+  Deferred: `beats.atni.json` is app-internal presenter data, not an exchange format;
+  the beat-fixture test validates it at build time against the fixture and the type.
+  A versioned envelope is post-convention work (one small unit).
+- **Advisory 3 - edge-derivation verifier outside the battery.** Accepted and FIXED in
+  `5ce91d8`: `npm run check:fixture` is chained from `validate:templates`, which the
+  `app-templates` check-all member runs; member count stays 12.
+- **Advisory 4 - hardcoded caption counts.** Accepted and FIXED in `5ce91d8`: every
+  number in a beat label is asserted against the fixture (people with a priority tie,
+  entities per kind).
+- **Advisory 5 - zero-result measure caption.** Accepted and FIXED in `0c2b756`:
+  "label - 0 highlighted" on an empty measure, bare label only while pending; tested.
+- **Advisory 6 - hotkey tests stop at the mapping.** Partly accepted: the B2 browser
+  proof drives the real keydown, rail clicks, and rail visibility against the running
+  app; a unit test that drives `handlePresenterKeydown` through the store is
+  post-convention.
+- **Advisory 7 - `app/src/viz/index.ts` over the I5 size threshold (~680 lines).**
+  Deferred with an exception recorded here: splitting the renderer coordinator the night
+  before the show reopens the path the human has not yet seen on a real GPU. Split
+  after the convention (presenter coordination into its own module).
+
+Also this addendum: the live intake rehearsal (CS-10) proved the ATNI template form,
+the wizard mount, and `cn intake selftest --dry`; the queue-folder grant is a native
+picker the human performs. It found a real defect: staging before a folder grant
+fails silently because the dashboard returns before rendering `lastError`. Fixed in
+the `fix(intake)` commit that follows.
