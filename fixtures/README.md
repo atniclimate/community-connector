@@ -9,3 +9,9 @@ tags), not from an arbitrary index formula; `app/scripts/check-atni-edges.mjs` v
 that invariant, prints edge counts per kind, and reports the designated spotlight
 person's neighbor count. Regenerate with `node app/scripts/generate-atni-ops.mjs`, then
 check with `node app/scripts/check-atni-edges.mjs`.
+
+`templates/atni-convention.template.json` 0.1.2 (2026-09-14) adds tags attributes to the
+person kind for the convention intake questions (roles, origins, connections, seeking,
+offering, committee_memberships, organization_affiliations); nothing was removed. The ops
+fixture still embeds the 0.1.1 template and folds unchanged, since every added attribute
+is optional; the generator was not rerun.

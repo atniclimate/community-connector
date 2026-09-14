@@ -1,5 +1,5 @@
 {
-  "schema_version": "0.1.1",
+  "schema_version": "0.1.2",
   "template_id": "atni-convention",
   "name": "ATNI Climate Convention Network",
   "description": "Template for the ATNI Climate convention pilot network (D-094c): people, the 15 standing ATNI Climate committees, and partner organizations, connected by committee membership, organizational affiliation, and declared person-to-person ties. FULLY SYNTHETIC fixture for the 2026-09-14 reveal - every person, organization, and tribe/affiliation name is fictional and every example contact value uses the @example.test namespace. The 15 committee names are the real, public ATNI Climate committee list; no committee-member data is real. Consent is enforced structurally at intake (D-030), not stored as a template attribute.",
@@ -19,7 +19,14 @@
         { "id": "role", "type": "text", "default_visibility": "group" },
         { "id": "areas_of_interest", "type": "tags", "default_visibility": "group" },
         { "id": "specialties", "type": "tags", "default_visibility": "group" },
+        { "id": "roles", "type": "tags", "default_visibility": "group" },
+        { "id": "origins", "type": "tags", "default_visibility": "group" },
+        { "id": "connections", "type": "tags", "default_visibility": "group" },
+        { "id": "seeking", "type": "tags", "default_visibility": "group" },
+        { "id": "offering", "type": "tags", "default_visibility": "group" },
         { "id": "events_of_interest", "type": "tags", "default_visibility": "group" },
+        { "id": "committee_memberships", "type": "tags", "default_visibility": "group" },
+        { "id": "organization_affiliations", "type": "tags", "default_visibility": "group" },
         { "id": "contact_email", "type": "link", "format": "email", "default_visibility": "trusted" },
         { "id": "contact_preference", "type": "enum", "values": ["email", "phone", "no-contact"], "default_visibility": "group" }
       ]
