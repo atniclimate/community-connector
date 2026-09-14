@@ -236,18 +236,74 @@ export function beatIndexForKey(key: string, beats: readonly PresentBeat[]): num
 /**
  * The stage caption. Measure beats show a count only - "label - N
  * highlighted" - never the per-entity explanations (D-099: counts, never
- * names; D-103.5). `highlightCount` defaults to the number of explanations,
- * which is one per highlighted entity.
+ * names; D-103.5). `explanations` is null while the measure call is still
+ * pending (the bare label shows, never a false zero); once it has returned,
+ * the count renders even when it is 0. `highlightCount` defaults to the
+ * number of explanations, which is one per highlighted entity.
  */
 export function presenterBeatText(
   beat: PresentBeat | undefined,
-  explanations: readonly string[],
-  highlightCount: number = explanations.length,
+  explanations: readonly string[] | null,
+  highlightCount: number = explanations?.length ?? 0,
 ): string {
   if (beat === undefined) {
     return "";
   }
-  return explanations.length === 0
-    ? beat.label
-    : `${beat.label} - ${highlightCount} highlighted`;
+  if (beat.measure === undefined || explanations === null) {
+    return beat.label;
+  }
+  return `${beat.label} - ${highlightCount} highlighted`;
+}
+
+/**
+ * The stage name gate (D-099: no person name ever appears on stage). Takes
+ * the label emphasis set the focus pipeline produced - the focused entity
+ * plus its neighbors and the beat's highlights, or null when nothing is lit
+ * and the normal zoom policy labels the nearest nodes - and restricts it to
+ * the beat's `labelKinds`. Outside present mode, or for a beat without
+ * `labelKinds`, the emphasis passes through unchanged (today's behavior).
+ * With `labelKinds`, the result is the emphasis set (every entity when there
+ * is none) filtered to those kinds, so a person is never labeled on such a
+ * beat whether lit, focused, or context; an empty `labelKinds` labels
+ * nothing. The label layer's existing `setEmphasis` renders the result, so
+ * this adds no render pass (ADR-004).
+ */
+export function stageLabelIds(
+  entities: readonly { readonly id: string; readonly kind?: string | null }[],
+  emphasis: ReadonlySet<string> | null,
+  beat: PresentBeat | undefined,
+  present: boolean,
+): ReadonlySet<string> | null {
+  const labelKinds = present ? beat?.labelKinds : undefined;
+  if (labelKinds === undefined) {
+    return emphasis;
+  }
+  return new Set(
+    entities
+      .filter((entity) => (emphasis === null || emphasis.has(entity.id)) && labelKinds.includes(entity.kind ?? ""))
+      .map((entity) => entity.id),
+  );
+}
+
+/** The presenter key that shows or hides the operator's button rail. */
+export const RAIL_TOGGLE_KEY = "r";
+
+/**
+ * The rail toggle, pure so it is testable without a DOM: `r` (either case)
+ * flips `shown`; any other key leaves it alone. The rail starts hidden on
+ * every entry to present mode (viz/index.ts resets `shown` on exit), so the
+ * stage never shows the operator's buttons unless the operator asks.
+ */
+export function nextRailShown(shown: boolean, key: string): boolean {
+  return key.toLowerCase() === RAIL_TOGGLE_KEY ? !shown : shown;
+}
+
+/**
+ * Whether the rail element carries the `hidden` attribute: hidden outside
+ * present mode regardless of `shown`, and hidden in present mode until the
+ * operator toggles it. `hidden` removes it from layout and the tab order, so
+ * its buttons are never focusable while hidden.
+ */
+export function railHidden(present: boolean, shown: boolean): boolean {
+  return !present || !shown;
 }

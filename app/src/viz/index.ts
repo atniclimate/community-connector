@@ -14,7 +14,17 @@ import { projectedEntities } from "./projection";
 import { createVizScene, type SceneSetup } from "./scene";
 import { createCameraRig, zoomToFit, type CameraRig } from "./camera";
 import { applyFocusToNodeLayer, computeFocusSet, FocusBlend, writeNodeHover, type FocusSet } from "./focus";
-import { beatCameraMove, beatHighlights, beatIndexForKey, measureHighlights, presenterBeatText } from "./presenter";
+import {
+  beatCameraMove,
+  beatHighlights,
+  beatIndexForKey,
+  measureHighlights,
+  nextRailShown,
+  presenterBeatText,
+  railHidden,
+  RAIL_TOGGLE_KEY,
+  stageLabelIds,
+} from "./presenter";
 import { effectivePixelRatio, QualityManager, type QualityProfile } from "./quality";
 
 export type MountedViz = () => void;
@@ -68,10 +78,16 @@ type RenderState = {
   presentMeasureKey: string | null;
   highlightedIds: ReadonlySet<string>;
   highlightedEdgeIds: ReadonlySet<string>;
-  measureExplanations: readonly string[];
+  /** Null while no measure has returned for the active beat (pending or no
+   * measure): the caption shows the bare label, never a false zero. */
+  measureExplanations: readonly string[] | null;
   live: HTMLDivElement;
   beatLabel: HTMLDivElement;
   rail: HTMLDivElement;
+  /** Operator's rail toggle (`r`); reset on leaving present mode so every
+   * entry starts with the rail hidden (D-099: nothing but the graph and the
+   * caption on stage). */
+  railShown: boolean;
   dirty: boolean;
   frame: number | null;
   lastTime: number | null;
@@ -129,10 +145,11 @@ export function mountViz(container: HTMLElement, store: Store, client: WasmClien
     presentMeasureKey: null,
     highlightedIds: new Set<string>(),
     highlightedEdgeIds: new Set<string>(),
-    measureExplanations: [],
+    measureExplanations: null,
     live,
     beatLabel,
     rail,
+    railShown: false,
     dirty: true,
     frame: null,
     lastTime: null,
@@ -158,6 +175,16 @@ export function mountViz(container: HTMLElement, store: Store, client: WasmClien
   resizeObserver.observe(container);
   document.addEventListener("visibilitychange", onVisibility);
   window.addEventListener("keydown", onKeydown);
+  if (import.meta.env.DEV) {
+    // Dev-only proof hook for the stage name gate (D-099), beside main.ts's
+    // __cn_state_snapshot: the label texts the layer is rendering right now.
+    Object.defineProperty(window, "__cn_visible_labels", {
+      value: () => renderState.labels?.visibleTexts() ?? [],
+      configurable: false,
+      enumerable: false,
+      writable: false,
+    });
+  }
   handleState(renderState, container, store, client);
   return () => {
     resizeObserver.disconnect();
@@ -347,9 +374,16 @@ function applyFocusRendering(
   writeHover(renderState, state, renderState.hover.hoveredEntityId, true);
   writeFocusTargetColors(renderState.edges, state.theme.resolved, focus?.adjacentEdgeIds ?? null);
   renderState.halos?.setSelected(focusedId);
-  renderState.labels?.setEmphasis(
-    focus === null ? null : new Set([...(focus.focusedId === null ? [] : [focus.focusedId]), ...focus.neighborIds]),
-  );
+  // Label emphasis follows the lit set, then passes the stage name gate: in
+  // present mode a beat's labelKinds drops every other kind (people
+  // included) before the label layer sees the set. Same setEmphasis path,
+  // no extra render pass (ADR-004).
+  const present = state.view.mode === "present";
+  const beat = present ? state.presentation.beats[state.presentation.beatIndex] : undefined;
+  const emphasis = focus === null
+    ? null
+    : new Set([...(focus.focusedId === null ? [] : [focus.focusedId]), ...focus.neighborIds]);
+  renderState.labels?.setEmphasis(stageLabelIds(projection.entities ?? [], emphasis, beat, present));
   renderState.focusBlend.setTarget(focus === null ? BLEND_OFF : BLEND_ON);
   return focus;
 }
@@ -395,7 +429,7 @@ function syncPresenterMeasure(
   renderState.presentMeasureKey = key;
   renderState.highlightedIds = new Set<string>();
   renderState.highlightedEdgeIds = new Set<string>();
-  renderState.measureExplanations = [];
+  renderState.measureExplanations = null;
   if (key !== null && beat?.measure !== undefined && state.session.groupId !== null) {
     void loadPresenterMeasure(renderState, store, client, state, beat, key);
   }
@@ -450,9 +484,14 @@ function updatePresenterLabel(
   renderState.beatLabel.hidden = !present || text === "";
   renderState.beatLabel.textContent = text;
   renderState.live.textContent = text;
-  // The rail is part of the present-mode chrome: hidden with everything else
-  // (ui.css) outside present mode, shown for the duration of it.
-  renderState.rail.hidden = !present;
+  // The rail is operator chrome, not stage chrome: hidden outside present
+  // mode with everything else (ui.css), and hidden by default inside it until
+  // the operator presses `r`. Leaving present mode resets the toggle so the
+  // next entry starts hidden again.
+  if (!present) {
+    renderState.railShown = false;
+  }
+  renderState.rail.hidden = railHidden(present, renderState.railShown);
 }
 
 /**
@@ -536,6 +575,10 @@ function handlePresenterKeydown(event: KeyboardEvent, renderState: RenderState, 
     beatIndex = ZERO;
   } else if (event.key.toLowerCase() === "f") {
     fitPresenterView(renderState, state);
+  } else if (event.key.toLowerCase() === RAIL_TOGGLE_KEY) {
+    // Operator's rail: DOM-only, so no render is scheduled for it.
+    renderState.railShown = nextRailShown(renderState.railShown, event.key);
+    renderState.rail.hidden = railHidden(true, renderState.railShown);
   } else if (event.key === "Escape") {
     store.dispatch({ kind: "presentExited" });
   } else {

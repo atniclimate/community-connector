@@ -456,9 +456,11 @@
   overflow-wrap: anywhere;
 }
 
-/* CS-06 presenter rail: on-screen beat-jump buttons, shown only in present
-   mode (index.ts toggles [hidden]). Top-left so it never overlaps
-   .cn-present-beat at the bottom. Styled like .cn-present-enter; no motion. */
+/* CS-06 presenter rail: on-screen beat-jump buttons for the operator. Hidden
+   outside present mode and hidden by default inside it; the `r` key toggles
+   it (index.ts sets [hidden], which also drops its buttons from the tab
+   order). Top-left so it never overlaps .cn-present-beat at the bottom.
+   Styled like .cn-present-enter; no motion. */
 .cn-present-rail {
   position: absolute;
   z-index: 2;

@@ -6,8 +6,10 @@ demo. Don't use `-Built` for the reveal: the production build loads no data.
 
 ## Presenter mode
 
-Click the **Present** toolbar button once beats have loaded. Hover a node for
-its full name; click it to focus.
+Click the **Present** toolbar button once beats have loaded. Click a node to
+focus it. No person's name is ever rendered on stage in present mode (D-099):
+the hover tooltip is suppressed, and each beat's `labelKinds` limits node
+labels to committees and organizations. Hover names return on exit.
 
 | Key | Action |
 | --- | --- |
@@ -15,6 +17,7 @@ its full name; click it to focus.
 | `ArrowLeft` | Back to the previous beat |
 | `Home` | Jump to the first beat |
 | `F` | Zoom-to-fit the whole network (camera only, no beat change) |
+| `r` | Toggle the operator's button rail (hidden by default in present mode) |
 | `c` | Jump to the `committees` beat |
 | `o` | Jump to the `organizations` beat |
 | `m` | Jump to the `members` beat |
@@ -25,8 +28,8 @@ its full name; click it to focus.
 
 Every key above only does something while presenter mode is active. The
 letter and `1`/`End` keys jump straight to a beat by id (a small ARIA-labeled
-button rail mirrors them on screen); `Space`/`ArrowRight`/`ArrowLeft`/`Home`
-still step through the sheet in order.
+button rail mirrors them on screen once `r` shows it);
+`Space`/`ArrowRight`/`ArrowLeft`/`Home` still step through the sheet in order.
 
 ## A9 cue sheet (2026-09-15)
 
@@ -47,7 +50,9 @@ nothing else:
 | "Relationships. Being a good relative. Being a good ancestor." | `Space` | `constellation` |
 
 Nothing is pressed after the third cue - the constellation beat holds through
-applause. `Escape` is never pressed during A9 (it exits presenter mode).
+applause. `Escape` is never pressed during A9 (it exits presenter mode). The
+button rail stays hidden on stage: `r` is not pressed during A9, and the
+display shows only the graph and the caption - never a person's name.
 
 **Recovery if the wrong beat shows:** press `Home`, then `Space` seven times -
 that walks `network-overview -> members -> committees -> organizations ->
@@ -75,6 +80,10 @@ validation. Each entry:
   fit the whole projection.
 - `measure`: optional, `"betweenness_top_n"` or `"single_tie"` (UNIT 2);
   `topN` applies only to `betweenness_top_n`.
+- `labelKinds`: optional list of entity kinds whose labels may render on
+  this beat; every other label (the focused node and its neighbors included)
+  is hidden. Every beat in the ATNI sheet carries it without `person`, and
+  `npm run test` enforces that (D-099).
 
 Edit the file, save, and reload the app - it's fetched once at boot.
 

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { JsonObject, PresentBeat, ProjectionDto } from "../state/state";
 import { computeFocusSet } from "./focus";
+import { stageTooltipSuppressed } from "./hover";
 import {
   beatCameraMove,
   beatHighlights,
@@ -8,7 +9,10 @@ import {
   edgeKindBeatHighlights,
   kindBeatHighlights,
   measureHighlights,
+  nextRailShown,
   presenterBeatText,
+  railHidden,
+  stageLabelIds,
   type CameraMoveContext,
 } from "./presenter";
 
@@ -109,6 +113,95 @@ describe("presenter captions (D-103.5: counts, never names)", () => {
     expect(text).toBe("Network bridges - 2 highlighted");
     expect(text).not.toContain("shortest paths");
     expect(presenterBeatText(beat, highlights.explanations)).toBe("Network bridges - 2 highlighted");
+  });
+
+  it("renders a true zero when a measure returns nothing, and the bare label while it is pending", () => {
+    const beat: PresentBeat = { id: "bridges", label: "Network bridges", measure: "betweenness_top_n", topN: 3 };
+    const empty = measureHighlights({ betweenness: {}, degree: {} }, beat);
+
+    expect(empty.ids.size).toBe(0);
+    expect(presenterBeatText(beat, empty.explanations, empty.ids.size)).toBe("Network bridges - 0 highlighted");
+    expect(presenterBeatText(beat, [])).toBe("Network bridges - 0 highlighted");
+    // null = the measure call has not returned yet: no count, no false zero.
+    expect(presenterBeatText(beat, null)).toBe("Network bridges");
+    // Non-measure beats never carry a count, whatever they are handed.
+    expect(presenterBeatText({ id: "all", label: "Overview" }, null)).toBe("Overview");
+    expect(presenterBeatText({ id: "all", label: "Overview" }, [], 5)).toBe("Overview");
+  });
+});
+
+describe("stage name gate (D-099: no person name on stage)", () => {
+  const entities = projection.entities ?? [];
+  const spotlight = computeFocusSet(projection, "p2");
+  const spotlightEmphasis = new Set(["p2", ...(spotlight?.neighborIds ?? [])]);
+
+  it("passes the emphasis through untouched for beats without labelKinds and outside present mode", () => {
+    const plain: PresentBeat = { id: "one", label: "One node", focusEntityId: "p2" };
+    expect(stageLabelIds(entities, spotlightEmphasis, plain, true)).toBe(spotlightEmphasis);
+    expect(stageLabelIds(entities, null, plain, true)).toBeNull();
+    const gated: PresentBeat = { ...plain, labelKinds: ["committee"] };
+    expect(stageLabelIds(entities, spotlightEmphasis, gated, false)).toBe(spotlightEmphasis);
+    expect(stageLabelIds(entities, null, undefined, true)).toBeNull();
+  });
+
+  it("keeps only the lit entities of the beat's kinds: the spotlight's organization, never the people", () => {
+    const beat: PresentBeat = {
+      id: "one",
+      label: "One node",
+      focusEntityId: "p2",
+      camera: "hold",
+      labelKinds: ["committee", "organization"],
+    };
+    // p2's neighborhood is p1 (a person) and o1 (an organization).
+    expect([...spotlightEmphasis].sort()).toEqual(["o1", "p1", "p2"]);
+    const gated = stageLabelIds(entities, spotlightEmphasis, beat, true);
+    expect([...(gated ?? [])]).toEqual(["o1"]);
+    expect(gated?.has("p2"), "the focused person must not be labeled").toBe(false);
+    expect(gated?.has("p1"), "a neighboring person must not be labeled").toBe(false);
+  });
+
+  it("gates a people-only highlight set down to nothing rather than letting a person through", () => {
+    const beat: PresentBeat = { id: "members", label: "Members", filter: { kinds: ["person"] }, labelKinds: ["committee"] };
+    const lit = beatHighlights(projection, beat);
+    const focus = computeFocusSet(projection, null, lit?.ids, lit?.edgeIds);
+    const emphasis = new Set(focus?.neighborIds ?? []);
+    expect(emphasis.size).toBe(3);
+    expect(stageLabelIds(entities, emphasis, beat, true)?.size).toBe(0);
+  });
+
+  it("with no emphasis (an all-lit beat) labels every entity of the kinds and nothing else; [] labels nothing", () => {
+    const finale: PresentBeat = { id: "constellation", label: "All", labelKinds: ["committee", "organization"] };
+    expect([...(stageLabelIds(entities, null, finale, true) ?? [])].sort()).toEqual(["c1", "o1"]);
+    expect(stageLabelIds(entities, null, { ...finale, labelKinds: [] }, true)?.size).toBe(0);
+    expect(stageLabelIds([{ id: "x" }], null, finale, true)?.size).toBe(0);
+  });
+
+  it("suppresses the hover tooltip in present mode only", () => {
+    expect(stageTooltipSuppressed("present")).toBe(true);
+    expect(stageTooltipSuppressed("overview")).toBe(false);
+    expect(stageTooltipSuppressed("focus")).toBe(false);
+    expect(stageTooltipSuppressed("story")).toBe(false);
+  });
+});
+
+describe("presenter rail toggle (r; hidden by default on stage)", () => {
+  it("flips on r in either case and ignores every other key", () => {
+    expect(nextRailShown(false, "r")).toBe(true);
+    expect(nextRailShown(true, "r")).toBe(false);
+    expect(nextRailShown(false, "R")).toBe(true);
+    expect(nextRailShown(false, "f")).toBe(false);
+    expect(nextRailShown(true, " ")).toBe(true);
+    expect(nextRailShown(true, "Escape")).toBe(true);
+  });
+
+  it("is hidden outside present mode and hidden in present mode until shown", () => {
+    expect(railHidden(false, false)).toBe(true);
+    expect(railHidden(false, true)).toBe(true);
+    expect(railHidden(true, false)).toBe(true);
+    expect(railHidden(true, true)).toBe(false);
+    // The default entry state: present, not yet toggled.
+    expect(railHidden(true, nextRailShown(false, "Space"))).toBe(true);
+    expect(railHidden(true, nextRailShown(false, "r"))).toBe(false);
   });
 });
 

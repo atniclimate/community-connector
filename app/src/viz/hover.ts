@@ -1,9 +1,20 @@
-import type { AppState, ProjectionEntityDto } from "../state/state";
+import type { AppState, ProjectionEntityDto, ViewMode } from "../state/state";
 import { entityLabel } from "./projection";
 
 const TOOLTIP_OFFSET = 14;
 const TOOLTIP_MARGIN = 8;
 const ZERO = 0;
+
+/**
+ * The stage name gate for hover (D-099: no person name ever appears on
+ * stage). In present mode the tooltip is suppressed entirely rather than
+ * reduced to the kind label: it is the simpler rule, the operator does not
+ * need a tooltip on stage, and the node's hover emphasis still shows which
+ * node the pointer is on. Pure so it is testable without a DOM.
+ */
+export function stageTooltipSuppressed(mode: ViewMode): boolean {
+  return mode === "present";
+}
 
 /** Writes (or clears) one node's hover emphasis on the current node layer. */
 export type HoverWriter = (entityId: string, hovered: boolean) => void;
@@ -61,7 +72,7 @@ export class HoverOverlay {
         write(next, true);
       }
     }
-    const entity = next === null ? undefined : entities.get(next);
+    const entity = next === null || stageTooltipSuppressed(state.view.mode) ? undefined : entities.get(next);
     if (entity === undefined) {
       this.tooltip.hidden = true;
       return;

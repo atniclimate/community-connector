@@ -1,40 +1,46 @@
 [
   {
     "id": "network-overview",
-    "label": "Convention network overview"
+    "label": "Convention network overview",
+    "labelKinds": ["committee", "organization"]
   },
   {
     "id": "members",
     "label": "Members",
     "filter": {
       "kinds": ["person"]
-    }
+    },
+    "labelKinds": ["committee"]
   },
   {
     "id": "committees",
     "label": "Standing committees",
     "filter": {
       "kinds": ["committee"]
-    }
+    },
+    "labelKinds": ["committee"]
   },
   {
     "id": "organizations",
     "label": "Partner organizations",
     "filter": {
       "kinds": ["organization"]
-    }
+    },
+    "labelKinds": ["organization"]
   },
   {
     "id": "connectors",
     "label": "The people who connect committees",
     "measure": "betweenness_top_n",
-    "topN": 5
+    "topN": 5,
+    "labelKinds": ["committee"]
   },
   {
     "id": "one-node",
     "label": "One Nation. One node.",
     "focusEntityId": "00000000-0000-0000-0000-0000000de2c5",
-    "camera": "hold"
+    "camera": "hold",
+    "labelKinds": ["committee", "organization"]
   },
   {
     "id": "shared-priorities",
@@ -42,11 +48,13 @@
     "filter": {
       "edgeKinds": ["connected_to"]
     },
-    "camera": "hold"
+    "camera": "hold",
+    "labelKinds": ["committee"]
   },
   {
     "id": "constellation",
     "label": "60 Relatives. 15 committees. 12 organizations. Connected through shared committees, organizations, and priorities.",
-    "camera": "fit"
+    "camera": "fit",
+    "labelKinds": ["committee", "organization"]
   }
 ]

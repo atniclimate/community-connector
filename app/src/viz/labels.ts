@@ -28,6 +28,9 @@ export type LabelLayer = {
    * dimmed context stays unlabeled. null restores the normal policy.
    */
   readonly setEmphasis: (ids: ReadonlySet<string> | null) => void;
+  /** The texts currently rendered, for DEV inspection and the stage name
+   * gate's browser proof (D-099); never read by the render path. */
+  readonly visibleTexts: () => readonly string[];
   readonly dispose: () => void;
 };
 
@@ -273,6 +276,7 @@ export function buildLabelLayer(args: BuildLabelLayerArgs): LabelLayer {
       // Force the next update to recompute regardless of camera movement.
       lastCamera.set(Number.NaN, Number.NaN, Number.NaN);
     },
+    visibleTexts: () => slots.filter((slot) => slot.mesh.visible).map((slot) => String(slot.mesh.text)),
     dispose: () => {
       for (const slot of slots) {
         slot.mesh.dispose();

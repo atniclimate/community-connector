@@ -107,6 +107,15 @@ export type PresentBeat = {
   };
   readonly measure?: PresentMeasure;
   readonly topN?: number;
+  /**
+   * Present mode only: the entity kinds whose labels may render on this
+   * beat. When set, every other label is hidden - including the focused
+   * entity and its neighbors - so a beat that lights people can name their
+   * committees without ever naming a person (D-099 stage name gate). An
+   * empty array labels nothing. Undefined keeps today's behavior (labels
+   * follow the lit set). Ignored outside present mode.
+   */
+  readonly labelKinds?: readonly string[];
 };
 
 export type PresentationState = {
