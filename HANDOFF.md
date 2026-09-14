@@ -81,6 +81,10 @@ PASS at `202e762`; only docs commits since):**
     voice (labels Name / Tribal Nation or organization / Role / Priority areas / ...);
     consent draft v2 at `docs/design/intake-consent-text-draft-2026-09-14.md` is shared
     by the form and the in-app path; required-field errors show only after interaction.
+    The form asks the human's nine questions verbatim (D-105,
+    `docs/design/intake-questions-2026-09-14.md`); the template is 0.1.2 with the new
+    tags attributes `roles`, `origins`, `connections`, `seeking`, `offering`,
+    `committee_memberships`, `organization_affiliations` (additive; fixture unchanged).
     Still DRAFT (D-023), still not deployed (D-059.8). Preview locally with
     `cd form && npx vite preview --port 4173` at `/community-connector/`.
     **Degraded mode:** Codex hit its usage limit (retry after 2026-09-19), so the form

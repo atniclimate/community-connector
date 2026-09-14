@@ -2767,3 +2767,37 @@ text stays the D-102 Arial and Arimo stack, since D-102 is the human's own rulin
 traditional body text and section 7 question 4 (Lexend Deca body) remains theirs to
 revisit. Palette, radius, surface ladder, components, and house style were identical
 between editions, so nothing else changed.
+
+## D-105 (2026-09-14) - The convention QR form asks the human's nine questions; template 0.1.2 adds the attributes they need
+
+Trigger: the human supplied the revised, community-facing question set for the QR form
+on 2026-09-14 (recorded verbatim in `docs/design/intake-questions-2026-09-14.md`) and
+dropped several earlier fields.
+
+Choice:
+1. **Mapping.** Name -> `display_name` (required); What do you Do -> `roles` (tags, new);
+   Where are you from -> `origins` (tags, new); What is important to you ->
+   `areas_of_interest`; What are you good at -> `specialties`; Who are you connected with
+   -> `connections` (tags, new); What are you hoping to find -> `seeking` (tags, new);
+   What are you here to share -> `offering` (tags, new); What committees will you attend
+   -> `committee_memberships` (tags, new on main with the identical definition the S-E2
+   branch carries, alongside `organization_affiliations`, so the branch merges cleanly).
+2. **Additive only.** The ATNI template moves 0.1.1 -> 0.1.2 by adding attributes;
+   `tribe`, `role`, `events_of_interest`, `contact_email`, and `contact_preference` stay
+   in the template so the synthetic fixture and the in-app facilitator form remain valid,
+   and simply do not appear on the QR form.
+3. **Order and allowlist live in the form's per-template config**, not in the template:
+   the template describes the data, the form config describes one community's
+   conversation with it. A question listed for an attribute the template lacks fails
+   loudly; unlisted attributes are not rendered or sent.
+4. **Wording is the human's**, verbatim, including capitalization, the trailing
+   ellipses, the "(Optional)" marker on question 6, and the capitalized "Knowledge".
+   The voice rules govern only text the session adds.
+5. **Analysis seed.** `seeking` and `offering` are the first need-and-offer pair in the
+   data model, the raw material for R6 need-to-solution routing after the convention.
+
+Flagged for the human: question 6 invites names of third parties who did not consent
+(entries are Tier 1, facilitator-reviewed, never rendered on the projector; the D-023
+reviewer may want the help text to say so); only question 6 carries "(Optional)" although
+every question but the name is optional; the dropped contact fields mean the facilitator
+has no contact route for a respondent unless one is written into an answer.
