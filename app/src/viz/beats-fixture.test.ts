@@ -3,6 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import type { JsonObject, JsonValue, PresentBeat, PresentCamera, PresentMeasure } from "../state/state";
+import { validateBeats } from "../state/beats";
 
 // Validates the committed ATNI beat sheet against the committed synthetic
 // fixture it presents (D-103: "a mistyped id fails silently" is closed here).
@@ -32,12 +33,10 @@ function isObject(value: JsonValue | undefined): value is JsonObject {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+/** Read through the runtime reader (state/beats.ts), so the committed sheet
+ * is proven to pass the same validation main.ts applies at boot. */
 function loadBeats(): readonly PresentBeat[] {
-  const parsed: unknown = JSON.parse(readFileSync(beatsPath, "utf8"));
-  if (!Array.isArray(parsed)) {
-    throw new Error("beats.atni.json must be a JSON array of beats");
-  }
-  return parsed as readonly PresentBeat[];
+  return validateBeats(JSON.parse(readFileSync(beatsPath, "utf8")));
 }
 
 function loadFixture(): FixtureIndex {

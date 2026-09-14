@@ -135,13 +135,37 @@ describe("stage name gate (D-099: no person name on stage)", () => {
   const spotlight = computeFocusSet(projection, "p2");
   const spotlightEmphasis = new Set(["p2", ...(spotlight?.neighborIds ?? [])]);
 
-  it("passes the emphasis through untouched for beats without labelKinds and outside present mode", () => {
+  it("passes the emphasis through untouched outside present mode, gated beat or not", () => {
     const plain: PresentBeat = { id: "one", label: "One node", focusEntityId: "p2" };
-    expect(stageLabelIds(entities, spotlightEmphasis, plain, true)).toBe(spotlightEmphasis);
-    expect(stageLabelIds(entities, null, plain, true)).toBeNull();
     const gated: PresentBeat = { ...plain, labelKinds: ["committee"] };
+    expect(stageLabelIds(entities, spotlightEmphasis, plain, false)).toBe(spotlightEmphasis);
     expect(stageLabelIds(entities, spotlightEmphasis, gated, false)).toBe(spotlightEmphasis);
-    expect(stageLabelIds(entities, null, undefined, true)).toBeNull();
+    expect(stageLabelIds(entities, null, gated, false)).toBeNull();
+    expect(stageLabelIds(entities, null, undefined, false)).toBeNull();
+  });
+
+  it("fails closed in present mode: a beat without labelKinds, or no beat at all, labels nothing", () => {
+    const plain: PresentBeat = { id: "one", label: "One node", focusEntityId: "p2" };
+    // The focused person and the lit set never pass through on an ungated beat.
+    expect(stageLabelIds(entities, spotlightEmphasis, plain, true)?.size).toBe(0);
+    // No emphasis (an all-lit beat) is not "label everything" either.
+    expect(stageLabelIds(entities, null, plain, true)?.size).toBe(0);
+    // A bad beat index (beat undefined) labels nothing rather than everything.
+    expect(stageLabelIds(entities, null, undefined, true)?.size).toBe(0);
+    expect(stageLabelIds(entities, spotlightEmphasis, undefined, true)?.size).toBe(0);
+  });
+
+  it("drops person from labelKinds in present mode even when a beat lists it", () => {
+    const listsPeople: PresentBeat = { id: "one", label: "One node", focusEntityId: "p2", labelKinds: ["person", "organization"] };
+    const gated = stageLabelIds(entities, spotlightEmphasis, listsPeople, true);
+    expect([...(gated ?? [])]).toEqual(["o1"]);
+    expect(gated?.has("p2"), "the focused person must not be labeled").toBe(false);
+    expect(gated?.has("p1"), "a neighboring person must not be labeled").toBe(false);
+    const onlyPeople: PresentBeat = { ...listsPeople, labelKinds: ["person"] };
+    expect(stageLabelIds(entities, spotlightEmphasis, onlyPeople, true)?.size).toBe(0);
+    expect(stageLabelIds(entities, null, onlyPeople, true)?.size).toBe(0);
+    // Outside present mode the beat is ignored entirely (today's behavior).
+    expect(stageLabelIds(entities, spotlightEmphasis, onlyPeople, false)).toBe(spotlightEmphasis);
   });
 
   it("keeps only the lit entities of the beat's kinds: the spotlight's organization, never the people", () => {

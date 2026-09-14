@@ -1,4 +1,5 @@
 import type { JsonObject, JsonValue, PresentBeat, ProjectionDto } from "../state/state";
+import { STAGE_UNLABELED_KINDS } from "../state/beats";
 import { edgeEndpoints } from "./projection";
 
 export type MeasureHighlights = {
@@ -260,13 +261,15 @@ export function presenterBeatText(
  * the label emphasis set the focus pipeline produced - the focused entity
  * plus its neighbors and the beat's highlights, or null when nothing is lit
  * and the normal zoom policy labels the nearest nodes - and restricts it to
- * the beat's `labelKinds`. Outside present mode, or for a beat without
- * `labelKinds`, the emphasis passes through unchanged (today's behavior).
- * With `labelKinds`, the result is the emphasis set (every entity when there
- * is none) filtered to those kinds, so a person is never labeled on such a
- * beat whether lit, focused, or context; an empty `labelKinds` labels
- * nothing. The label layer's existing `setEmphasis` renders the result, so
- * this adds no render pass (ADR-004).
+ * the beat's `labelKinds`. Outside present mode the emphasis passes through
+ * unchanged. In present mode the gate FAILS CLOSED: a missing beat or a
+ * beat without `labelKinds` labels nothing (never "everything"), and the
+ * kinds in `STAGE_UNLABELED_KINDS` (person) are dropped from `labelKinds`
+ * even if a beat lists them, so a person is never labeled on stage whether
+ * lit, focused, or context. With `labelKinds`, the result is the emphasis
+ * set (every entity when there is none) filtered to the permitted kinds; an
+ * empty `labelKinds` labels nothing. The label layer's existing
+ * `setEmphasis` renders the result, so this adds no render pass (ADR-004).
  */
 export function stageLabelIds(
   entities: readonly { readonly id: string; readonly kind?: string | null }[],
@@ -274,9 +277,12 @@ export function stageLabelIds(
   beat: PresentBeat | undefined,
   present: boolean,
 ): ReadonlySet<string> | null {
-  const labelKinds = present ? beat?.labelKinds : undefined;
-  if (labelKinds === undefined) {
+  if (!present) {
     return emphasis;
+  }
+  const labelKinds = (beat?.labelKinds ?? []).filter((kind) => !STAGE_UNLABELED_KINDS.includes(kind));
+  if (labelKinds.length === 0) {
+    return new Set<string>();
   }
   return new Set(
     entities

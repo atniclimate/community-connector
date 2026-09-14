@@ -1,7 +1,8 @@
 // Presenter-mode caption face (D-101/CS-05): self-hosted via Vite, weight 600
 // only, latin + latin-ext + vietnamese subsets, zero runtime font requests.
 import "@fontsource/league-spartan/600.css";
-import { createInitialState, type JsonObject, type PresentBeat } from "./state/state";
+import { createInitialState, type JsonObject } from "./state/state";
+import { BeatSheetError, validateBeats } from "./state/beats";
 import { createStore } from "./state/store";
 import { selectProjectedEntityCount } from "./state/selectors";
 import { loadGroup } from "./state/effects";
@@ -110,10 +111,13 @@ async function loadPresentBeats(): Promise<void> {
     if (!response.ok) {
       throw new Error(`Failed to fetch presenter beats (${response.status})`);
     }
-    const beats = await response.json() as readonly PresentBeat[];
+    // Validated, never cast: a malformed sheet (or one that names people on
+    // stage, D-099) takes the same error path as a failed fetch.
+    const beats = validateBeats(await response.json());
     store.dispatch({ kind: "presentBeatsLoaded", beats });
   } catch (error) {
-    store.dispatch({ kind: "errorSurfaced", error: client.toErrorEnvelope(error) });
+    const envelope = error instanceof BeatSheetError ? error.envelope : client.toErrorEnvelope(error);
+    store.dispatch({ kind: "errorSurfaced", error: envelope });
   }
 }
 
