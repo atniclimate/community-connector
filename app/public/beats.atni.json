@@ -23,5 +23,30 @@
     "filter": {
       "kinds": ["organization"]
     }
+  },
+  {
+    "id": "connectors",
+    "label": "The people who connect committees",
+    "measure": "betweenness_top_n",
+    "topN": 5
+  },
+  {
+    "id": "one-node",
+    "label": "One Nation. One node.",
+    "focusEntityId": "00000000-0000-0000-0000-0000000de2c5",
+    "camera": "hold"
+  },
+  {
+    "id": "shared-priorities",
+    "label": "48 Relatives who share the same priorities",
+    "filter": {
+      "edgeKinds": ["connected_to"]
+    },
+    "camera": "hold"
+  },
+  {
+    "id": "constellation",
+    "label": "60 Relatives. 15 committees. 12 organizations. Connected through shared committees, organizations, and priorities.",
+    "camera": "fit"
   }
 ]

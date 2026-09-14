@@ -15,9 +15,51 @@ its full name; click it to focus.
 | `ArrowLeft` | Back to the previous beat |
 | `Home` | Jump to the first beat |
 | `F` | Zoom-to-fit the whole network (camera only, no beat change) |
+| `c` | Jump to the `committees` beat |
+| `o` | Jump to the `organizations` beat |
+| `m` | Jump to the `members` beat |
+| `p` | Jump to the `shared-priorities` beat |
+| `1` | Jump to the `one-node` beat |
+| `End` | Jump to the `constellation` beat |
 | `Escape` | Exit presenter mode |
 
-Every key above only does something while presenter mode is active.
+Every key above only does something while presenter mode is active. The
+letter and `1`/`End` keys jump straight to a beat by id (a small ARIA-labeled
+button rail mirrors them on screen); `Space`/`ArrowRight`/`ArrowLeft`/`Home`
+still step through the sheet in order.
+
+## A9 cue sheet (2026-09-15)
+
+The eight-beat sheet in `app/public/beats.atni.json` ends on the constellation
+finale for act A9 of the General Assembly session (D-103). Before the reports,
+the browser is already open via `pwsh scripts/reveal.ps1`, **Present** has been
+clicked, and the display is pre-loaded on beat 5 (`connectors`) - or held on
+the venue's thanks slide per the operator's call - so nothing needs to be
+touched during the floor conversation.
+
+At the spine's single documented cue, press `Space` exactly once per line and
+nothing else:
+
+| Spine line | Press | Beat reached |
+| --- | --- | --- |
+| "communities connected in new ways" | `Space` | `one-node` |
+| "But the ways that matter most are as relatives" | `Space` | `shared-priorities` |
+| "Relationships. Being a good relative. Being a good ancestor." | `Space` | `constellation` |
+
+Nothing is pressed after the third cue - the constellation beat holds through
+applause. `Escape` is never pressed during A9 (it exits presenter mode).
+
+**Recovery if the wrong beat shows:** press `Home`, then `Space` seven times -
+that walks `network-overview -> members -> committees -> organizations ->
+connectors -> one-node -> shared-priorities -> constellation`, landing back on
+the finale regardless of where the display was.
+
+**Alternative (needs a spine edit, human's call):** a pre-switch at "These
+tools can be more" instead of the single documented cue, giving four Space
+presses spread earlier in the close rather than three bunched at the end.
+Not wired up unless the human asks for the spine change (D-103.7).
+
+**Operator:** ________ (OQ-11)
 
 ## Editing beats
 
