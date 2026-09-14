@@ -43,6 +43,8 @@ if ($ManifestOut -eq "") { $ManifestOut = Join-Path $FormDir "dist.manifest.json
 if ($TemplatePath -eq "") {
   $TemplatePath = Join-Path $RepoRoot "fixtures/templates/research-network.template.json"
 }
+# Vite's config reads the template relative to form/; make repo-relative paths work.
+$TemplatePath = (Resolve-Path -LiteralPath $TemplatePath).Path
 
 # Build-time config for Vite's `define` (process-scoped; not persisted).
 $env:CN_FORM_PUBLIC_KEY_HEX = $PublicKeyHex
