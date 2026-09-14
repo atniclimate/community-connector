@@ -58,14 +58,14 @@ body {
   text-wrap: pretty;
 }
 
-/* Program wordmark: text-only, stacked, League Spartan 800 (design system
-   section 4: permitted without the seal in dense black product chrome). */
+/* Program wordmark: text-only, stacked, League Spartan 600 (design system
+   09/12 section 4: permitted without the seal in dense black product chrome). */
 .cn-wordmark {
   display: flex;
   flex-direction: column;
   padding: 16px 16px 0;
   font-family: var(--cn-font-display);
-  font-weight: 800;
+  font-weight: 600;
   font-size: 13px;
   line-height: 1;
   letter-spacing: 0.04em;
@@ -88,10 +88,11 @@ body {
   padding: 32px 16px 48px;
 }
 
-/* Heading 1: League Spartan 700, 2.25 x body, tight tracking, balanced. */
+/* Heading 1: League Spartan 600 (the 09/12 system's H1 weight; D-101 SemiBold),
+   2.25 x body, tight tracking, balanced. */
 .cn-form-title {
   font-family: var(--cn-font-display);
-  font-weight: 700;
+  font-weight: 600;
   font-size: 36px;
   line-height: 1.1;
   letter-spacing: -0.025em;
@@ -198,7 +199,7 @@ body {
   padding: 0;
   margin: 0 0 12px;
   font-family: var(--cn-font-display);
-  font-weight: 700;
+  font-weight: 600;
   font-size: 18.7px;
   line-height: 1.2;
   letter-spacing: -0.01em;

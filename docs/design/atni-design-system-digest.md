@@ -323,10 +323,12 @@ muted tone on dark).
 
 ## 7. Open questions and conflicts for the human
 
-1. **Which design system is current?** Two dated, differently-typed systems coexist
-   (top-level, 09/12/2026, League Spartan + Lexend Deca; nested handoff bundle,
-   07/16/2026, Spartan MB + TeX Gyre), and nothing marks the handoff bundle withdrawn.
-   Confirm the top-level file is sole authority, or say which handoff pieces still apply.
+1. **Which design system is current?** RESOLVED 2026-09-14 by the human: the top-level
+   09/12/2026 revision at `I:\ATNI_design-system\ATNI design system\` is the sole
+   authority (League Spartan + Lexend Deca). The 07/16/2026 handoff bundle (also
+   circulated as `I:\ATNI design system.zip`) is superseded; its palette, radius, surface
+   ladder, components, and house style are identical and still describe the system, but
+   its Spartan MB and TeX Gyre typography does not apply (D-104 addendum).
 2. **Lexend vs. Lexend Deca vs. D-101's "Lexend Medium."** D-101 named plain Lexend at
    Medium; the system uses Lexend Deca at Light (300) for subtitles, and ships an unused
    `Lexend` font folder alongside the used `Lexend Deca`. Which family/weight is correct?

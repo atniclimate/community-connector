@@ -11,10 +11,10 @@
  * the metric-compatible fallback behind Arial in the D-102 stack, at 400
  * (body), 600 (labels), and 700 (bold lead-ins).
  */
-import "@fontsource/league-spartan/latin-700.css";
-import "@fontsource/league-spartan/latin-ext-700.css";
-import "@fontsource/league-spartan/latin-800.css";
-import "@fontsource/league-spartan/latin-ext-800.css";
+import "@fontsource/league-spartan/latin-500.css";
+import "@fontsource/league-spartan/latin-ext-500.css";
+import "@fontsource/league-spartan/latin-600.css";
+import "@fontsource/league-spartan/latin-ext-600.css";
 import "@fontsource/arimo/latin-400.css";
 import "@fontsource/arimo/latin-ext-400.css";
 import "@fontsource/arimo/latin-600.css";

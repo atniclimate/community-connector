@@ -2754,3 +2754,16 @@ bare `catch {}` in `form/src/main.ts` and `render.ts` nearing the I5 size guidel
 pre-existing and deferred. Follow-ups from the build: required-field errors gated to
 interaction or submit (`6e3cf64`), the in-app consent path carries draft v2 (`c69b02d`,
 `7d3bef7`).
+
+### D-104 addendum (2026-09-14, ~07:05) - the 09/12 revision is the sole design-system authority
+
+Human ruling: `I:\ATNI_design-system\ATNI design system\` (the revision dated
+09/12/2026) is the correct design system; the 07/16/2026 bundle circulated as
+`I:\ATNI design system.zip` is superseded. This closes digest section 7, question 1.
+Consequences applied to the form: display weights follow the 09/12 system and D-101
+(League Spartan 600 for Heading 1, the legend, and the stacked ATNI / CLIMATE wordmark;
+the system defines no 700 or 800), font imports are League Spartan 500 and 600; body
+text stays the D-102 Arial and Arimo stack, since D-102 is the human's own ruling on
+traditional body text and section 7 question 4 (Lexend Deca body) remains theirs to
+revisit. Palette, radius, surface ladder, components, and house style were identical
+between editions, so nothing else changed.
