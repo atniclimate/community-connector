@@ -31,7 +31,10 @@
   --cn-accent-text: #ffffff;
   --cn-red-on-dark: #f26b5e; /* links, small red text, errors, focus ring */
   --cn-status-review-bg: #fdf3e2; /* Under Review tag */
-  --cn-status-review-fg: #b4740e;
+  /* Design-system Under Review text is #B4740E, which reads 3.5:1 on its tint at
+     tag size; darkened to hold WCAG AA 4.5:1 (5.8:1) until the system sets a
+     small-text variant. */
+  --cn-status-review-fg: #8a5209;
 
   /* Type (design system section 1.2; D-101/D-102 faces) */
   --cn-font-display: "League Spartan", "Arial Black", Arial, sans-serif;
