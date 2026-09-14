@@ -2615,3 +2615,70 @@ the wizard mount, and `cn intake selftest --dry`; the queue-folder grant is a na
 picker the human performs. It found a real defect: staging before a folder grant
 fails silently because the dashboard returns before rendering `lastError`. Fixed in
 the `fix(intake)` commit that follows.
+
+### D-103 addendum 2 (2026-09-14, ~02:40) - second and third Codex rounds, S-E2 branch, true-up
+
+Codex review (profile `review`, gpt-5.6-sol) of the B2 diff `d3d2283..5ce91d8` is at
+`C:\dev\_reviews\community-connector\2026-09-14_convention-sprint-review-b2.md`. Two
+blocking findings, both accepted and fixed in B3 (`02c45ff`, `202e762`):
+
+- **BLOCKING - the stage name gate failed open**: a beat without `labelKinds` labeled
+  everything in present mode, and nothing in the render path rejected `person`. Fixed in
+  `02c45ff`: in present mode `stageLabelIds` labels nothing without `labelKinds` and
+  always excludes `person`; the beat sheet is validated at load (`validateBeats` in
+  `app/src/state/beats.ts`) and a sheet naming `person` or carrying unknown values is
+  rejected through the loader's existing error path.
+- **BLOCKING - rail visibility lived on renderer state (I4)**: fixed in `202e762`,
+  `PresentationState.railShown`, toggled by `presentRailToggled` from the `r` key, reset
+  whenever any action crosses into or out of present mode; the renderer only projects it.
+
+B2 advisories: kind-intersection over-suppression on `members` / `shared-priorities`
+(accepted as the intended stage image: a lit constellation with no labels; the caption
+carries the count); wiring-level tests for hover and keydown (post-convention); rail
+tests through `handlePresenterKeydown` (post-convention); per-beat caption tuples and
+caption-text cross-check against fixture names (post-convention); beat-sheet
+`schema_version` (runtime validator now exists, envelope still deferred, addendum 1);
+`index.ts` size (excepted, addendum 1); DEV-only hooks now asserted absent from every
+built bundle by `scripts/check-size.mjs` inside the `app-snapshot` member.
+
+Codex review of the B3 diff `d32a1f0..202e762` is at
+`...\2026-09-14_convention-sprint-review-b3.md`: NO blocking findings; both B2 blockers
+confirmed closed end to end. Advisories: the `labelKinds` doc comment in `state.ts` was
+stale (fixed in the true-up commit); free-text `beat.label` captions are not name-checked
+(accepted: captions are authored, count-only, and reviewed; a fixture-name cross-check is
+post-convention); `validateBeats` allows `betweenness_top_n` without `topN` (renderer
+clamps; post-convention tightening); the loader error path is tested at the envelope
+level only (post-convention); a pre-existing I9 issue where Space at window level
+advances the beat while a rail button has focus (Enter works; post-convention fix).
+
+**S-E2 (intake-to-edges)** was built on branch `s-e2-intake-edges` in the worktree
+`I:\claude-temp\claude\I--community-connector\057c2e60-c176-425e-bd6e-5655e5ac0ff2\scratchpad\wt-s-e2`
+(commits `98561db` blueprint `docs/blueprints/intake-edges.md`, `4a5ea8f` template
+membership tags with a schema PATCH bump to 0.1.2, `468765f` `plan_approval` emitting
+`member_of` / `affiliated_with` `EdgeCreate` ops inside the same approval batch,
+`80fb5a8` review view listing the planned edges). The mandatory three-reviewer
+adversarial round ran with a refute mandate; verdicts: schema and field
+accept-with-fixes; ingest and edge resolution accept-with-fixes; durable owner and review
+view accept-with-fixes; no finding rated blocking. Medium findings and their fix round on
+the branch: the review-view edge preview read raw group state instead of the viewer's
+projection (fixed `7cee537`); membership rules hardcoded in Rust rather than template
+data (moved into the template as a schema-validated block, `e1d5273`, Rust table kept as
+the documented fallback); membership resolution extracted to `membership.rs` so the
+durable owner shrinks (`b6c3d9e`); a test against the shipped ATNI template (`f92c19c`);
+still landing at the time of this entry: warnings preserved on the crash-recovery path
+(I12) and a multi-op crash-recovery test through the durable seam. The branch's
+`docs/blueprints/intake-edges.md` carries the round's per-finding dispositions.
+
+The branch is NOT merged: per D-056.1/D-056.2 the verdict is the human's to record, and
+merging a durable-owner change the night before the show is outside this sprint's
+mandate. Any person added live on Tuesday lands without edges (accepted for one
+afternoon). Merge notes: one import-line conflict in `app/src/ui/intake/panel.ts` (union
+of both lists); regenerate the fixture so the embedded template carries 0.1.2; decide
+whether exact-match name resolution (no trim, no case fold) is acceptable for real use or
+whether the D-093c alias table comes first.
+
+**True-up 2026-09-14 (~02:40):** HANDOFF.md rewritten (previous archived at
+`docs/archive/handoffs/2026-09-13-trueup.md`); `docs/NEXT_SESSION.md` launch cards
+refreshed; `SESSION_ROSTER.yaml` S-R0 done, S-E1 / S-E2 / S-E3 partial with outcomes;
+`CONTROLS.md` states the fail-closed gate; memory pointer updated. Final code HEAD for the
+convention is `202e762` (check-all 12/12 there); everything after it is docs.

@@ -1,10 +1,10 @@
 roster_version: 1
-updated: 2026-09-12
+updated: 2026-09-14
 project: community-connector (Community Navigator)
 planning_authority: PLAN_1.0.md (v1.1, Phase 5 reconciliation 2026-07-24) for the P-ids; this
   roster's own sessions (R0-R7) are director-fixed additions for the 2026-09-12 pickup,
   not PLAN_1.0.md ids - see TRACE.yaml's tasks.R0-R7 notes
-updated: 2026-09-12
+updated: 2026-09-14
 plan_tier: unverified   # see state.unverified item 1 - no seat/plan was named this session
 
 evidence:
@@ -208,12 +208,10 @@ sessions:
       own committed conventional commit; this MUST land before any reveal-chain commit
       (R2/R4a/R4b) is made, since a red check-all would gate every later commit's own
       verification loop"
-    status: partial
-    outcome: "2026-09-12 (evening true-up, verified on disk) - 1 of 3 fixes landed. The
-      clippy fix is 7be2b5b (landed by S-R4a because it blocked every commit); check-all
-      has been 12/12 since. NOT done - no rust-toolchain.toml exists at the repo root or
-      in core/, and troika-three-text is still under devDependencies in app/package.json
-      although app/src/viz/labels.ts imports it. Both remain small mechanical fixes."
+    status: done
+    outcome: "2026-09-14 (convention sprint, D-103, verified on disk) - all three fixes
+      landed: clippy 7be2b5b (2026-09-12), rust-toolchain.toml pinned to 1.98.1 in
+      7b9b9d9, troika-three-text moved to dependencies in d122826. check-all 12/12 since."
 
   - id: S-R2
     task_ids: [R2]
@@ -741,8 +739,13 @@ sessions:
     budget_tokens: 40000
     gate: "pwsh scripts/check-all.ps1 12/12 AND npm run build (form/) against the ATNI template AND a manual visual check that dark mode renders"
     stop_when: "the ATNI template builds via a documented flag (not only an env var), the theme-token slot exists and is exercised by a placeholder palette, and no approval.rs or durable-owner code was touched"
-    status: planned
-    outcome: null
+    status: partial
+    outcome: "2026-09-14 (convention sprint, D-103) - the styling slice that needed no
+      section-7 answer landed in d3d2283: presenter caption in League Spartan SemiBold 600
+      via pinned @fontsource/league-spartan, ground #010B13 and text #E8ECF0 through the
+      token pipeline. NOT done: the form build switch (the flag already exists in
+      scripts/build-form.ps1, deferred: no form airs) and the section-7 typography and
+      kind-color decisions (human)."
 
   - id: S-E2
     task_ids: [E2]
@@ -785,8 +788,13 @@ sessions:
       verified against the actual working tree, an approved synthetic submission with a
       committee_memberships field produces the entity AND its member_of edges in the
       same batch, and the human has recorded the round's disposition in DECISIONS.md"
-    status: planned
-    outcome: null
+    status: partial
+    outcome: "2026-09-14 (convention sprint, D-103 addendum 2) - built on branch
+      s-e2-intake-edges only (blueprint docs/blueprints/intake-edges.md, template 0.1.2
+      membership tags, plan_approval emits member_of/affiliated_with EdgeCreate in the
+      same batch, review view lists planned edges); three-reviewer adversarial round ran,
+      all accept-with-fixes, medium findings fixed on the branch. NOT merged; the human's
+      recorded verdict is owed before merge (D-056.1/2)."
 
   - id: S-E3
     task_ids: [E3]
@@ -826,8 +834,14 @@ sessions:
     stop_when: "c/o/t/s and the on-screen rail all work on the atni-convention
       fixture, CONTROLS.md is updated to match, and the human-only visual/
       accessibility gates have been handed off - this session does not self-certify them"
-    status: planned
-    outcome: null
+    status: partial
+    outcome: "2026-09-14 (convention sprint, D-103) - keys c/o/m plus p (shared
+      priorities), 1 (one node), End (constellation) and an operator rail (hidden by
+      default, r toggles, state in presentation.railShown) landed in 034b2c7, 0c2b756 and
+      the B3 follow-up; the name gate is a per-beat labelKinds field enforced fail-closed
+      in present mode (no person label or hover name on stage), replacing the planned
+      nameOnStage flag. NOT done: the t (tribe) and s (state of residence, D-100) beats;
+      the human-only visual and accessibility gates."
 
   - id: S-E4
     task_ids: [E4]

@@ -80,10 +80,12 @@ validation. Each entry:
   fit the whole projection.
 - `measure`: optional, `"betweenness_top_n"` or `"single_tie"` (UNIT 2);
   `topN` applies only to `betweenness_top_n`.
-- `labelKinds`: optional list of entity kinds whose labels may render on
-  this beat; every other label (the focused node and its neighbors included)
-  is hidden. Every beat in the ATNI sheet carries it without `person`, and
-  `npm run test` enforces that (D-099).
+- `labelKinds`: list of entity kinds whose labels may render on this beat;
+  every other label (the focused node and its neighbors included) is hidden.
+  The gate fails closed: in present mode a beat WITHOUT `labelKinds` labels
+  nothing, `person` is always excluded even if listed, and a sheet that lists
+  `person` is rejected at load. Every beat in the ATNI sheet carries it without
+  `person`, and `npm run test` enforces that (D-099).
 
 Edit the file, save, and reload the app - it's fetched once at boot.
 
