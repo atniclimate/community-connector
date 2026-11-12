@@ -86,6 +86,12 @@ const DEV_GROUPS: Readonly<Record<string, DevGroup>> = {
     groupId: "00000000-0000-0000-0000-0000000dbba0",
     viewerPerson: "00000000-0000-0000-0000-0000000de2bd",
   },
+  "relatives-demo": {
+    fixture: "relatives-demo",
+    groupId: "00000000-0000-0000-0000-000000124f80",
+    // An ordinary Member (the seeker in planted pair b), so person-centered views read as a member's, not governance's.
+    viewerPerson: "00000000-0000-0000-0000-000000127699",
+  },
 };
 const DEFAULT_DEV_GROUP = "research-network";
 

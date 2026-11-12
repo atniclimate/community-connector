@@ -1,0 +1,75 @@
+{
+  "schema_version": "0.1.0",
+  "template_id": "relatives-demo",
+  "name": "Relatives Demo Network",
+  "description": "FULLY SYNTHETIC developer fixture for person-centered and continuance features: people, organizations, seats that outlive their holders, places, and more-than-human relatives. Every person, organization, seat, place, and relative is fictional; there are no emails, phone numbers, real Nation names, or real people. Labels are plain developer language; community vocabulary authority rests with ATNI (D-051).",
+  "kinds": [
+    {
+      "id": "person",
+      "label": "Person",
+      "shape": "sphere",
+      "color_role": "kind-1",
+      "attributes": [
+        { "id": "display_name", "type": "text", "required": true, "default_visibility": "group" },
+        { "id": "nation_or_org", "type": "text", "default_visibility": "group" },
+        { "id": "seeking", "type": "tags", "default_visibility": "group" },
+        { "id": "offering", "type": "tags", "default_visibility": "group" },
+        { "id": "specialties", "type": "tags", "default_visibility": "group" },
+        { "id": "willing_to_introduce", "type": "enum", "values": ["yes", "no"], "default_visibility": "group" },
+        { "id": "capacity", "type": "enum", "values": ["open", "limited", "resting"], "default_visibility": "group" },
+        { "id": "resting_until", "type": "date", "default_visibility": "group" }
+      ]
+    },
+    {
+      "id": "organization",
+      "label": "Organization",
+      "shape": "cube",
+      "color_role": "kind-2",
+      "attributes": [
+        { "id": "display_name", "type": "text", "required": true, "default_visibility": "group" },
+        { "id": "org_type", "type": "enum", "values": ["tribal_department", "intertribal_body", "agency", "university", "nonprofit"], "default_visibility": "group" }
+      ]
+    },
+    {
+      "id": "seat",
+      "label": "Seat",
+      "shape": "octahedron",
+      "color_role": "kind-3",
+      "attributes": [
+        { "id": "title", "type": "text", "required": true, "default_visibility": "group" },
+        { "id": "last_confirmed", "type": "date", "default_visibility": "group" }
+      ]
+    },
+    {
+      "id": "place",
+      "label": "Place",
+      "shape": "cone",
+      "color_role": "kind-4",
+      "attributes": [
+        { "id": "display_name", "type": "text", "required": true, "default_visibility": "group" },
+        { "id": "place_type", "type": "enum", "values": ["watershed", "river", "airshed", "meadow", "coast"], "default_visibility": "group" },
+        { "id": "location", "type": "geo", "default_visibility": "group" }
+      ]
+    },
+    {
+      "id": "relative",
+      "label": "Relative",
+      "shape": "tetrahedron",
+      "color_role": "kind-5",
+      "attributes": [
+        { "id": "display_name", "type": "text", "required": true, "default_visibility": "group" },
+        { "id": "relative_type", "type": "enum", "values": ["fish_run", "plant", "tree", "animal", "water"], "default_visibility": "group" },
+        { "id": "seasons", "type": "tags", "default_visibility": "group" }
+      ]
+    }
+  ],
+  "edge_kinds": [
+    { "id": "member_of", "label": "member of", "from": ["person"], "to": ["organization"], "directed": true },
+    { "id": "connected_to", "label": "connected to", "from": ["person"], "to": ["person"], "directed": false, "weighted": "optional" },
+    { "id": "holds_seat", "label": "holds seat", "from": ["person"], "to": ["seat"], "directed": true },
+    { "id": "seat_in", "label": "seat in", "from": ["seat"], "to": ["organization"], "directed": true },
+    { "id": "cares_for", "label": "cares for", "from": ["person", "organization"], "to": ["place", "relative"], "directed": true },
+    { "id": "lives_at", "label": "lives at", "from": ["relative"], "to": ["place"], "directed": true },
+    { "id": "learned_from", "label": "learned from", "from": ["person"], "to": ["person"], "directed": true }
+  ]
+}
