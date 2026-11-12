@@ -40,6 +40,34 @@ pub fn is_governance(state: &GroupState, person: PersonId) -> bool {
     active_roles_for(state, &person).any(|role| role == GroupRole::Governance)
 }
 
+/// Whose records a viewer may run person-centered analysis over.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AnalysisScope {
+    /// Active governance in this group: results may cover every entity.
+    All,
+    /// Results limited to entities this person owns.
+    OwnRecords(PersonId),
+    /// Anonymous viewers get no analysis results.
+    Nothing,
+}
+
+/// Returns the analysis scope for a viewer. cn-api uses it to limit
+/// continuance results to the viewer's own entities unless governance, and
+/// to allow introduction suggestions only for a center the viewer owns
+/// unless governance, because results naming other people are a targeting
+/// risk (TigerSwan built watch lists from exactly this kind of tie data).
+///
+/// Reviewable choice: every non-governance person, including active
+/// facilitators, gets `OwnRecords`. Facilitator authority is write-side
+/// (D-028) and does not widen analysis.
+pub fn analysis_scope(state: &GroupState, viewer: &ViewerContext) -> AnalysisScope {
+    match viewer {
+        ViewerContext::Anonymous => AnalysisScope::Nothing,
+        ViewerContext::Person { person } if is_governance(state, *person) => AnalysisScope::All,
+        ViewerContext::Person { person } => AnalysisScope::OwnRecords(*person),
+    }
+}
+
 /// Returns true when the viewer has an active facilitator or governance
 /// membership in the group (facilitator blueprint section 2; D-028). Grants
 /// write authority only; it is never consulted on a read path.
