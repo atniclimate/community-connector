@@ -223,6 +223,7 @@ fn assert_measures_match(plain: &GraphIndex, hidden: &GraphIndex, ids: &[EntityI
     assert_eq!(degree_measures(plain), degree_measures(hidden));
     assert_eq!(betweenness(plain), betweenness(hidden));
     assert_eq!(eccentricity(plain), eccentricity(hidden));
+    assert_eq!(continuance(plain), continuance(hidden));
     let membership = kind("affiliated_with");
     for &a in ids {
         for &b in ids {
@@ -302,6 +303,7 @@ fn hidden_fixture_would_change_results_if_it_were_visible() {
     assert_eq!(shortest_path(&plain, p3, p4, &c), Ok(None));
     assert!(shortest_path(&owner, p3, p4, &c).expect("known").is_some());
     assert_ne!(betweenness(&plain), betweenness(&owner));
+    assert_ne!(continuance(&plain), continuance(&owner));
     let membership = kind("affiliated_with");
     assert_ne!(
         shared_committee_jaccard(&plain, entity_id(1), entity_id(2), &membership),
