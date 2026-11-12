@@ -83,8 +83,10 @@ Effective disclosure is computed on the circle lattice.
 ```text
 effective_tier = most_restrictive(entity.tier, attribute.tier_override)
 ceiling = circle_ceiling(effective_tier)
-visible = viewer_circle >= min(value.visibility, ceiling)
+visible = viewer_circle <= min(value.visibility, ceiling)
 ```
+
+Circles order by audience size, so deeper access is the smaller value (Private sorts below Public); the `<=` direction follows the ERRATA under `value_visible` in `docs/blueprints/cn-perm.md`, which corrected the original `>=`.
 
 Rules by object type:
 
