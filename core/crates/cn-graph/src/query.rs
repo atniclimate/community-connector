@@ -147,23 +147,32 @@ fn unweighted_path(
     None
 }
 
+/// Hop-bounded label-setting search ordered by (cost, hops, node, push
+/// order). Labels pop in that order, so a node's first settled label is its
+/// best. Under `max_hops` a node is settled again by a later, costlier label
+/// that uses fewer hops, because only that label may still fit the limit;
+/// without a limit the first label is final (plain Dijkstra).
 fn weighted_path(
     idx: &GraphIndex,
     from: EntityId,
     to: EntityId,
     c: &PathConstraints,
 ) -> Option<Path> {
-    let mut heap = BinaryHeap::from([Reverse(QueueState::new(0.0, 0, from))]);
-    let mut best = BTreeMap::from([(from, (0.0, 0_usize))]);
-    let mut previous = BTreeMap::new();
+    let mut labels = vec![Label {
+        node: from,
+        via: None,
+    }];
+    let mut heap = BinaryHeap::from([Reverse(QueueState::new(0.0, 0, from, 0))]);
+    let mut settled_hops = BTreeMap::new();
     while let Some(Reverse(state)) = heap.pop() {
-        if stale_state(&best, state) {
+        if dominated(&settled_hops, c, state.node, state.hops) {
             continue;
         }
+        settled_hops.insert(state.node, state.hops);
         if state.node == to {
-            return Some(reconstruct(from, to, &previous, state.cost));
+            return Some(label_path(&labels, state.label, state.cost));
         }
-        push_weighted_neighbors(idx, c, state, &mut best, &mut previous, &mut heap);
+        push_weighted_neighbors(idx, c, state, &settled_hops, &mut labels, &mut heap);
     }
     None
 }
@@ -172,8 +181,8 @@ fn push_weighted_neighbors(
     idx: &GraphIndex,
     c: &PathConstraints,
     state: QueueState,
-    best: &mut BTreeMap<EntityId, (f64, usize)>,
-    previous: &mut BTreeMap<EntityId, (EntityId, EdgeId)>,
+    settled_hops: &BTreeMap<EntityId, usize>,
+    labels: &mut Vec<Label>,
     heap: &mut BinaryHeap<Reverse<QueueState>>,
 ) {
     let next_hops = state.hops.saturating_add(1);
@@ -181,14 +190,54 @@ fn push_weighted_neighbors(
         return;
     }
     for adj in neighbors(idx, state.node, c) {
-        let next_cost = state.cost + edge_cost(adj);
-        if !is_better(best.get(&adj.to), next_cost, next_hops) {
+        if dominated(settled_hops, c, adj.to, next_hops) {
             continue;
         }
-        best.insert(adj.to, (next_cost, next_hops));
-        previous.insert(adj.to, (state.node, adj.edge));
-        heap.push(Reverse(QueueState::new(next_cost, next_hops, adj.to)));
+        let next_cost = state.cost + edge_cost(adj);
+        labels.push(Label {
+            node: adj.to,
+            via: Some((state.label, adj.edge)),
+        });
+        let label = labels.len() - 1;
+        heap.push(Reverse(QueueState::new(
+            next_cost, next_hops, adj.to, label,
+        )));
     }
+}
+
+/// A label for `node` is useless once the node was settled by a label that
+/// was no costlier (pop order) and used no more hops; with no hop limit,
+/// fewer hops cannot rescue a costlier label either.
+fn dominated(
+    settled_hops: &BTreeMap<EntityId, usize>,
+    c: &PathConstraints,
+    node: EntityId,
+    hops: usize,
+) -> bool {
+    settled_hops
+        .get(&node)
+        .is_some_and(|&best| c.max_hops.is_none() || best <= hops)
+}
+
+fn label_path(labels: &[Label], last: usize, cost: f64) -> Path {
+    let mut nodes = vec![labels[last].node];
+    let mut edges = Vec::new();
+    let mut current = last;
+    while let Some((parent, edge)) = labels[current].via {
+        edges.push(edge);
+        nodes.push(labels[parent].node);
+        current = parent;
+    }
+    nodes.reverse();
+    edges.reverse();
+    Path { nodes, edges, cost }
+}
+
+/// One step of a weighted search: the node reached and the parent label and
+/// edge it was reached through (`None` for the source).
+struct Label {
+    node: EntityId,
+    via: Option<(usize, EdgeId)>,
 }
 
 fn reconstruct(
@@ -274,37 +323,28 @@ fn edge_cost(adj: &Adjacency) -> f64 {
         .map_or(1.0, |weight| 1.0 / weight.max(f64::EPSILON))
 }
 
-fn is_better(current: Option<&(f64, usize)>, cost: f64, hops: usize) -> bool {
-    current.is_none_or(|(best_cost, best_hops)| {
-        cost.total_cmp(best_cost) == Ordering::Less
-            || (cost.total_cmp(best_cost) == Ordering::Equal && hops < *best_hops)
-    })
-}
-
-fn stale_state(best: &BTreeMap<EntityId, (f64, usize)>, state: QueueState) -> bool {
-    best.get(&state.node).is_some_and(|(cost, hops)| {
-        *hops != state.hops || cost.total_cmp(&state.cost) != Ordering::Equal
-    })
-}
-
 #[derive(Debug, Clone, Copy)]
 struct QueueState {
     cost: f64,
     hops: usize,
     node: EntityId,
+    label: usize,
 }
 
 impl QueueState {
-    fn new(cost: f64, hops: usize, node: EntityId) -> Self {
-        Self { cost, hops, node }
+    fn new(cost: f64, hops: usize, node: EntityId, label: usize) -> Self {
+        Self {
+            cost,
+            hops,
+            node,
+            label,
+        }
     }
 }
 
 impl PartialEq for QueueState {
     fn eq(&self, other: &Self) -> bool {
-        self.cost.total_cmp(&other.cost) == Ordering::Equal
-            && self.hops == other.hops
-            && self.node == other.node
+        self.cmp(other) == Ordering::Equal
     }
 }
 
@@ -322,6 +362,7 @@ impl Ord for QueueState {
             .total_cmp(&other.cost)
             .then_with(|| self.hops.cmp(&other.hops))
             .then_with(|| self.node.cmp(&other.node))
+            .then_with(|| self.label.cmp(&other.label))
     }
 }
 
