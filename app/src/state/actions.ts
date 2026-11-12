@@ -59,6 +59,11 @@ export type Action =
       readonly kind: "routeCleared";
     }
   | {
+      /** Focuses a "who can help" result; the viz lights its path. */
+      readonly kind: "routeResultChosen";
+      readonly entityId: string;
+    }
+  | {
       readonly kind: "groupLoadRequested";
       readonly groupId: string;
       readonly viewer: ViewerContextDto;

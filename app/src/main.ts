@@ -13,6 +13,7 @@ import { mountLegend } from "./viz/legend";
 import { mountSearch } from "./ui/search";
 import { mountDetailPanel } from "./ui/detail";
 import { mountFlatProjection } from "./ui/flat";
+import { mountRelatives } from "./ui/relatives";
 import { mountIntakeWizard } from "./ui/intake/panel";
 
 declare const __CN_SNAPSHOT_MODE__: boolean;
@@ -27,6 +28,7 @@ const searchElement = document.createElement("div");
 const vizElement = document.createElement("div");
 const detailElement = document.createElement("div");
 const flatElement = document.createElement("div");
+const relativesElement = document.createElement("div");
 const intakeElement = document.createElement("div");
 const statusText = document.createElement("span");
 const presentButton = document.createElement("button");
@@ -52,12 +54,14 @@ detailElement.setAttribute("aria-label", "Selected entity details");
 flatElement.className = "cn-flat-region";
 flatElement.setAttribute("role", "region");
 flatElement.setAttribute("aria-label", "Flat network view");
+relativesElement.className = "cn-relatives-region";
 intakeElement.className = "cn-intake-region";
 appElement.replaceChildren(
   statusElement,
   searchElement,
   vizElement,
   detailElement,
+  relativesElement,
   flatElement,
   intakeElement,
 );
@@ -197,6 +201,7 @@ const unmounts = [
   mountViz(vizElement, store, client),
   mountLegend(vizElement, store),
   mountDetailPanel(detailElement, { store, client }),
+  mountRelatives(relativesElement, { store, client }),
   mountFlatProjection(flatElement, { store }),
 ];
 render();

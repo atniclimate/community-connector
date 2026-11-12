@@ -2,6 +2,7 @@ import type {
   AppState,
   EntityDetailDto,
   ErrorEnvelopeDto,
+  PathDto,
   ProjectionEntityDto,
   RouteCandidateDto,
   SearchState,
@@ -41,6 +42,15 @@ export function selectRoutingResults(state: AppState): readonly RoutingCandidate
     resting: visiblyResting(selectProjectedEntityById(state, candidate.entity)),
   }));
   return [...candidates.filter((c) => !c.resting), ...candidates.filter((c) => c.resting)];
+}
+
+/** The chosen "who can help" path while its result is the focused entity. */
+export function selectChosenRoutePath(state: AppState): PathDto | null {
+  const { chosen, result } = state.routing;
+  if (chosen === null || state.view.mode !== "focus" || state.view.focusedEntityId !== chosen) {
+    return null;
+  }
+  return result?.find((candidate) => candidate.entity === chosen)?.path ?? null;
 }
 
 export type MirrorGapLine = {

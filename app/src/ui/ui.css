@@ -19,7 +19,8 @@
   gap: 1rem;
 }
 
-.cn-present-enter {
+.cn-present-enter,
+.cn-relatives-submit {
   flex: none;
   border: 1px solid var(--cn-text-secondary, #b5c0d0);
   border-radius: 4px;
@@ -35,7 +36,8 @@
   opacity: 0.5;
 }
 
-.cn-present-enter:focus-visible {
+.cn-present-enter:focus-visible,
+.cn-relatives-submit:focus-visible {
   outline: 2px solid var(--cn-accent-focusRing, #ffd38a);
   outline-offset: 2px;
 }
@@ -51,6 +53,7 @@
 #app[data-view-mode="present"] .cn-search-region,
 #app[data-view-mode="present"] .cn-detail-region,
 #app[data-view-mode="present"] .cn-flat-region,
+#app[data-view-mode="present"] .cn-relatives-region,
 #app[data-view-mode="present"] .cn-intake-region,
 #app[data-view-mode="present"] .cn-legend {
   display: none;
@@ -95,7 +98,8 @@
 
 .cn-search,
 .cn-detail,
-.cn-flat {
+.cn-flat,
+.cn-relatives {
   box-sizing: border-box;
   width: 100%;
   min-width: 0;
@@ -110,7 +114,8 @@
 
 .cn-search *:focus-visible,
 .cn-detail *:focus-visible,
-.cn-flat *:focus-visible {
+.cn-flat *:focus-visible,
+.cn-relatives *:focus-visible {
   outline: 2px solid var(--cn-accent-focusRing, #ffd38a);
   outline-offset: 2px;
 }
@@ -308,25 +313,80 @@
   max-width: 100%;
 }
 
-.cn-flat table {
+.cn-flat table,
+.cn-relatives table {
   border-collapse: collapse;
   width: 100%;
 }
 
 .cn-flat th,
-.cn-flat td {
+.cn-flat td,
+.cn-relatives th,
+.cn-relatives td {
   text-align: left;
   padding: 0.25rem 0.5rem;
   border-bottom: 1px solid var(--cn-bg-edge, #06080d);
   overflow-wrap: anywhere;
 }
 
-.cn-flat thead th {
+.cn-flat thead th,
+.cn-relatives thead th {
   color: var(--cn-text-secondary, #b5c0d0);
   font-size: 0.8125rem;
 }
 
-.cn-flat-open {
+/* Relatives panel: full-width row, single column at 375px (I9). */
+.cn-relatives-region {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+
+.cn-relatives-heading {
+  margin: 0.75rem 0 0.25rem;
+  font-size: 1rem;
+}
+
+.cn-relatives-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: flex-end;
+}
+
+.cn-relatives-form .cn-search-label {
+  flex-basis: 100%;
+  margin-bottom: 0;
+}
+
+.cn-relatives-form .cn-search-input {
+  flex: 1 1 12rem;
+  width: auto;
+}
+
+.cn-relatives-list {
+  list-style: none;
+  margin: 0.5rem 0 0;
+  padding: 0;
+}
+
+.cn-relatives-list li {
+  padding: 0.375rem 0;
+  border-bottom: 1px solid var(--cn-bg-edge, #06080d);
+}
+
+.cn-relatives-line,
+.cn-relatives-gap {
+  margin: 0.25rem 0 0;
+  overflow-wrap: anywhere;
+}
+
+.cn-relatives-gap {
+  color: var(--cn-text-secondary, #b5c0d0);
+  font-size: 0.8125rem;
+}
+
+.cn-flat-open,
+.cn-relatives-pick {
   border: none;
   background: transparent;
   color: inherit;
@@ -340,7 +400,8 @@
 @media (prefers-reduced-motion: no-preference) {
   .cn-search-option,
   .cn-detail-close,
-  .cn-flat-open {
+  .cn-flat-open,
+  .cn-relatives-pick {
     transition: background-color 120ms ease-out, color 120ms ease-out;
   }
 }

@@ -102,6 +102,8 @@ export type RouteCandidateDto = {
 
 export type RoutingState = RequestSlice<readonly RouteCandidateDto[]> & {
   readonly query: string;
+  /** The result the viewer chose; its path is lit while it stays focused. */
+  readonly chosen: string | null;
 };
 
 export type NeighborhoodDto = {
@@ -355,7 +357,7 @@ function idleSlice<T>(): RequestSlice<T> {
 }
 
 export function initialRoutingState(query = ""): RoutingState {
-  return { ...idleSlice<readonly RouteCandidateDto[]>(), query };
+  return { ...idleSlice<readonly RouteCandidateDto[]>(), query, chosen: null };
 }
 
 export function initialAnalysisState(): AnalysisState {

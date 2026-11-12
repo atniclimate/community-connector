@@ -321,7 +321,14 @@ function reduceAction(state: AppState, action: Action): AppState {
     case "routeRequested":
       return {
         ...state,
-        routing: { ...state.routing, query: action.query, status: "pending", error: null, request: action.request },
+        routing: {
+          ...state.routing,
+          query: action.query,
+          status: "pending",
+          error: null,
+          request: action.request,
+          chosen: null,
+        },
       };
     case "routeSucceeded":
     case "routeFailed":
@@ -337,6 +344,11 @@ function reduceAction(state: AppState, action: Action): AppState {
       };
     case "routeCleared":
       return { ...state, routing: initialRoutingState() };
+    case "routeResultChosen":
+      return {
+        ...reduceAction(state, { kind: "entityFocused", entityId: action.entityId }),
+        routing: { ...state.routing, chosen: action.entityId },
+      };
     case "analysisRequested":
       return withAnalysis(state, action.analysis, {
         ...state.analysis[action.analysis],

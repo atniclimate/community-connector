@@ -1,5 +1,6 @@
 import { Color, Matrix4, Object3D } from "three";
-import type { ProjectionDto } from "../state/state";
+import type { AppState, ProjectionDto } from "../state/state";
+import { selectChosenRoutePath } from "../state/selectors";
 import { scaleChroma, shiftLightness } from "../theme/color";
 import type { Theme } from "../theme/tokens";
 import { RENDER_TOKENS } from "./config";
@@ -30,6 +31,21 @@ const COLOR = new Color();
 // omits them.
 const HOVER_LIGHTNESS_DELTA = 0.08;
 const DIM_CHROMA_SCALE = 0.35;
+
+/**
+ * Outside present mode, the chosen "who can help" chain lights through the
+ * same highlight sets presenter beats use; empty when nothing is chosen.
+ * shortcut: choosing the result that is already focused does not re-light,
+ * because syncMotion re-applies focus only on a focus change; track the
+ * chosen path in RenderState if that matters.
+ */
+export function routePathHighlights(state: AppState): {
+  readonly ids: ReadonlySet<string>;
+  readonly edgeIds: ReadonlySet<string>;
+} {
+  const path = selectChosenRoutePath(state);
+  return { ids: new Set(path?.nodes ?? []), edgeIds: new Set(path?.edges ?? []) };
+}
 
 /**
  * `highlightedIds` and `highlightedEdgeIds` are extra members the caller

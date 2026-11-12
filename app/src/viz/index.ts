@@ -13,7 +13,7 @@ import { HoverOverlay } from "./hover";
 import { projectedEntities } from "./projection";
 import { createVizScene, type SceneSetup } from "./scene";
 import { createCameraRig, zoomToFit, type CameraRig } from "./camera";
-import { applyFocusToNodeLayer, computeFocusSet, FocusBlend, writeNodeHover, type FocusSet } from "./focus";
+import { applyFocusToNodeLayer, computeFocusSet, FocusBlend, routePathHighlights, writeNodeHover, type FocusSet } from "./focus";
 import {
   beatCameraMove,
   beatHighlights,
@@ -285,11 +285,11 @@ function syncMotion(
   renderState.sceneSetup.setPresentMode(present);
   const beat = present ? state.presentation.beats[state.presentation.beatIndex] : undefined;
   syncPresenterMeasure(renderState, state, beat, store, client);
-  const highlights = beatHighlights(state.data.projection, present ? beat : undefined);
+  const highlights = present ? beatHighlights(state.data.projection, beat) : routePathHighlights(state);
   if (highlights !== null) {
     // Measure beats own highlightedIds (set asynchronously); every other beat,
-    // and leaving presenter mode, derives it from the beat's kind and
-    // edge-kind filters.
+    // derives it from the beat's kind and edge-kind filters; outside
+    // presenter mode it is the chosen "who can help" path, if any.
     renderState.highlightedIds = highlights.ids;
     renderState.highlightedEdgeIds = highlights.edgeIds;
   }
