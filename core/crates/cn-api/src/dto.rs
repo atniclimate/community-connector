@@ -61,6 +61,12 @@ pub(crate) struct NeighborhoodRequest {
     pub(crate) constraints: PathConstraints,
 }
 
+/// Request for `graph_continuance`. It has no options yet; the call takes a
+/// JSON object so options can be added without changing the signature.
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ContinuanceRequest {}
+
 /// One committee-overlap comparison requested by the caller (the graph side
 /// is otherwise computed for every entity, never scoped by the caller - the
 /// no-leak property, ADR-003 D1).

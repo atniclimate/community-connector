@@ -88,4 +88,32 @@ describe("WasmClient protocol routing", () => {
 
     await expect(pending).resolves.toEqual({ degree: {}, betweenness: {} });
   });
+
+  it("routes continuance, introduction, and mirror requests through the worker protocol", async () => {
+    const transport = new MockTransport();
+    const client = new WasmClient(transport);
+    const viewer = { kind: "person", person: "p1" } as const;
+    const continuance = client.graphContinuance("group-alpha", viewer, {});
+    const introductions = client.suggestIntroductions("group-alpha", viewer, { center: "e1" });
+    const mirror = client.recordMirror("group-alpha", viewer);
+
+    expect(transport.sent).toEqual([
+      { correlationId: 1, kind: "graphContinuance", groupId: "group-alpha", viewer, request: {} },
+      {
+        correlationId: 2,
+        kind: "suggestIntroductions",
+        groupId: "group-alpha",
+        viewer,
+        request: { center: "e1" },
+      },
+      { correlationId: 3, kind: "recordMirror", groupId: "group-alpha", viewer },
+    ]);
+    transport.reply({ correlationId: 3, ok: { owner: "p1", entities: {} } });
+    transport.reply({ correlationId: 2, ok: [{ candidate: "e2" }] });
+    transport.reply({ correlationId: 1, ok: { articulation_points: {}, bridges: {} } });
+
+    await expect(continuance).resolves.toEqual({ articulation_points: {}, bridges: {} });
+    await expect(introductions).resolves.toEqual([{ candidate: "e2" }]);
+    await expect(mirror).resolves.toEqual({ owner: "p1", entities: {} });
+  });
 });

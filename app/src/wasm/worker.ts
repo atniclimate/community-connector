@@ -46,6 +46,12 @@ function runRequest(instance: CnApi, request: WorkerRequest): string {
       return instance.query_neighborhood(request.groupId, viewerJson(request), JSON.stringify(request.request));
     case "graphMeasures":
       return instance.graph_measures(request.groupId, viewerJson(request), JSON.stringify(request.request));
+    case "graphContinuance":
+      return instance.graph_continuance(request.groupId, viewerJson(request), JSON.stringify(request.request));
+    case "suggestIntroductions":
+      return instance.suggest_introductions(request.groupId, viewerJson(request), JSON.stringify(request.request));
+    case "recordMirror":
+      return instance.record_mirror(request.groupId, viewerJson(request));
     case "viewerRoles":
       return instance.viewer_roles(request.groupId, viewerJson(request));
     case "intakeStageRecord":

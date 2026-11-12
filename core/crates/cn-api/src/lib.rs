@@ -3,6 +3,7 @@
 //! The public surface follows ADR-003 D1-D4 and A-B5: callers pass JSON
 //! strings, receive envelope JSON strings, and never get raw store state.
 
+mod analysis;
 mod dto;
 mod error;
 mod export;
@@ -133,6 +134,36 @@ impl Api {
         request_json: &str,
     ) -> String {
         respond(|| self.graph_measures_impl(group_id, viewer_ctx_json, request_json))
+    }
+
+    /// Articulation points, bridge ties, and component sizes over the viewer
+    /// projection, limited by `cn_perm::analysis_scope`: governance sees all,
+    /// other people only what rests on their own records, anonymous nothing.
+    pub fn graph_continuance(
+        &mut self,
+        group_id: &str,
+        viewer_ctx_json: &str,
+        request_json: &str,
+    ) -> String {
+        respond(|| self.graph_continuance_impl(group_id, viewer_ctx_json, request_json))
+    }
+
+    /// Introduction suggestions for a center; unless governance, the center
+    /// must be the viewer's own entity, else the same not_found a hidden or
+    /// missing center gets (ADR-003 A-B4).
+    pub fn suggest_introductions(
+        &mut self,
+        group_id: &str,
+        viewer_ctx_json: &str,
+        request_json: &str,
+    ) -> String {
+        respond(|| self.suggest_introductions_impl(group_id, viewer_ctx_json, request_json))
+    }
+
+    /// What each audience receives of the viewer's own records; anonymous
+    /// gets an empty mirror.
+    pub fn record_mirror(&self, group_id: &str, viewer_ctx_json: &str) -> String {
+        respond(|| self.record_mirror_impl(group_id, viewer_ctx_json))
     }
 
     /// Searches projected attribute values only (ADR-003 A-B4).

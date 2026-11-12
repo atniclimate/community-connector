@@ -66,6 +66,26 @@ export type WorkerRequest =
     }
   | {
       readonly correlationId: number;
+      readonly kind: "graphContinuance";
+      readonly groupId: string;
+      readonly viewer: ViewerContextDto;
+      readonly request: JsonObject;
+    }
+  | {
+      readonly correlationId: number;
+      readonly kind: "suggestIntroductions";
+      readonly groupId: string;
+      readonly viewer: ViewerContextDto;
+      readonly request: JsonObject;
+    }
+  | {
+      readonly correlationId: number;
+      readonly kind: "recordMirror";
+      readonly groupId: string;
+      readonly viewer: ViewerContextDto;
+    }
+  | {
+      readonly correlationId: number;
       readonly kind: "viewerRoles";
       readonly groupId: string;
       readonly viewer: ViewerContextDto;
@@ -110,6 +130,9 @@ export type WorkerRequestInput =
   | Omit<Extract<WorkerRequest, { readonly kind: "queryPaths" }>, "correlationId">
   | Omit<Extract<WorkerRequest, { readonly kind: "queryNeighborhood" }>, "correlationId">
   | Omit<Extract<WorkerRequest, { readonly kind: "graphMeasures" }>, "correlationId">
+  | Omit<Extract<WorkerRequest, { readonly kind: "graphContinuance" }>, "correlationId">
+  | Omit<Extract<WorkerRequest, { readonly kind: "suggestIntroductions" }>, "correlationId">
+  | Omit<Extract<WorkerRequest, { readonly kind: "recordMirror" }>, "correlationId">
   | Omit<Extract<WorkerRequest, { readonly kind: "viewerRoles" }>, "correlationId">
   | Omit<Extract<WorkerRequest, { readonly kind: "intakeStageRecord" }>, "correlationId">
   | Omit<Extract<WorkerRequest, { readonly kind: "intakeBuildDecision" }>, "correlationId">

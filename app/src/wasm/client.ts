@@ -110,6 +110,26 @@ export class WasmClient {
     return this.request({ kind: "graphMeasures", groupId, viewer, request });
   }
 
+  public graphContinuance(
+    groupId: string,
+    viewer: ViewerContextDto,
+    request: JsonObject,
+  ): Promise<JsonObject> {
+    return this.request({ kind: "graphContinuance", groupId, viewer, request });
+  }
+
+  public suggestIntroductions(
+    groupId: string,
+    viewer: ViewerContextDto,
+    request: JsonObject,
+  ): Promise<readonly JsonObject[]> {
+    return this.request({ kind: "suggestIntroductions", groupId, viewer, request });
+  }
+
+  public recordMirror(groupId: string, viewer: ViewerContextDto): Promise<JsonObject> {
+    return this.request({ kind: "recordMirror", groupId, viewer });
+  }
+
   public viewerRoles(groupId: string, viewer: ViewerContextDto): Promise<JsonObject> {
     return this.request({ kind: "viewerRoles", groupId, viewer });
   }

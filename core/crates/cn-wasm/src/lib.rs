@@ -109,6 +109,30 @@ mod bindings {
                 .graph_measures(group_id, viewer_ctx_json, request_json)
         }
 
+        pub fn graph_continuance(
+            &mut self,
+            group_id: &str,
+            viewer_ctx_json: &str,
+            request_json: &str,
+        ) -> String {
+            self.inner
+                .graph_continuance(group_id, viewer_ctx_json, request_json)
+        }
+
+        pub fn suggest_introductions(
+            &mut self,
+            group_id: &str,
+            viewer_ctx_json: &str,
+            request_json: &str,
+        ) -> String {
+            self.inner
+                .suggest_introductions(group_id, viewer_ctx_json, request_json)
+        }
+
+        pub fn record_mirror(&self, group_id: &str, viewer_ctx_json: &str) -> String {
+            self.inner.record_mirror(group_id, viewer_ctx_json)
+        }
+
         pub fn validation_report(&self, group_id: &str, viewer_ctx_json: &str) -> String {
             self.inner.validation_report(group_id, viewer_ctx_json)
         }
