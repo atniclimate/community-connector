@@ -20,9 +20,24 @@ has seen the new UI in a browser, and its copy is draft (D-051, D-023). ADR-008
 (two-sided relations) and ADR-007 (Network circle and bridging) are Proposed and
 reviewed; acceptance is the human's. The gap that matters most: approved remote
 respondents land unowned (ADR-005 D7) and viewers are asserted (D-015), so none of this
-reaches a real person yet. The convention outcome is unrecorded. Nothing was pushed.
+reaches a real person yet. The convention outcome is unrecorded. Main was pushed to
+origin at the 2026-11-12 trueup (see HANDOFF.md).
 
-## Launch card: ADR-008 implementation, owner claim, key-bound viewer (NEXT, after the human accepts ADR-008)
+## Launch card: walkthrough, demo, then decisions (NEXT, with the human present)
+
+**Gate** the human's decisions recorded in DECISIONS.md - **Budget** ~40k tokens
+
+> Role: guide. Walk the human through the 2026-11-11 changes in the order of
+> `docs/planning/RELATIVES-ACROSS-GRAPHS-2026-11-11.md` (sections 1-8). Demo in a real
+> browser: `cd app; npm run dev`, open `?group=relatives-demo`, search "eelgrass", try
+> the Relatives panel sections and the My relatives toggle, and note anything that reads
+> wrong (this is the first real-browser run of the panel). Then take the human's answers
+> to the one-line questions in HANDOFF.md (ADR-008 and ADR-007 acceptance, reciprocity
+> rule, ratification, facilitator scope, S-E2 backup and verdict, convention outcome)
+> and record them as a DECISIONS.md entry. Only after acceptance does the ADR-008 card
+> below start.
+
+## Launch card: ADR-008 implementation, owner claim, key-bound viewer (after the walkthrough and the human's acceptance of ADR-008)
 
 **Gate** ADR-008 accepted by the human (recorded in DECISIONS.md); ADR-008 test
 obligations green; check-all 12/12 - **Budget** ~150k tokens

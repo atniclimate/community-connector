@@ -12,7 +12,8 @@
 > Plain `git push` fails from a non-interactive session here: `gh` has two accounts and the
 > active one is not `atniclimate`. Working one-shot form (changes no config, prints no token):
 > `git -c credential.helper= -c 'credential.helper=!f() { echo username=atniclimate; echo "password=$(gh auth token --user atniclimate)"; }; f' push origin main`.
-> This session pushed nothing; main is ahead of origin by this session's commits.
+> The 2026-11-12 trueup pushed main (the 2026-11-11 session's commits) to origin/main
+> with the one-shot form above; the owner's eight uncommitted policy edits stay local.
 
 ## What this project is
 
@@ -98,6 +99,11 @@ archived handoff. **The convention outcome is unrecorded:** nothing in the repo 
 the A9 reveal went on 2026-09-15, and the D-052 retrospective was never held.
 
 **NOT done - ordered next actions:**
+0. **Walkthrough, demo, then decisions (owner's direction at the 2026-11-12 trueup):**
+   walk the human through the 2026-11-11 changes, demo `?group=relatives-demo` in a real
+   browser (first real-browser run of the Relatives panel), then record the human's
+   answers to the one-line questions below in DECISIONS.md. Launch card:
+   `docs/NEXT_SESSION.md`.
 1. **ADR-008 acceptance, then its implementation** before the S-E2 branch or any form
    answer creates person-to-person edges: `EdgeAcknowledge`, Confirmed status, final
    private refusal, grandfathering in synthetic groups, template `subject` field, model
