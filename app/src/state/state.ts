@@ -76,6 +76,107 @@ export type SearchState = {
   readonly request: RequestIdentity | null;
 };
 
+/** One status/result/error/request record for a viewer-scoped core call;
+ * results are dropped on staleness exactly like search (ADR-003 D3). */
+export type RequestSlice<T> = {
+  readonly status: SearchStatus;
+  readonly result: T | null;
+  readonly error: ErrorEnvelopeDto | null;
+  readonly request: RequestIdentity | null;
+};
+
+/** cn-graph `Path` over the viewer projection; null when no route exists. */
+export type PathDto = {
+  readonly nodes: readonly string[];
+  readonly edges: readonly string[];
+  readonly cost: number;
+};
+
+/** A "who can help" candidate: the search hits that matched it and the
+ * route from the viewer's own entity, or null when none is within reach. */
+export type RouteCandidateDto = {
+  readonly entity: string;
+  readonly hits: readonly SearchHitDto[];
+  readonly path: PathDto | null;
+};
+
+export type RoutingState = RequestSlice<readonly RouteCandidateDto[]> & {
+  readonly query: string;
+};
+
+export type NeighborhoodDto = {
+  readonly center: string;
+  readonly layers: readonly (readonly string[])[];
+};
+
+export type ArticulationPointDto = {
+  readonly entity: string;
+  readonly parts: number;
+  readonly part_sizes: readonly number[];
+  readonly explanation: string;
+};
+
+export type BridgeTieDto = {
+  readonly edge: string;
+  readonly from: string;
+  readonly to: string;
+  readonly from_side: number;
+  readonly to_side: number;
+  readonly explanation: string;
+};
+
+export type ContinuanceDto = {
+  readonly articulation_points: Readonly<Record<string, ArticulationPointDto>>;
+  readonly bridges: Readonly<Record<string, BridgeTieDto>>;
+  readonly components: Readonly<Record<string, number>>;
+};
+
+export type IntroductionDto = {
+  readonly candidate: string;
+  readonly score: number;
+  readonly introducers: readonly { readonly entity: string; readonly willing: boolean }[];
+  readonly shared_tags: {
+    readonly center_seeks: readonly string[];
+    readonly candidate_seeks: readonly string[];
+  };
+  readonly explanation: string;
+};
+
+/** cn-perm `VisibilityMirror`: the chosen circle, the tier ceiling, and
+ * what each audience receives - all computed by the core (I2). */
+export type VisibilityMirrorDto = {
+  readonly visibility: string;
+  readonly effective_tier: string;
+  readonly ceiling: string;
+  readonly audiences: Readonly<Record<string, boolean>>;
+  readonly tier_capped: boolean;
+  readonly ceiling_blocks: readonly string[];
+};
+
+export type EntityMirrorDto = {
+  readonly kind: string;
+  readonly presence: VisibilityMirrorDto;
+  readonly attributes: Readonly<Record<string, VisibilityMirrorDto>>;
+};
+
+export type RecordMirrorDto = {
+  readonly owner: string | null;
+  readonly entities: Readonly<Record<string, EntityMirrorDto>>;
+};
+
+export type AnalysisResults = {
+  readonly neighborhood: NeighborhoodDto;
+  readonly continuance: ContinuanceDto;
+  readonly introductions: readonly IntroductionDto[];
+  readonly mirror: RecordMirrorDto;
+};
+
+export type AnalysisName = keyof AnalysisResults;
+
+export type AnalysisState = {
+  readonly [K in AnalysisName]: RequestSlice<AnalysisResults[K]>;
+};
+
 export type LoadState = "idle" | "loading" | "ready" | "error";
 export type ViewMode = "overview" | "focus" | "story" | "present";
 export type QualityTierName = "A" | "B" | "C" | "D";
@@ -225,6 +326,10 @@ export interface AppState {
     readonly kindMeta: Readonly<Record<string, KindMeta>>;
   };
   readonly search: SearchState;
+  /** "Who can help" routing: search plus paths from the viewer's own entity. */
+  readonly routing: RoutingState;
+  /** Person-centered core calls; reset with search on group load or projection. */
+  readonly analysis: AnalysisState;
   readonly presentation: PresentationState;
   /** Intake queue slice: survives group reloads (the queue is the
    * facilitator's ops directory, not group-session data). */
@@ -242,6 +347,23 @@ export function initialSearchState(): SearchState {
     hits: [],
     error: null,
     request: null,
+  };
+}
+
+function idleSlice<T>(): RequestSlice<T> {
+  return { status: "idle", result: null, error: null, request: null };
+}
+
+export function initialRoutingState(query = ""): RoutingState {
+  return { ...idleSlice<readonly RouteCandidateDto[]>(), query };
+}
+
+export function initialAnalysisState(): AnalysisState {
+  return {
+    neighborhood: idleSlice(),
+    continuance: idleSlice(),
+    introductions: idleSlice(),
+    mirror: idleSlice(),
   };
 }
 
@@ -286,6 +408,8 @@ export function createInitialState(reducedMotion = false): AppState {
       kindMeta: {},
     },
     search: initialSearchState(),
+    routing: initialRoutingState(),
+    analysis: initialAnalysisState(),
     presentation: initialPresentationState(),
     intake: initialIntakeState(),
     theme: {

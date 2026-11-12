@@ -1,4 +1,83 @@
-import type { AppState, EntityDetailDto, ProjectionEntityDto, SearchState } from "./state";
+import type {
+  AppState,
+  EntityDetailDto,
+  ErrorEnvelopeDto,
+  ProjectionEntityDto,
+  RouteCandidateDto,
+  SearchState,
+  SearchStatus,
+  VisibilityMirrorDto,
+} from "./state";
+
+/**
+ * The viewer's own entity: the first projected entity the core marks
+ * `owner_is_viewer`. shortcut: a viewer owning several entities gets the
+ * first in projection order; pick by kind when a viewer can own several.
+ */
+export function selectSelfEntityId(state: AppState): string | null {
+  return selectProjectedEntities(state).find((entity) => entity.owner_is_viewer === true)?.id ?? null;
+}
+
+export type RoutingCandidateView = RouteCandidateDto & { readonly resting: boolean };
+
+function visiblyResting(entity: ProjectionEntityDto | null): boolean {
+  const attributes = entity?.attributes;
+  if (typeof attributes !== "object" || attributes === null || Array.isArray(attributes)) {
+    return false;
+  }
+  const capacity = (attributes as Readonly<Record<string, unknown>>).capacity;
+  return typeof capacity === "object" && capacity !== null && (capacity as { value?: unknown }).value === "resting";
+}
+
+/**
+ * Routing candidates in core order, except that a candidate whose projected
+ * capacity reads "resting" sorts last so the same few people are not asked
+ * first while resting. Presentation order only: it reads what the viewer's
+ * projection already shows and never decides visibility (I2).
+ */
+export function selectRoutingResults(state: AppState): readonly RoutingCandidateView[] {
+  const candidates = (state.routing.result ?? []).map((candidate) => ({
+    ...candidate,
+    resting: visiblyResting(selectProjectedEntityById(state, candidate.entity)),
+  }));
+  return [...candidates.filter((c) => !c.resting), ...candidates.filter((c) => c.resting)];
+}
+
+export type MirrorGapLine = {
+  readonly entityId: string;
+  /** Null for the record's own presence. */
+  readonly attribute: string | null;
+  readonly text: string;
+};
+
+export type MirrorView = {
+  readonly status: SearchStatus;
+  readonly error: ErrorEnvelopeDto | null;
+  readonly gaps: readonly MirrorGapLine[];
+};
+
+function gapText(attribute: string | null, mirror: VisibilityMirrorDto): string {
+  const chose = attribute === null ? "You chose" : `For ${attribute}, you chose`;
+  return `${chose} ${mirror.visibility}; this record's tier holds it at ${mirror.ceiling}.`;
+}
+
+/**
+ * Plain-language lines for every value whose chosen circle is wider than
+ * its tier allows, from the core's own `tier_capped` and `ceiling` (I2).
+ */
+export function selectMirrorView(state: AppState): MirrorView {
+  const { status, error, result } = state.analysis.mirror;
+  const gaps: MirrorGapLine[] = [];
+  for (const [entityId, entity] of Object.entries(result?.entities ?? {})) {
+    const values: [string | null, VisibilityMirrorDto][] = [[null, entity.presence], ...Object.entries(entity.attributes)];
+    for (const [attribute, mirror] of values) {
+      if (mirror.tier_capped) {
+        gaps.push({ entityId, attribute, text: gapText(attribute, mirror) });
+      }
+    }
+  }
+  return { status, error, gaps };
+}
 
 export function selectProjectedEntities(state: AppState): readonly ProjectionEntityDto[] {
   return state.data.projection?.entities ?? [];

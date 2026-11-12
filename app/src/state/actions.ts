@@ -1,4 +1,6 @@
 import type {
+  AnalysisName,
+  AnalysisResults,
   EntityDetailDto,
   ErrorEnvelopeDto,
   IntakeRecordSummaryDto,
@@ -7,12 +9,55 @@ import type {
   ProjectionDto,
   QualityTierName,
   RequestIdentity,
+  RouteCandidateDto,
   SearchHitDto,
   ViewerContextDto,
 } from "./state";
 import type { Theme, ThemeReport } from "../theme/tokens";
 
+/** Ties each analysis name to its own result type. */
+export type AnalysisSucceededAction = {
+  readonly [K in AnalysisName]: {
+    readonly kind: "analysisSucceeded";
+    readonly analysis: K;
+    readonly result: AnalysisResults[K];
+    readonly request: RequestIdentity;
+  };
+}[AnalysisName];
+
 export type Action =
+  | AnalysisSucceededAction
+  | {
+      readonly kind: "analysisRequested";
+      readonly analysis: AnalysisName;
+      readonly request: RequestIdentity;
+    }
+  | {
+      readonly kind: "analysisFailed";
+      readonly analysis: AnalysisName;
+      readonly error: ErrorEnvelopeDto;
+      readonly request: RequestIdentity;
+    }
+  | {
+      readonly kind: "routeRequested";
+      readonly query: string;
+      readonly request: RequestIdentity;
+    }
+  | {
+      readonly kind: "routeSucceeded";
+      readonly query: string;
+      readonly candidates: readonly RouteCandidateDto[];
+      readonly request: RequestIdentity;
+    }
+  | {
+      readonly kind: "routeFailed";
+      readonly query: string;
+      readonly error: ErrorEnvelopeDto;
+      readonly request: RequestIdentity;
+    }
+  | {
+      readonly kind: "routeCleared";
+    }
   | {
       readonly kind: "groupLoadRequested";
       readonly groupId: string;

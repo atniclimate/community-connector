@@ -1,7 +1,12 @@
 import type { Action } from "./actions";
 import type { AppState, PresentBeat } from "./state";
-import { initialIntakeState, initialSearchState } from "./state";
-import type { RequestIdentity } from "./state";
+import {
+  initialAnalysisState,
+  initialIntakeState,
+  initialRoutingState,
+  initialSearchState,
+} from "./state";
+import type { AnalysisName, AnalysisState, RequestIdentity } from "./state";
 
 function assertNever(value: never): never {
   throw new Error(`Unhandled action: ${JSON.stringify(value)}`);
@@ -59,6 +64,18 @@ function sameRequest(left: RequestIdentity | null, right: RequestIdentity): bool
   return left !== null && left.requestId === right.requestId;
 }
 
+function isCurrent(state: AppState, slice: { readonly request: RequestIdentity | null }, request: RequestIdentity): boolean {
+  return requestMatchesSession(state, request) && sameRequest(slice.request, request);
+}
+
+function withAnalysis<K extends AnalysisName>(
+  state: AppState,
+  name: K,
+  slice: AnalysisState[K],
+): AppState {
+  return { ...state, analysis: { ...state.analysis, [name]: slice } };
+}
+
 /**
  * The operator's rail is stage chrome that must never survive a mode
  * change: whenever an action moves the view into or out of "present" (by
@@ -103,6 +120,8 @@ function reduceAction(state: AppState, action: Action): AppState {
           kindMeta: {},
         },
         search: initialSearchState(),
+        routing: initialRoutingState(),
+        analysis: initialAnalysisState(),
         theme: { resolved: null, report: null },
       };
     case "groupLoadSucceeded":
@@ -137,6 +156,8 @@ function reduceAction(state: AppState, action: Action): AppState {
         // Hits computed against the previous projection are stale viewer-scoped
         // data; the query survives so the viewer can re-run it.
         search: { ...initialSearchState(), query: state.search.query },
+        routing: initialRoutingState(state.routing.query),
+        analysis: initialAnalysisState(),
       };
     case "themeDerived":
       return {
@@ -297,6 +318,54 @@ function reduceAction(state: AppState, action: Action): AppState {
       };
     case "searchCleared":
       return { ...state, search: initialSearchState() };
+    case "routeRequested":
+      return {
+        ...state,
+        routing: { ...state.routing, query: action.query, status: "pending", error: null, request: action.request },
+      };
+    case "routeSucceeded":
+    case "routeFailed":
+      if (action.query !== state.routing.query || !isCurrent(state, state.routing, action.request)) {
+        return state;
+      }
+      return {
+        ...state,
+        routing:
+          action.kind === "routeSucceeded"
+            ? { ...state.routing, status: "ready", result: action.candidates, error: null, request: null }
+            : { ...state.routing, status: "error", result: null, error: action.error, request: null },
+      };
+    case "routeCleared":
+      return { ...state, routing: initialRoutingState() };
+    case "analysisRequested":
+      return withAnalysis(state, action.analysis, {
+        ...state.analysis[action.analysis],
+        status: "pending",
+        error: null,
+        request: action.request,
+      });
+    case "analysisSucceeded":
+      if (!isCurrent(state, state.analysis[action.analysis], action.request)) {
+        return state;
+      }
+      // The action type pairs `analysis` with its own result type; the
+      // spread below cannot carry that correlation, hence the cast.
+      return withAnalysis(state, action.analysis, {
+        status: "ready",
+        result: action.result,
+        error: null,
+        request: null,
+      } as AnalysisState[typeof action.analysis]);
+    case "analysisFailed":
+      if (!isCurrent(state, state.analysis[action.analysis], action.request)) {
+        return state;
+      }
+      return withAnalysis(state, action.analysis, {
+        status: "error",
+        result: null,
+        error: action.error,
+        request: null,
+      });
     case "errorSurfaced":
       return {
         ...state,

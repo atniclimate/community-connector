@@ -11,6 +11,29 @@ import type { WasmClient } from "../wasm/client";
 import { deriveTheme } from "../theme/derive";
 import type { GroupTemplateDto, GroupTemplateKindDto } from "../theme/tokens";
 import { parseSearchHits } from "./search";
+import type { Action } from "./actions";
+import type { AnalysisName, PathDto } from "./state";
+import {
+  candidatesFromHits,
+  parseContinuance,
+  parseIntroductions,
+  parseMirror,
+  parseNeighborhood,
+  parsePath,
+  type Parsed,
+} from "./analysis";
+import { selectSelfEntityId } from "./selectors";
+
+/** Longest "who can help" chain from the viewer's own entity. */
+export const ROUTE_MAX_HOPS = 4;
+/** Rings of the viewer's neighborhood for the ring layout. */
+export const NEIGHBORHOOD_HOPS = 3;
+const ROUTE_CONSTRAINTS = {
+  allowed_edge_kinds: null,
+  max_hops: ROUTE_MAX_HOPS,
+  weighted: false,
+  respect_direction: false,
+};
 
 /** Attribute-hit cap sent with every search query (existing cn-api contract). */
 export const SEARCH_RESULT_LIMIT = 25;
@@ -163,4 +186,138 @@ export async function openDetail(
       error: client.toErrorEnvelope(error),
     });
   }
+}
+
+/**
+ * "Who can help": runs the existing core search, then a shortest path from
+ * the viewer's own entity to each candidate (unweighted, direction ignored,
+ * at most ROUTE_MAX_HOPS). With no own entity in the projection every
+ * candidate carries a null path. Stale responses are dropped by the reducer.
+ */
+export async function runRouting(store: Store, client: WasmClient, query: string): Promise<void> {
+  const state = store.getState();
+  const request = requestIdentity(state);
+  if (request === null) {
+    return;
+  }
+  const trimmed = query.trim();
+  if (trimmed === "") {
+    store.dispatch({ kind: "routeCleared" });
+    return;
+  }
+  const self = selectSelfEntityId(state);
+  store.dispatch({ kind: "routeRequested", query: trimmed, request });
+  const pathTo = async (to: string): Promise<PathDto | null> => {
+    if (self === null) {
+      return null;
+    }
+    const raw = await client.queryPaths(request.groupId, request.viewer, {
+      from: self,
+      to,
+      constraints: ROUTE_CONSTRAINTS,
+    });
+    const parsed = parsePath(raw);
+    if ("error" in parsed) {
+      throw parsed.error;
+    }
+    return parsed.value;
+  };
+  try {
+    const hits = parseSearchHits(
+      await client.search(request.groupId, request.viewer, { text: trimmed, limit: SEARCH_RESULT_LIMIT }),
+    );
+    if ("error" in hits) {
+      store.dispatch({ kind: "routeFailed", query: trimmed, request, error: hits.error });
+      return;
+    }
+    const candidates = await Promise.all(
+      candidatesFromHits(hits.hits, self).map(async (found) => ({ ...found, path: await pathTo(found.entity) })),
+    );
+    store.dispatch({ kind: "routeSucceeded", query: trimmed, request, candidates });
+  } catch (error) {
+    store.dispatch({ kind: "routeFailed", query: trimmed, request, error: client.toErrorEnvelope(error) });
+  }
+}
+
+async function runAnalysis<T>(
+  store: Store,
+  client: WasmClient,
+  analysis: AnalysisName,
+  call: (request: RequestIdentity) => Promise<unknown>,
+  parse: (value: unknown) => Parsed<T>,
+  succeeded: (result: T, request: RequestIdentity) => Action,
+): Promise<void> {
+  const request = requestIdentity(store.getState());
+  if (request === null) {
+    return;
+  }
+  store.dispatch({ kind: "analysisRequested", analysis, request });
+  try {
+    const parsed = parse(await call(request));
+    store.dispatch(
+      "error" in parsed
+        ? { kind: "analysisFailed", analysis, request, error: parsed.error }
+        : succeeded(parsed.value, request),
+    );
+  } catch (error) {
+    store.dispatch({ kind: "analysisFailed", analysis, request, error: client.toErrorEnvelope(error) });
+  }
+}
+
+/** The viewer's neighborhood rings for the ring layout. No own entity in
+ * the projection means nothing to center on, so nothing is requested. */
+export async function loadNeighborhood(store: Store, client: WasmClient): Promise<void> {
+  const center = selectSelfEntityId(store.getState());
+  if (center === null) {
+    return;
+  }
+  await runAnalysis(
+    store,
+    client,
+    "neighborhood",
+    (r) => client.queryNeighborhood(r.groupId, r.viewer, { center, hops: NEIGHBORHOOD_HOPS }),
+    parseNeighborhood,
+    (result, request) => ({ kind: "analysisSucceeded", analysis: "neighborhood", result, request }),
+  );
+}
+
+/** Articulation points and bridge ties, scoped by the core to the viewer. */
+export async function loadContinuance(store: Store, client: WasmClient): Promise<void> {
+  await runAnalysis(
+    store,
+    client,
+    "continuance",
+    (r) => client.graphContinuance(r.groupId, r.viewer, {}),
+    parseContinuance,
+    (result, request) => ({ kind: "analysisSucceeded", analysis: "continuance", result, request }),
+  );
+}
+
+/** Introduction suggestions centered on the viewer's own entity; nothing is
+ * requested without one (the core would answer not_found anyway). */
+export async function loadIntroductions(store: Store, client: WasmClient): Promise<void> {
+  const center = selectSelfEntityId(store.getState());
+  if (center === null) {
+    return;
+  }
+  await runAnalysis(
+    store,
+    client,
+    "introductions",
+    (r) => client.suggestIntroductions(r.groupId, r.viewer, { center }),
+    parseIntroductions,
+    (result, request) => ({ kind: "analysisSucceeded", analysis: "introductions", result, request }),
+  );
+}
+
+/** What each audience receives of the viewer's own records. */
+export async function loadMirror(store: Store, client: WasmClient): Promise<void> {
+  await runAnalysis(
+    store,
+    client,
+    "mirror",
+    (r) => client.recordMirror(r.groupId, r.viewer),
+    parseMirror,
+    (result, request) => ({ kind: "analysisSucceeded", analysis: "mirror", result, request }),
+  );
 }
