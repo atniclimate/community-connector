@@ -2,12 +2,14 @@
 //! write authorization.
 
 pub mod authz;
+pub mod mirror;
 pub mod projection;
 pub mod reports;
 pub mod rules;
 pub mod viewer;
 
 pub use authz::PermAuthorizer;
+pub use mirror::{Audience, EntityMirror, RecordMirror, VisibilityMirror, record_mirror};
 pub use projection::{
     DetailAttribute, DetailProvenance, EntityDetailMetadata, ProjectedEdge, ProjectedEntity,
     ProjectedStory, ProjectedStoryStep, Projection, entity_detail_metadata, export_projection,
