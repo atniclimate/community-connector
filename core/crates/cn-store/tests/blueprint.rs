@@ -467,6 +467,26 @@ fn validation_quarantine_and_wrong_group() {
 }
 
 #[test]
+fn edge_with_foreign_group_id_is_quarantined_wrong_group() {
+    let mut foreign = edge(1, 1, 2);
+    foreign.group_id = id(999);
+    let ops = vec![
+        group_create(0),
+        op(1, OpKind::EntityCreate { entity: entity(1) }),
+        op(2, OpKind::EntityCreate { entity: entity(2) }),
+        op(3, OpKind::EdgeCreate { edge: foreign }),
+    ];
+    let (state, report) = fold(ops);
+    assert!(state.edges.is_empty());
+    assert_eq!(report.quarantined.len(), 1);
+    assert_eq!(report.quarantined[0].reason, QuarantineReason::WrongGroup);
+    assert_eq!(
+        report.quarantined[0].subject,
+        Some(SubjectRef::Edge(edge_id(1)))
+    );
+}
+
+#[test]
 fn trust_revoke_and_custody_rules() {
     let grant = TrustGrant::new(
         id(600),

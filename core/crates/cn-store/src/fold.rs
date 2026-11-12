@@ -423,6 +423,13 @@ impl GroupState {
                 Vec::new(),
             );
         }
+        if !self.valid_group(edge.group_id) {
+            return ApplyResult::Quarantined(
+                QuarantineReason::WrongGroup,
+                Some(SubjectRef::Edge(edge.id)),
+                Vec::new(),
+            );
+        }
         if !self.entities.contains_key(&edge.from) || !self.entities.contains_key(&edge.to) {
             return ApplyResult::Quarantined(
                 QuarantineReason::MissingTarget,
