@@ -2831,3 +2831,114 @@ human's):
    the system entirely": a commitment that needs an owned, recorded purge (relay queue,
    staging folder, applied group ops, exports; the D-059.11 sweep is the hook). Added to
    the human's queue in HANDOFF.md.
+
+## D-107 (2026-11-11) - Relatives across graphs: an exploration session, the first person-centered slice, ADR-007 and ADR-008 proposed
+
+Trigger: the owner opened a session with a charge to take a deep look at the tool, name
+its primary goals, treat the convention goals (remote capture, intake) as important but
+not the core, and explore a system of networks of practice, organizations, institutions,
+Tribes, and affinities in which each person is the center of their own view, each entity
+shares as little or as much as it chooses, and consenting entities serve as interlinkages
+between graphs, so that connections are made as relatives. The owner relaxed the
+sovereignty guards for the exploration only. That relaxation changed what was explored,
+not what was built or committed: no real data entered anything, every fixture is
+synthetic, no human gate was crossed, nothing was pushed, and both network-shaped
+decisions stay Proposed. The vision, evidence, and sequence are in
+`docs/planning/RELATIVES-ACROSS-GRAPHS-2026-11-11.md`; the evidence register is
+`docs/research/relatives-discovery-2026-11-11.md` (`f07e1bc`, 40 load-bearing claims
+Jev-checked, 36 supported, 4 weak and corrected).
+
+Choice (what was decided and built; commits `f07e1bc..130e20d`, then the docs commits of
+this close):
+1. **Primary goal named.** The destination is a web of relatives that can find each other
+   across institutions, held in Tribe-held, event-sourced records; the convention work is
+   the on-ramp. TSDF T1 ("relationships are mutual and ongoing, not transactional") is the
+   definition of that destination, and the code has never activated it.
+2. **Defects fixed first.** Edges whose group id is not the group's are quarantined
+   `WrongGroup` (`49a51cb`); edge submits no longer reveal whether a hidden entity exists
+   (`23aacec`); the permission spec's visibility rule matches the code (`3ce9823`);
+   weighted paths honor `max_hops` without dropping valid routes (`f68b38e`), after a pure
+   I5 split of `query.rs` into index, measures, and query modules (`0436d19`).
+3. **A first person-centered slice on synthetic data.** The relatives-demo fixture, where
+   every person is a member and owns their record (`9777031`); the record mirror, what
+   each audience receives of a person's own record (`c75f904`); an analysis scope in
+   cn-perm, all results for governance and own records for everyone else (`f0e76a6`);
+   hidden-entity invariance tests for every graph measure and query (`4aa654a`);
+   continuance measures, articulation points and bridge ties (`5be76c8`); introduction
+   suggestions through mutual relatives, an introducer named only when willing
+   (`0048e77`); all three through cn-api, cn-wasm, and the worker client (`7c45afa`); the
+   app state machine (`8efb181`); the Relatives panel (`8f8e203`); and the "My relatives"
+   ring layout (`130e20d`). Routing (R6) is now reachable from the app for the first time.
+4. **The TSDF consent link.** "Tiered Sovereign Data Framework" is a link on both consent
+   paths (`ef3ee77` form, `6db3c24` in-app). The paragraph is split at render time, so the
+   digested consent text and the D8 manifest digest are unchanged.
+5. **Two network-shaped ADRs proposed, not accepted** (below).
+
+**The EdgeCreate authorization rule changed** (`23aacec`). Before, a member's edge to a
+hidden target was Applied (revision 1) while an edge to an absent target was Quarantined
+(revision 0), so any member could test whether a hidden id exists. The fix is in cn-perm
+authorization, not in cn-api's outcome redaction: redacting the outcome cannot hide an
+edge that was really applied, because the revision bump and the stored edge still give it
+away, and I2 keeps the decision in cn-perm. Non-governance submitters now get `Denied`
+with `target_missing` for any endpoint outside their projection. Because the rule reuses
+the projection rule, members and facilitators can no longer link to archived or retracted
+entities, even ones they could see before. Governance keeps the old quarantine behavior.
+Any flow that links to such entities, the `s-e2-intake-edges` branch included, must be
+checked against this at integration. The analogous StoryCreate oracle (story steps naming
+a hidden entity quarantine `MissingTarget`) is recorded and not fixed.
+
+**Process.** The core units were built in two worktrees on branches `relatives/perm` and
+`relatives/graph`, each verified by an independent claim-verifier, then cherry-picked onto
+main without conflicts (`git cherry` shows all ten as already on main). Worktree commits
+ran the owner's current PII-only pre-commit hook (the uncommitted version in the main
+checkout) through `git -c core.hooksPath=...`; the owner's dirty files were never
+staged or committed. Integration: `pwsh
+scripts/check-all.ps1` at `130e20d`, 12 of 12 members passed; form suite 81 of 81 and
+relay suite 47 of 47 outside check-all. That run used the owner's uncommitted
+`scripts/check-all.ps1`, `scripts/pii-scan.ps1`, and hook scripts. No browser, real-GPU,
+or real-device check was done; the I9 walkthrough of the panel and ring layout is owed.
+UI copy is draft developer language pending D-051 and D-023 review.
+
+**Correction note on D-106.** D-106 describes the framework link as built ("The framework
+link is a navigation anchor"). It was not built on 2026-09-14; HANDOFF listed it as NOT
+done item 0. It is built now, in `ef3ee77` (form) and `6db3c24` (in-app), with the
+attributes D-106 names. D-106 stays as written.
+
+**ADR-007** (`118f1be`, Proposed): the Network circle and bridging between graphs. Phase A
+(director work once the human accepts the ADR as a whole): agreements naming outside
+persons, admitted per (agreement, use) up to T2 as if at Group, never T3, with an injected
+time and declared use, (kind, attr) scopes, bridge consent, and no crossing for unowned
+person records, intake records, or relation-bearing attributes; receipts deferred to their
+own slice (D9). Phase B (Network means members of compact parties) and Phase C (identity,
+verified logs, transport) are human gates. Lands at model 0.1.3, after ADR-008. Open
+questions (one line each, in the ADR): reciprocity default for compacts; who ratifies (two
+governance members or k-of-n); persons only or grantee groups in Phase A; default maximum
+duration; the TSDF T2 mapping and reviewed T2 wording (a Phase A precondition); whether
+facilitators count as governance for agreements; dropping in-scope T1 after Phase B;
+waiving grantee acceptance; Network visibility as the person key; governance audit of
+consent (with ATNI Climate, paired with ADR-008 question 1); who attests network
+membership; the small-cell threshold for analysis outputs; co-produced data.
+
+**ADR-008** (`b151878`, Proposed): two-sided relations. `EdgeAcknowledge` is an endpoint
+owner's answer and only theirs; a tie is Confirmed only when both owned ends accept; a
+refusal is final and private, and to everyone but the refuser it looks exactly like an
+unanswered ask; edges created before activation are grandfathered at Group in synthetic
+groups only; a template `subject` field marks person kinds. Activation version 0.1.2. Open
+questions: whether governance sees refusals (never, counts only as the interim default, or
+in full with a reason); the default quiet period; whether an organization endpoint needs
+its governance's acknowledgment; whether an asker may withdraw a pending request.
+
+Both ADRs were reviewed through three adversarial lenses (permission soundness; TSDF
+fidelity, sovereignty, and harm; fit to the codebase), each with verdict "revise before
+acceptance", plus a Jev check of their TSDF and research citations. Every blocking finding
+is applied in the committed text; two advisory sub-parts are declined with reasons; each
+ADR ends with its review log. The fit lens recommends ADR-008 first.
+
+Strongest surviving objection: the person-centered features reach only fixtures where
+people are members and own their records. A remote respondent approved through the
+ADR-005 path lands unowned (ADR-005 D7), so the mirror, "what rests on you",
+introductions, and the ring layout show them nothing, and ADR-008's acknowledgment cannot
+be answered by them. Until an owner claim and a key-bound viewer exist (D-015 still lets
+any caller assert a viewer), this slice demonstrates the shape of personal mode on
+synthetic data and does not yet serve any real person. That is why ADR-008, the owner
+claim, and the key-bound viewer are sequenced before ADR-007 Phase A.
