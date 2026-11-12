@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { JsonObject } from "../../state/state";
-import { consentText, consentTextDigest } from "./consent";
+import { CONSENT_PARAGRAPHS, TSDF_LINK, consentText, consentTextDigest, splitOnTsdfLink } from "./consent";
 import {
   SUBMISSION_VERSION,
   TAGS_MAX_ITEMS,
@@ -178,5 +178,35 @@ describe("consent boilerplate (v3, the human's wording verbatim - D-106)", () =>
     const digest = await consentTextDigest();
     expect(digest).toMatch(/^[0-9a-f]{64}$/);
     expect(digest).toBe(await consentTextDigest());
+  });
+
+  it("has a stable golden digest (the TSDF link did not change the recorded text)", async () => {
+    // v3 in-app digest captured before the TSDF link landed (2026-11-11).
+    expect(await consentTextDigest()).toBe(
+      "1f3183c0da3304429827274a2a75d471c737b4212a0d135c94c63316e319bcbc",
+    );
+    expect(consentText()).not.toMatch(/<a|href|https:/);
+  });
+
+  it("links the Tiered Sovereign Data Framework in a new tab with noopener noreferrer", () => {
+    expect(TSDF_LINK).toEqual({
+      text: "Tiered Sovereign Data Framework",
+      href: "https://atniclimate.github.io/TieredSovereignDataFramework/#overview",
+      target: "_blank",
+      rel: "noopener noreferrer",
+    });
+    const split = CONSENT_PARAGRAPHS.map(([lead, body]) => [lead, splitOnTsdfLink(body)] as const).filter(
+      ([, parts]) => parts !== null,
+    );
+    expect(split).toEqual([
+      [
+        "How your information is held:",
+        [
+          "Everything entered here is designated Tier 1 of the ",
+          "Tiered Sovereign Data Framework",
+          "; shared within the network and governed by the community it belongs to.",
+        ],
+      ],
+    ]);
   });
 });

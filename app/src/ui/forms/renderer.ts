@@ -20,7 +20,9 @@ import {
   CONSENT_HEADING,
   CONSENT_PARAGRAPHS,
   FORM_VERSION,
+  TSDF_LINK,
   consentTextDigest,
+  splitOnTsdfLink,
 } from "./consent";
 import type { FormAttr, FormKind, RawFieldValue } from "./model";
 import { advisoryIssues, buildPayload, canSubmit, formModel } from "./model";
@@ -42,6 +44,16 @@ type FieldControl = {
   readonly errorElement: HTMLElement;
   readonly input: HTMLElement;
 };
+
+/** A consent paragraph body as DOM children, with the TSDF phrase as a new-tab link. */
+function consentBody(body: string): (HTMLElement | string)[] {
+  const parts = splitOnTsdfLink(body);
+  if (parts === null) {
+    return [body];
+  }
+  const { text, href, target, rel } = TSDF_LINK;
+  return [parts[0], el("a", { text, attrs: { href, target, rel } }), parts[2]];
+}
 
 export function mountEntryForm(container: HTMLElement, deps: EntryFormDeps): () => void {
   const model = formModel(deps.template);
@@ -72,8 +84,8 @@ export function mountEntryForm(container: HTMLElement, deps: EntryFormDeps): () 
     el("p", { className: "cn-entry-form-draft-banner", text: CONSENT_DRAFT_BANNER }),
     ...CONSENT_PARAGRAPHS.map(([lead, body]) =>
       lead !== null
-        ? el("p", {}, [el("strong", { text: `${lead} ` }), body])
-        : el("p", { text: body }),
+        ? el("p", {}, [el("strong", { text: `${lead} ` }), ...consentBody(body)])
+        : el("p", {}, consentBody(body)),
     ),
     el("div", { className: "cn-entry-form-affirm" }, [
       consentCheckbox,

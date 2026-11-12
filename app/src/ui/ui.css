@@ -391,6 +391,17 @@
   padding: 0.75rem;
 }
 
+/* Consent links: Red on Dark (#F26B5E, the design system's link color on dark
+   grounds) with the app's focus ring. */
+.cn-entry-form-consent a {
+  color: #f26b5e;
+}
+
+.cn-entry-form-consent a:focus-visible {
+  outline: 2px solid var(--cn-accent-focusRing, #ffd38a);
+  outline-offset: 2px;
+}
+
 .cn-entry-form-draft-banner {
   font-weight: 600;
   color: var(--cn-accent-focusRing, #ffd38a);
