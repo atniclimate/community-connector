@@ -26,4 +26,6 @@ history is also in git.
 - `2026-09-12-evening-trueup.md` - the handoff as incrementally updated through the
   2026-09-12 evening (next-phase plan, D-099..D-102, push, design-system digest),
   superseded by the 2026-09-13 true-up, which folded those updates into state of play.
-  The live root `HANDOFF.md` continues from here.
+- `2026-09-14-convention-sprint.md` - the handoff at the end of the convention sprint
+  (A9 constellation, QR form, D-103..D-106), superseded by the 2026-11-11 relatives
+  session close (D-107). The live root `HANDOFF.md` continues from here.
