@@ -5,9 +5,43 @@ import {
   CONSENT_DRAFT_BANNER,
   CONSENT_HEADING,
   CONSENT_PARAGRAPHS,
+  TSDF_LINK,
   consentText,
   consentTextDigest,
+  splitOnTsdfLink,
 } from "./consent";
+
+describe("Tiered Sovereign Data Framework link (HANDOFF item 0)", () => {
+  it("is a new-tab link to the framework overview with noopener noreferrer", () => {
+    expect(TSDF_LINK).toEqual({
+      text: "Tiered Sovereign Data Framework",
+      href: "https://atniclimate.github.io/TieredSovereignDataFramework/#overview",
+      target: "_blank",
+      rel: "noopener noreferrer",
+    });
+  });
+
+  it("splits only the 'How your information is held:' body, losslessly", () => {
+    const split = CONSENT_PARAGRAPHS.map(([lead, body]) => [lead, splitOnTsdfLink(body)] as const).filter(
+      ([, parts]) => parts !== null,
+    );
+    expect(split).toEqual([
+      [
+        "How your information is held:",
+        [
+          "Everything entered here is designated Tier 1 of the ",
+          "Tiered Sovereign Data Framework",
+          "; shared within the network and governed by the community it belongs to.",
+        ],
+      ],
+    ]);
+  });
+
+  it("leaves the digested consent text as the plain words (golden digest below unchanged)", () => {
+    expect(consentText()).toContain("Tier 1 of the Tiered Sovereign Data Framework; shared");
+    expect(consentText()).not.toMatch(/<a|href|https:/);
+  });
+});
 
 describe("consent text (v3, the human's wording verbatim - D-106)", () => {
   it("is deterministic", async () => {

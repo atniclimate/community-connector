@@ -89,6 +89,28 @@ export const CONSENT_PARAGRAPHS: readonly (readonly [string | null, string])[] =
   ],
 ];
 
+/**
+ * The "Tiered Sovereign Data Framework" phrase renders as a link to the
+ * framework (HANDOFF item 0, the human's request 2026-09-14). The words stay
+ * in the paragraph body unchanged, so `consentText()` and its digest do not
+ * move; the renderer splits the body around the phrase with `splitOnTsdfLink`.
+ */
+export const TSDF_LINK = {
+  text: "Tiered Sovereign Data Framework",
+  href: "https://atniclimate.github.io/TieredSovereignDataFramework/#overview",
+  target: "_blank",
+  rel: "noopener noreferrer",
+} as const;
+
+/** `[before, phrase, after]` around the first TSDF phrase in `body`, or null when absent. */
+export function splitOnTsdfLink(body: string): readonly [string, string, string] | null {
+  const at = body.indexOf(TSDF_LINK.text);
+  if (at < 0) {
+    return null;
+  }
+  return [body.slice(0, at), TSDF_LINK.text, body.slice(at + TSDF_LINK.text.length)];
+}
+
 /** The affirmation the checkbox asserts (the D-030 consent instrument), the human's exact wording. */
 export const CONSENT_AFFIRMATION =
   "I understand and consent to my information being used for this demonstration.";

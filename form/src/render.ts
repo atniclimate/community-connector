@@ -26,7 +26,9 @@ import {
   CONSENT_DRAFT_BANNER,
   CONSENT_HEADING,
   CONSENT_PARAGRAPHS,
+  TSDF_LINK,
   consentTextDigest,
+  splitOnTsdfLink,
 } from "./consent";
 import { buildInnerPayload, buildOuterEnvelope, type OuterEnvelope } from "./envelope";
 import {
@@ -130,6 +132,16 @@ function withPlaceholder(
   return placeholder.length > 0 ? { ...attrs, placeholder } : attrs;
 }
 
+/** A consent paragraph body as DOM children, with the TSDF phrase as a new-tab link. */
+function consentBody(body: string): (HTMLElement | string)[] {
+  const parts = splitOnTsdfLink(body);
+  if (parts === null) {
+    return [body];
+  }
+  const { text, href, target, rel } = TSDF_LINK;
+  return [parts[0], el("a", { text, attrs: { href, target, rel } }), parts[2]];
+}
+
 function draftTag(): HTMLElement {
   return el("p", {
     className: "cn-form-draft-banner",
@@ -199,8 +211,8 @@ export function mountForm(container: HTMLElement, deps: FormDeps): void {
       { className: "cn-form-consent-text" },
       CONSENT_PARAGRAPHS.map(([lead, body]) =>
         lead !== null
-          ? el("p", {}, [el("strong", { text: `${lead} ` }), body])
-          : el("p", { text: body }),
+          ? el("p", {}, [el("strong", { text: `${lead} ` }), ...consentBody(body)])
+          : el("p", {}, consentBody(body)),
       ),
     ),
     el("div", { className: "cn-form-affirm" }, [
