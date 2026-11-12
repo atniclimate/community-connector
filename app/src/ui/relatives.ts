@@ -12,8 +12,9 @@ import type {
   VisibilityMirrorDto,
 } from "../state/state";
 import type { WasmClient } from "../wasm/client";
-import { loadContinuance, loadIntroductions, loadMirror, ROUTE_MAX_HOPS, runRouting } from "../state/effects";
+import { loadContinuance, loadIntroductions, loadMirror, loadNeighborhood, ROUTE_MAX_HOPS, runRouting } from "../state/effects";
 import {
+  selectEgoNeighborhood,
   selectMirrorView,
   selectProjectedEntities,
   selectRoutingResults,
@@ -222,7 +223,58 @@ export function routingStatusText(state: AppState): string {
   return status === "ready" ? countText(result?.length ?? 0, "relative can help", "relatives can help") : "";
 }
 
+export const LAYOUT_NO_RECORD = "My relatives needs a record of your own in this group.";
+export const LAYOUT_WAITING = "My relatives is waiting for your relatives to load.";
+
+export type LayoutToggleView = {
+  /** True when the ring layout can be shown. */
+  readonly available: boolean;
+  /** True when the ring layout is the one on screen. */
+  readonly mine: boolean;
+  /** Why My relatives is disabled, or "" when it is available. */
+  readonly note: string;
+};
+
+export function layoutToggleView(state: AppState): LayoutToggleView {
+  const available = selectEgoNeighborhood(state) !== null;
+  const note = available
+    ? ""
+    : selectSelfEntityId(state) === null
+      ? LAYOUT_NO_RECORD
+      : sliceNotice(state.analysis.neighborhood, "your relatives") ?? LAYOUT_WAITING;
+  return { available, mine: available && state.ui.layoutMode === "mine", note };
+}
+
 // ---- DOM wiring (thin) ----
+
+/** Whole network / My relatives switch; updated in place so focus survives renders (I9). */
+function layoutToggle(store: Store): { readonly element: HTMLElement; readonly update: (view: LayoutToggleView) => void } {
+  const noteId = uiId("cn-relatives-layout-note");
+  const button = (text: string, mode: "whole" | "mine"): HTMLButtonElement => {
+    const b = el("button", { className: "cn-relatives-submit", text, attrs: { type: "button", "aria-pressed": "false" } });
+    b.addEventListener("click", () => store.dispatch({ kind: "layoutModeChanged", mode }));
+    return b;
+  };
+  const whole = button("Whole network", "whole");
+  const mine = button("My relatives", "mine");
+  const note = el("p", { className: "cn-relatives-line", attrs: { id: noteId } });
+  const element = el("div", { className: "cn-relatives-form", attrs: { role: "group", "aria-label": "Graph layout" } }, [whole, mine, note]);
+  return {
+    element,
+    update: (view) => {
+      whole.setAttribute("aria-pressed", String(!view.mine));
+      mine.setAttribute("aria-pressed", String(view.mine));
+      mine.disabled = !view.available;
+      note.textContent = view.note;
+      note.hidden = view.note === "";
+      if (view.note === "") {
+        mine.removeAttribute("aria-describedby");
+      } else {
+        mine.setAttribute("aria-describedby", noteId);
+      }
+    },
+  };
+}
 
 export type RelativesDeps = {
   readonly store: Store;
@@ -327,6 +379,7 @@ const LOADERS = [
   ["continuance", loadContinuance],
   ["introductions", loadIntroductions],
   ["mirror", loadMirror],
+  ["neighborhood", loadNeighborhood],
 ] as const;
 
 export function mountRelatives(container: HTMLElement, deps: RelativesDeps): () => void {
@@ -344,9 +397,11 @@ export function mountRelatives(container: HTMLElement, deps: RelativesDeps): () 
   const body = el("div", {}, [region("Who can help with...", [form, helpers]), rest]);
   const none = el("p", { className: "cn-relatives-line", text: NO_OWN_RECORD });
   const live = el("div", { className: "cn-ui-visually-hidden", attrs: { role: "status", "aria-live": "polite" } });
+  const toggle = layoutToggle(store);
   container.replaceChildren(
     el("section", { className: "cn-relatives", attrs: { "aria-labelledby": headingId } }, [
       el("h2", { className: "cn-flat-title", text: "Your relatives", attrs: { id: headingId } }),
+      toggle.element,
       none,
       body,
       live,
@@ -373,11 +428,12 @@ export function mountRelatives(container: HTMLElement, deps: RelativesDeps): () 
     const { routing } = state;
     // routing.chosen is left out: choosing a result must not rebuild the list
     // and drop keyboard focus from the button just pressed (I9).
-    const keys = [state.data.projection, state.data.kindMeta, routing.status, routing.result, routing.error, state.analysis];
+    const keys = [state.data.projection, state.data.kindMeta, routing.status, routing.result, routing.error, state.analysis, state.ui.layoutMode];
     if (keys.every((key, index) => key === rendered[index])) {
       return;
     }
     rendered = keys;
+    toggle.update(layoutToggleView(state));
     const ctx = relativesContext(state);
     none.hidden = ctx.selfId !== null || state.data.projection === null;
     body.hidden = ctx.selfId === null;

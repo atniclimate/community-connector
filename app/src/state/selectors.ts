@@ -2,6 +2,7 @@ import type {
   AppState,
   EntityDetailDto,
   ErrorEnvelopeDto,
+  NeighborhoodDto,
   PathDto,
   ProjectionEntityDto,
   RouteCandidateDto,
@@ -17,6 +18,13 @@ import type {
  */
 export function selectSelfEntityId(state: AppState): string | null {
   return selectProjectedEntities(state).find((entity) => entity.owner_is_viewer === true)?.id ?? null;
+}
+
+/** The viewer's loaded neighborhood, centered on their own entity, or null. */
+export function selectEgoNeighborhood(state: AppState): NeighborhoodDto | null {
+  const { status, result } = state.analysis.neighborhood;
+  const self = selectSelfEntityId(state);
+  return status === "ready" && result !== null && self !== null && result.center === self ? result : null;
 }
 
 export type RoutingCandidateView = RouteCandidateDto & { readonly resting: boolean };

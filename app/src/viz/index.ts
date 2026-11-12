@@ -6,7 +6,8 @@ import { RENDER_TOKENS } from "./config";
 import { buildEdgeLayer, setEdgeFocusBlend, writeFocusTargetColors, type EdgeLayer } from "./edges";
 import { buildHaloLayer, setHaloFocusDim, type HaloLayer } from "./halos";
 import { buildLabelLayer, type LabelLayer } from "./labels";
-import { computeLayout, type LayoutResult } from "./layout";
+import type { LayoutResult } from "./layout";
+import { layoutFor, layoutSource, type LayoutSource } from "./layout-mode";
 import { buildNodeLayer, degreesForProjection, type NodeLayer } from "./nodes";
 import { PickingController } from "./picking";
 import { HoverOverlay } from "./hover";
@@ -56,6 +57,7 @@ type RenderState = {
   cameraRig: CameraRig;
   renderer: WebGLRenderer;
   layout: LayoutResult | null;
+  layoutSource: LayoutSource;
   nodes: NodeLayer | null;
   edges: EdgeLayer | null;
   halos: HaloLayer | null;
@@ -121,6 +123,7 @@ export function mountViz(container: HTMLElement, store: Store, client: WasmClien
     cameraRig,
     renderer,
     layout: null,
+    layoutSource: null,
     nodes: null,
     edges: null,
     halos: null,
@@ -215,13 +218,15 @@ function handleState(
 function rebuildIfNeeded(renderState: RenderState, state: AppState, onNeedsRender: () => void): boolean {
   const projection = state.data.projection;
   const themeKey = JSON.stringify(state.theme.resolved?.tokens ?? {});
-  if (projection === null || !needsRebuild(renderState, projection, themeKey, state.view.mode)) {
+  const source = layoutSource(state);
+  if (projection === null || !needsRebuild(renderState, projection, themeKey, state.view.mode, source)) {
     return false;
   }
   disposeGraphLayers(renderState);
   const entities = projectedEntities(projection);
   renderState.entities = new Map((projection.entities ?? []).map((entity) => [entity.id, entity]));
-  renderState.layout = computeLayout(entities);
+  renderState.layout = layoutFor(entities, source);
+  renderState.layoutSource = source;
   const degrees = degreesForProjection(projection);
   renderState.degrees = degrees;
   renderState.nodes = buildNodeLayer({
@@ -596,10 +601,12 @@ function needsRebuild(
   projection: ProjectionDto,
   themeKey: string,
   viewMode: ViewMode,
+  source: LayoutSource,
 ): boolean {
   return renderState.projectionRevision !== (projection.revision ?? ZERO)
     || renderState.themeKey !== themeKey
-    || renderState.viewMode !== viewMode;
+    || renderState.viewMode !== viewMode
+    || renderState.layoutSource !== source;
 }
 
 function updateAria(renderState: RenderState, state: AppState): void {

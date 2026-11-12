@@ -5,6 +5,7 @@ import type {
   ErrorEnvelopeDto,
   IntakeRecordSummaryDto,
   KindMeta,
+  LayoutMode,
   PresentBeat,
   ProjectionDto,
   QualityTierName,
@@ -164,6 +165,10 @@ export type Action =
   | {
       readonly kind: "qualityTierChanged";
       readonly tier: QualityTierName;
+    }
+  | {
+      readonly kind: "layoutModeChanged";
+      readonly mode: LayoutMode;
     }
   | {
       readonly kind: "searchRequested";

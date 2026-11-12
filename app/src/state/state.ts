@@ -182,6 +182,8 @@ export type AnalysisState = {
 export type LoadState = "idle" | "loading" | "ready" | "error";
 export type ViewMode = "overview" | "focus" | "story" | "present";
 export type QualityTierName = "A" | "B" | "C" | "D";
+/** Whole-network clusters, or rings of the viewer's relatives around them. */
+export type LayoutMode = "whole" | "mine";
 export type ShapeName = "sphere" | "cube" | "octahedron" | "tetrahedron" | "torus" | "cone";
 
 export type PresentMeasure = "betweenness_top_n" | "single_tie";
@@ -319,6 +321,7 @@ export interface AppState {
     readonly detailEntityId: string | null;
     readonly reducedMotion: boolean;
     readonly qualityTier: QualityTierName;
+    readonly layoutMode: LayoutMode;
   };
   readonly data: {
     readonly projection: ProjectionDto | null;
@@ -401,6 +404,7 @@ export function createInitialState(reducedMotion = false): AppState {
       detailEntityId: null,
       reducedMotion,
       qualityTier: "B",
+      layoutMode: "whole",
     },
     data: {
       projection: null,

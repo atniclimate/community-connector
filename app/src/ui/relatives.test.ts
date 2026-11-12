@@ -4,10 +4,12 @@ import { selectChosenRoutePath } from "../state/selectors";
 import { createInitialState, type AppState, type ContinuanceDto, type IntroductionDto, type ProjectionDto, type RecordMirrorDto } from "../state/state";
 import {
   AUDIENCES,
+  LAYOUT_NO_RECORD,
   UNNAMED_RELATIVE,
   chainText,
   helperViews,
   introductionViews,
+  layoutToggleView,
   mirrorRows,
   relativesContext,
   restingOnYouLines,
@@ -159,5 +161,19 @@ describe("routeResultChosen", () => {
     expect(selectChosenRoutePath(state)).toEqual(path);
     state = reduce(state, { kind: "entityFocused", entityId: "ana" });
     expect(selectChosenRoutePath(state)).toBeNull();
+  });
+});
+
+describe("layoutToggleView", () => {
+  it("disables My relatives without an own record or a loaded neighborhood", () => {
+    expect(layoutToggleView(createInitialState())).toEqual({ available: false, mine: false, note: LAYOUT_NO_RECORD });
+    let state = reduce(loaded(), { kind: "layoutModeChanged", mode: "mine" });
+    expect(layoutToggleView(state)).toMatchObject({ available: false, mine: false });
+    const request = { requestId: 9, sessionId: state.session.sessionId, groupId: "group-alpha", viewer: state.session.viewer };
+    state = reduce(state, { kind: "analysisRequested", analysis: "neighborhood", request });
+    expect(layoutToggleView(state).note).toBe("Loading your relatives.");
+    const result = { center: "self", layers: [["ana"]] };
+    state = reduce(state, { kind: "analysisSucceeded", analysis: "neighborhood", result, request });
+    expect(layoutToggleView(state)).toEqual({ available: true, mine: true, note: "" });
   });
 });

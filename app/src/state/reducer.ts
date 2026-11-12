@@ -274,6 +274,8 @@ function reduceAction(state: AppState, action: Action): AppState {
         ...state,
         ui: { ...state.ui, qualityTier: action.tier },
       };
+    case "layoutModeChanged":
+      return state.ui.layoutMode === action.mode ? state : { ...state, ui: { ...state.ui, layoutMode: action.mode } };
     case "searchRequested":
       return {
         ...state,

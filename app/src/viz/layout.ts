@@ -71,6 +71,58 @@ export function computeLayout(entities: readonly ProjectionEntityDto[]): LayoutR
   return { positions };
 }
 
+const HASH_RING_SUFFIX = ":ring";
+const HALF = 0.5;
+/** Depth jitter as a share of ring spacing, so rings keep some 3D body. */
+const EGO_DEPTH_SHARE = 0.2;
+
+function byId(left: ProjectionEntityDto, right: ProjectionEntityDto): number {
+  return left.id.localeCompare(right.id);
+}
+
+/**
+ * Rings around one entity: the center at the origin, ring k for hop k of the
+ * neighborhood layers, and every entity no layer reached on one outer ring.
+ * Only ids in `entities` are placed, so a hidden entity leaves no gap (A-B4).
+ */
+export function computeEgoLayout(
+  entities: readonly ProjectionEntityDto[],
+  centerId: string,
+  layers: readonly (readonly string[])[],
+): LayoutResult {
+  const ringOf = new Map<string, number>();
+  layers.forEach((layer, index) => {
+    for (const id of layer) {
+      if (!ringOf.has(id)) {
+        ringOf.set(id, index + UNIT);
+      }
+    }
+  });
+  const outer = layers.length + UNIT;
+  const rings = new Map<number, string[]>();
+  const positions = new Map<string, Vector3>();
+  for (const entity of [...entities].sort(byId)) {
+    if (entity.id === centerId) {
+      positions.set(entity.id, new Vector3());
+      continue;
+    }
+    const ring = ringOf.get(entity.id) ?? outer;
+    const members = rings.get(ring) ?? [];
+    members.push(entity.id);
+    rings.set(ring, members);
+  }
+  const spacing = RENDER_TOKENS.layout.radius / outer;
+  for (const [ring, ids] of rings) {
+    const offset = unitFromHash(hashString(`${centerId}:${ring}${HASH_RING_SUFFIX}`)) * Math.PI * DIAMETER;
+    ids.forEach((id, index) => {
+      const theta = offset + index * RENDER_TOKENS.layout.goldenAngle;
+      const depth = (unitFromHash(hashString(`${id}${HASH_Y_SUFFIX}`)) - HALF) * spacing * EGO_DEPTH_SHARE;
+      positions.set(id, new Vector3(Math.cos(theta), Math.sin(theta), 0).multiplyScalar(ring * spacing).setZ(depth));
+    });
+  }
+  return { positions };
+}
+
 export function layoutSnapshot(layout: LayoutResult): Readonly<Record<string, readonly number[]>> {
   return Object.fromEntries(
     [...layout.positions.entries()].map(([id, position]) => [
