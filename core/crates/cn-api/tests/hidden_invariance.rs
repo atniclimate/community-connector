@@ -275,11 +275,22 @@ fn queries_and_measures_ignore_entities_and_edges_hidden_from_the_viewer() {
     assert_measures_match(&plain_idx, &hidden_idx, &ids);
     assert_queries_match(&plain_idx, &hidden_idx, &ids);
     assert_search_matches(&plain, &hidden);
+    for &center in &ids {
+        let req = IntroductionRequest::new(center);
+        assert_eq!(
+            suggest_introductions(&plain, &plain_idx, &req),
+            suggest_introductions(&hidden, &hidden_idx, &req)
+        );
+    }
 
     // A hidden id answers exactly like an id that never existed.
     let never: EntityId = entity_id(99);
     for n in 8..=10 {
         let hidden_id = entity_id(n);
+        assert_eq!(
+            suggest_introductions(&hidden, &hidden_idx, &IntroductionRequest::new(hidden_id)),
+            suggest_introductions(&hidden, &hidden_idx, &IntroductionRequest::new(never))
+        );
         let c = PathConstraints::default();
         assert_eq!(
             shortest_path(&hidden_idx, ids[0], hidden_id, &c),
@@ -308,5 +319,14 @@ fn hidden_fixture_would_change_results_if_it_were_visible() {
     assert_ne!(
         shared_committee_jaccard(&plain, entity_id(1), entity_id(2), &membership),
         shared_committee_jaccard(&owner, entity_id(1), entity_id(2), &membership),
+    );
+    let (plain_p, owner_p) = (
+        projection_for(visible_ops(), person(2)),
+        projection_for(with_hidden_ops(), person(2)),
+    );
+    let req = IntroductionRequest::new(p3);
+    assert_ne!(
+        suggest_introductions(&plain_p, &plain, &req),
+        suggest_introductions(&owner_p, &owner, &req)
     );
 }
