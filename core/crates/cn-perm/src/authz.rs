@@ -1,13 +1,15 @@
 use cn_model::{
-    CustodyEvent, Entity, Membership, MembershipId, PersonId, SensitivityTier, StoryId, TrustGrant,
-    TrustGrantId,
+    CustodyEvent, Edge, Entity, Membership, MembershipId, PersonId, SensitivityTier, StoryId,
+    TrustGrant, TrustGrantId,
 };
 use cn_store::{
     Authorizer, AuthzDenial, CustodyTarget, GroupState, OpKind, Operation, TierTarget,
     VisibilityTarget,
 };
 
-use crate::projection::{edge_visible, entity_visible, story_visible, visible_entity_attributes};
+use crate::projection::{
+    edge_visible, entity_projected, entity_visible, story_visible, visible_entity_attributes,
+};
 use crate::viewer::{
     ViewerContext, has_member_role, is_active_member, is_facilitator_or_governance, is_governance,
 };
@@ -31,7 +33,7 @@ pub fn authorize_op(state: &GroupState, op: &Operation) -> Result<(), AuthzDenia
     match &op.kind {
         OpKind::GroupCreate { .. } => authorize_group_create(state),
         OpKind::EntityCreate { entity } => authorize_entity_create(state, submitter, entity),
-        OpKind::EdgeCreate { edge } => authorize_unowned_create(state, submitter, edge),
+        OpKind::EdgeCreate { edge } => authorize_edge_create(state, submitter, edge),
         OpKind::StoryCreate { story } => authorize_unowned_create(state, submitter, story),
         OpKind::AttributeSet { entity, .. } | OpKind::AttributeRemove { entity, .. } => {
             authorize_entity_mutation(state, submitter, *entity)
@@ -87,6 +89,33 @@ fn authorize_unowned_create<T>(
     _record: &T,
 ) -> Result<(), AuthzDenial> {
     require_member(state, submitter)
+}
+
+/// EdgeCreate: a member may link only entities their projection contains, and
+/// a hidden endpoint is denied exactly like a missing one, so the outcome never
+/// reveals whether a hidden entity exists (ADR-003 A-B4). Governance reaches
+/// any target and still gets the fold's MissingTarget quarantine.
+fn authorize_edge_create(
+    state: &GroupState,
+    submitter: PersonId,
+    edge: &Edge,
+) -> Result<(), AuthzDenial> {
+    require_member(state, submitter)?;
+    if is_governance(state, submitter) {
+        return Ok(());
+    }
+    let viewer = ViewerContext::Person { person: submitter };
+    let projected = |id| {
+        state
+            .entities
+            .get(id)
+            .is_some_and(|entity| entity_projected(state, &viewer, entity))
+    };
+    if projected(&edge.from) && projected(&edge.to) {
+        Ok(())
+    } else {
+        Err(denial("target_missing", "edge endpoint missing"))
+    }
 }
 
 fn authorize_entity_mutation(

@@ -372,6 +372,15 @@ fn edge_create_cells() {
     assert_allowed(&state, 2, person(2), create(31, 2));
     assert_allowed(&state, 3, person(3), create(32, 3));
     assert_allowed(&state, 4, person(1), create(33, 1));
+    // A hidden endpoint (private e3) is denied exactly like an absent one.
+    let to = |n: u128, target: u128, by: u128| OpKind::EdgeCreate {
+        edge: edge_by(n, 1, target, person(by)),
+    };
+    assert_denied(&state, 5, person(2), to(34, 3, 2), "target_missing");
+    assert_denied(&state, 6, person(2), to(35, 99, 2), "target_missing");
+    assert_denied(&state, 7, person(3), to(36, 5, 3), "target_missing");
+    // Governance reaches any target.
+    assert_allowed(&state, 8, person(1), to(37, 3, 1));
 }
 
 #[test]

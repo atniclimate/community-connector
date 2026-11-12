@@ -200,10 +200,15 @@ fn project_entities(state: &GroupState, viewer: &ViewerContext) -> Vec<Projected
     state
         .entities
         .values()
-        .filter(|entity| entity.lifecycle == Lifecycle::Active)
-        .filter(|entity| entity_visible(state, viewer, entity))
+        .filter(|entity| entity_projected(state, viewer, entity))
         .map(|entity| project_entity(state, viewer, entity))
         .collect()
+}
+
+/// True when `project` would include this entity for the viewer: active and
+/// presence-visible.
+pub fn entity_projected(state: &GroupState, viewer: &ViewerContext, entity: &Entity) -> bool {
+    entity.lifecycle == Lifecycle::Active && entity_visible(state, viewer, entity)
 }
 
 /// Projects entity presence when the presence rule passes (spec section 5;

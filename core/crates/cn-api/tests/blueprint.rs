@@ -386,6 +386,55 @@ fn submit_hidden_and_absent_denials_have_identical_outcome_json() {
 }
 
 #[test]
+fn edge_submit_to_hidden_and_absent_endpoints_is_indistinguishable() {
+    let shared = vec![
+        op(
+            group_id(),
+            3,
+            person(1),
+            OpKind::EntityCreate {
+                entity: entity(2, None, Circle::Public),
+            },
+        ),
+        op(
+            group_id(),
+            4,
+            person(2),
+            OpKind::MembershipAdd {
+                membership: membership(1, person(2), GroupRole::Member),
+            },
+        ),
+    ];
+    let mut hidden_ops = vec![op(
+        group_id(),
+        2,
+        person(1),
+        OpKind::EntityCreate {
+            entity: entity(1, Some(person(1)), Circle::Private),
+        },
+    )];
+    hidden_ops.extend(shared.clone());
+    let mut hidden_api = load_api(&hidden_ops);
+    let mut absent_api = load_api(&shared);
+    let guess = op(
+        group_id(),
+        10,
+        person(2),
+        OpKind::EdgeCreate {
+            edge: edge(1, 2, 1),
+        },
+    );
+    let ops_json = serde_json::to_string(&vec![guess]).expect("ops json");
+
+    let hidden =
+        ok(&hidden_api.submit_ops(&group_id().to_string(), &viewer_person(2), &ops_json, 2_000));
+    let absent =
+        ok(&absent_api.submit_ops(&group_id().to_string(), &viewer_person(2), &ops_json, 2_000));
+
+    assert_eq!(hidden, absent);
+}
+
+#[test]
 fn streaming_load_two_chunks_matches_one_chunk_and_commit_rules() {
     let ops = vec![
         op(
